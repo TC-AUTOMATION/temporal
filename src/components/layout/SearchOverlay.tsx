@@ -5,7 +5,7 @@ import { X, Search } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { products } from '@/lib/products';
 import Link from 'next/link';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,7 @@ export default function SearchOverlay() {
   return (
     <Dialog open={isSearchOpen} onOpenChange={setSearchOpen}>
       <DialogContent className="sm:max-w-lg p-0 gap-0">
+        <DialogTitle className="sr-only">Recherche</DialogTitle>
         {/* Search input */}
         <div className="flex items-center border-b border-border p-2">
           <Search size={20} className="ml-2 text-muted-foreground" />

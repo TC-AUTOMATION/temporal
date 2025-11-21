@@ -9,7 +9,7 @@
   --temporal-black: #0a0a0a;
   --temporal-white: #ffffff;
   --temporal-gray: #f5f5f5;
-  --radius: 0.625rem;
+  --radius: 0;
   /* LIGHT THEME - White dominant with purple */
   --background: #ffffff;
   --foreground: #0a0a0a;
@@ -121,7 +121,7 @@
 }
 
 * {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='3' fill='%235B2D8E'/%3E%3C/svg%3E") 12 12, auto;
+  cursor: url("/cursor.png") 12 12, auto;
 }
 
 html {

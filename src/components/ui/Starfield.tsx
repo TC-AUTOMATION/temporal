@@ -84,16 +84,29 @@ export default function Starfield() {
           <svg
             width={star.size}
             height={star.size}
-            viewBox="0 0 24 24"
+            viewBox="0 0 100 100"
+            style={{ transform: `rotate(${star.id * 47 % 360}deg)` }}
           >
+            {/* Étoile style Temporal - branches épaisses asymétriques */}
             <path
-              d="M12 0L14 10L24 12L14 14L12 24L10 14L0 12L10 10L12 0Z"
-              fill={
-                darkMode
-                  ? (star.type === 'small' ? '#fafafa' : '#5B2D8E')
-                  : (star.type === 'small' ? '#0a0a0a' : '#5B2D8E')
-              }
-              opacity={star.type === 'small' ? 0.3 : star.type === 'medium' ? 0.5 : 0.7}
+              d="M50 0 L55 40 L50 50 L45 42 Z"
+              fill={darkMode ? '#ffffff' : '#0a0a0a'}
+              opacity={star.type === 'small' ? 0.6 : star.type === 'medium' ? 0.8 : 1}
+            />
+            <path
+              d="M100 50 L58 55 L50 50 L60 44 Z"
+              fill={darkMode ? '#ffffff' : '#0a0a0a'}
+              opacity={star.type === 'small' ? 0.6 : star.type === 'medium' ? 0.8 : 1}
+            />
+            <path
+              d="M50 100 L44 60 L50 50 L56 58 Z"
+              fill={darkMode ? '#ffffff' : '#0a0a0a'}
+              opacity={star.type === 'small' ? 0.6 : star.type === 'medium' ? 0.8 : 1}
+            />
+            <path
+              d="M0 50 L42 44 L50 50 L40 56 Z"
+              fill={darkMode ? '#ffffff' : '#0a0a0a'}
+              opacity={star.type === 'small' ? 0.6 : star.type === 'medium' ? 0.8 : 1}
             />
           </svg>
         </div>

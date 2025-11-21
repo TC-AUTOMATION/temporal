@@ -1,19 +1,32 @@
 'use client';
 
-import { Search, ChevronRight, Sparkles, Instagram, User, Flame, Shirt, Layers, Footprints, Watch } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronRight, Sparkles, Instagram, User, Flame, Shirt, Layers, Footprints, Watch, X, Zap } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 import TemporalLogo from '@/components/ui/TemporalLogo';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function Sidebar() {
-  const { language, isSidebarOpen, setSidebarOpen, setSearchOpen } = useStore();
+  const { language, darkMode, isSidebarOpen, setSidebarOpen, setSearchOpen } = useStore();
   const t = translations[language];
+  const [isClosing, setIsClosing] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isSidebarOpen) {
+      setTimeout(() => setIsVisible(true), 10);
+    }
+  }, [isSidebarOpen]);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setIsVisible(false);
+    setTimeout(() => {
+      setSidebarOpen(false);
+      setIsClosing(false);
+    }, 300);
+  };
 
   const menuItems = [
     { label: t.ensembles, href: '/shop?category=ensembles', icon: Flame },
@@ -28,32 +41,73 @@ export default function Sidebar() {
     setSearchOpen(true);
   };
 
-  return (
-    <Sheet open={isSidebarOpen} onOpenChange={setSidebarOpen}>
-      <SheetContent side="left" className="w-80 bg-card border-border p-0">
-        <SheetHeader className="p-6 border-b border-border">
-          <div className="flex items-center justify-between">
-            <TemporalLogo size={50} />
-          </div>
-          <SheetTitle className="sr-only">Menu</SheetTitle>
-          <SheetDescription className="sr-only">Navigation principale</SheetDescription>
-        </SheetHeader>
+  if (!isSidebarOpen) return null;
 
-        {/* Search */}
-        <div className="p-4">
-          <Button
-            variant="secondary"
-            className="w-full justify-start gap-3 h-12 rounded-xl"
-            onClick={handleSearchClick}
-          >
-            <Search size={18} className="text-muted-foreground" />
-            <span className="text-muted-foreground">Rechercher...</span>
-          </Button>
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-300 ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+        onClick={handleClose}
+      />
+
+      {/* Sidebar */}
+      <div
+        className={`fixed left-2 top-2 bottom-2 md:left-4 md:top-4 md:bottom-4 w-72 md:w-80 z-50  overflow-hidden shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+          isVisible ? 'translate-x-0' : '-translate-x-full'
+        } ${
+          darkMode
+            ? 'bg-black border border-white/10'
+            : 'bg-white border border-black/10'
+        }`}
+      >
+        {/* Header */}
+        <div className={`p-4 md:p-6 border-b flex-shrink-0 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+          <div className="flex items-center justify-between">
+            <TemporalLogo size={45} />
+            <button
+              onClick={handleClose}
+              className={`w-9 h-9 md:w-10 md:h-10 flex items-center justify-center transition-all hover:scale-110 ${
+                darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+              }`}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        <ScrollArea className="flex-1 px-4">
-          {/* Collections */}
-          <p className="text-muted-foreground text-xs uppercase tracking-wider mb-4 px-2">Collections</p>
+        {/* Search */}
+        <div className="p-3 md:p-4 flex-shrink-0">
+          <button
+            onClick={handleSearchClick}
+            className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
+              darkMode
+                ? 'bg-white/5 hover:bg-white/10 border border-white/10'
+                : 'bg-black/5 hover:bg-black/10 border border-black/10'
+            }`}
+          >
+            <Search size={16} className="text-primary" />
+            <span
+              className="text-muted-foreground text-sm"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            >
+              RECHERCHER...
+            </span>
+          </button>
+        </div>
+
+        {/* Menu */}
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pb-4">
+          {/* Collections title */}
+          <p
+            className="text-primary text-xs mb-4 px-2"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.3em' }}
+          >
+            COLLECTIONS
+          </p>
+
           <div className="space-y-1">
             {menuItems.map((item) => {
               const IconComponent = item.icon;
@@ -62,75 +116,116 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center justify-between px-3 py-2.5 md:px-4 md:py-3 transition-all group ${
+                    darkMode
+                      ? 'hover:bg-white/10'
+                      : 'hover:bg-black/5'
+                  }`}
                 >
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between h-12 rounded-xl px-4 hover:bg-secondary"
-                  >
-                    <div className="flex items-center gap-3">
-                      <IconComponent size={20} className="text-primary" />
-                      <span className="font-medium">{item.label}</span>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 flex items-center justify-center ${
+                      darkMode ? 'bg-primary/20' : 'bg-primary/10'
+                    }`}>
+                      <IconComponent size={14} className="text-primary" />
                     </div>
-                    <ChevronRight size={18} className="text-muted-foreground" />
-                  </Button>
+                    <span
+                      className="group-hover:text-primary transition-colors text-sm"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      {item.label.toUpperCase()}
+                    </span>
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                 </Link>
               );
             })}
 
             {/* Special offers */}
-            <Link href="/shop?category=offres" onClick={() => setSidebarOpen(false)}>
-              <Button
-                variant="outline"
-                className="w-full justify-between h-12 rounded-xl px-4 border-primary/30 bg-primary/10 hover:bg-primary/20"
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles size={18} className="text-primary" />
-                  <span className="font-bold text-primary">{t.offresSpeciales}</span>
+            <Link
+              href="/shop?category=offres"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center justify-between px-3 py-2.5 md:px-4 md:py-3 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 transition-all hover:scale-[1.02] group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-primary flex items-center justify-center">
+                  <Zap size={14} className="text-white" />
                 </div>
-                <ChevronRight size={18} className="text-primary/50" />
-              </Button>
+                <span
+                  className="text-primary text-sm"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  {t.offresSpeciales.toUpperCase()}
+                </span>
+              </div>
+              <ChevronRight size={16} className="text-primary group-hover:translate-x-1 transition-all" />
             </Link>
           </div>
 
-          <Separator className="my-6" />
+          {/* Divider */}
+          <div className={`my-4 h-[1px] ${darkMode ? 'bg-white/10' : 'bg-black/10'}`} />
 
           {/* About */}
-          <p className="text-muted-foreground text-xs uppercase tracking-wider mb-4 px-2">À propos</p>
-          <Link href="/about" onClick={() => setSidebarOpen(false)}>
-            <Button
-              variant="ghost"
-              className="w-full justify-between h-12 rounded-xl px-4 hover:bg-secondary"
+          <p
+            className="text-primary text-xs mb-2 px-2"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.3em' }}
+          >
+            À PROPOS
+          </p>
+
+          <Link
+            href="/about"
+            onClick={() => setSidebarOpen(false)}
+            className={`flex items-center justify-between px-3 py-2.5 transition-all group ${
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'
+            }`}
+          >
+            <span
+              className="text-muted-foreground group-hover:text-primary transition-colors text-sm"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
             >
-              <span className="text-muted-foreground font-medium">{t.quiSommesNous}</span>
-              <ChevronRight size={18} className="text-muted-foreground" />
-            </Button>
+              {t.quiSommesNous.toUpperCase()}
+            </span>
+            <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
           </Link>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border">
+        <div className={`p-3 md:p-4 border-t flex-shrink-0 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
           <div className="flex items-center justify-between">
             <Link href="/login" onClick={() => setSidebarOpen(false)}>
-              <Button variant="secondary" size="sm" className="rounded-full gap-2">
-                <User size={16} />
-                <span>Connexion</span>
-              </Button>
+              <button
+                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm transition-all hover:scale-105"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+              >
+                <User size={14} />
+                CONNEXION
+              </button>
             </Link>
             <div className="flex gap-2">
-              <Button variant="secondary" size="icon" className="rounded-full" asChild>
-                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer">
-                  <Instagram size={18} />
-                </a>
-              </Button>
-              <Button variant="secondary" size="icon" className="rounded-full" asChild>
-                <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer">
-                  <span className="text-xs font-bold">TT</span>
-                </a>
-              </Button>
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-9 h-9 flex items-center justify-center transition-all hover:scale-110 ${
+                  darkMode ? 'bg-white/10 hover:bg-primary' : 'bg-black/5 hover:bg-primary hover:text-white'
+                }`}
+              >
+                <Instagram size={16} />
+              </a>
+              <a
+                href="https://tiktok.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-9 h-9 flex items-center justify-center transition-all hover:scale-110 ${
+                  darkMode ? 'bg-white/10 hover:bg-primary' : 'bg-black/5 hover:bg-primary hover:text-white'
+                }`}
+              >
+                <span style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '0.75rem' }}>TT</span>
+              </a>
             </div>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </>
   );
 }

@@ -7,7 +7,6 @@ import { translations } from '@/lib/translations';
 import TemporalLogo from '@/components/ui/TemporalLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
 interface HeaderProps {
@@ -31,7 +30,6 @@ export default function Header({ showLogo = false }: HeaderProps) {
 
   useEffect(() => {
     const handleScroll = () => {
-      // Le logo apparait dans le header après 300px de scroll
       setScrolled(window.scrollY > 300);
     };
 
@@ -40,118 +38,161 @@ export default function Header({ showLogo = false }: HeaderProps) {
   }, []);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Afficher le logo si showLogo est true OU si on a scrollé
   const displayLogo = showLogo || scrolled;
 
   return (
-    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm text-foreground border-b border-border">
-      <div className="flex items-center justify-between px-4 py-3">
+    <header className={`sticky top-0 z-40 backdrop-blur-md border-b transition-all duration-300 ${
+      darkMode
+        ? 'bg-black/90 text-white border-white/10'
+        : 'bg-white/90 text-black border-black/10'
+    }`}>
+      <div className="relative flex items-center justify-between px-4 py-4">
         {/* Left section */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
+        <div className="flex items-center gap-3">
+          <button
             onClick={() => setSidebarOpen(true)}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+            }`}
             aria-label="Menu"
           >
-            <Menu size={24} />
-          </Button>
+            <Menu size={20} />
+          </button>
 
           {/* Theme toggle */}
-          <Button
-            variant="outline"
-            size="icon"
+          <button
             onClick={toggleDarkMode}
-            className="rounded-full"
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              darkMode
+                ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                : 'bg-primary/10 text-primary hover:bg-primary/20'
+            }`}
             aria-label="Toggle theme"
           >
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </Button>
+          </button>
         </div>
 
         {/* Center - Logo ou Welcome text */}
-        <div className="flex-1 text-center">
-          <div className={`transition-all duration-300 ${displayLogo ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
+        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+          <div className={`transition-all duration-500 ${displayLogo ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none'}`}>
             {displayLogo && (
-              <Link href="/">
-                <TemporalLogo size={40} className="mx-auto" />
+              <Link href="/" className="inline-block hover:scale-105 transition-transform">
+                <TemporalLogo size={45} className="mx-auto" />
               </Link>
             )}
           </div>
-          <div className={`transition-all duration-300 ${!displayLogo ? 'opacity-100' : 'opacity-0 absolute inset-0 flex items-center justify-center pointer-events-none'}`}>
+          <div className={`transition-all duration-500 ${!displayLogo ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             {!displayLogo && (
-              <h1 className="text-lg font-medium" style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>{t.welcome}</h1>
+              <div className="flex items-center gap-3">
+                <div className="hidden md:block h-[1px] w-8 bg-gradient-to-r from-transparent to-primary" />
+                <h1
+                  className="text-base md:text-xl tracking-[0.2em] md:tracking-[0.3em] whitespace-nowrap"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                >
+                  {t.welcome}
+                </h1>
+                <div className="hidden md:block h-[1px] w-8 bg-gradient-to-l from-transparent to-primary" />
+              </div>
             )}
           </div>
         </div>
 
         {/* Right section */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {/* Language switcher */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')}
-            className="text-sm font-medium"
-          >
-            <span className={language === 'fr' ? 'underline' : ''}>FR</span>
-            <span className="mx-1">/</span>
-            <span className={language === 'en' ? 'underline' : ''}>EN</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setLanguage('fr')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+                language === 'fr'
+                  ? 'bg-primary text-primary-foreground'
+                  : darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+              }`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '0.85rem' }}
+            >
+              FR
+            </button>
+            <button
+              onClick={() => setLanguage('en')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+                language === 'en'
+                  ? 'bg-primary text-primary-foreground'
+                  : darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+              }`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '0.85rem' }}
+            >
+              EN
+            </button>
+          </div>
 
           {/* Search */}
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={() => setSearchOpen(!isSearchOpen)}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              isSearchOpen
+                ? 'bg-primary text-primary-foreground'
+                : darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+            }`}
             aria-label="Search"
           >
-            {isSearchOpen ? <X size={20} /> : <Search size={20} />}
-          </Button>
+            {isSearchOpen ? <X size={18} /> : <Search size={18} />}
+          </button>
 
           {/* Profile */}
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/profile" aria-label="Profile">
-              <User size={20} />
-            </Link>
-          </Button>
+          <Link
+            href="/profile"
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+            }`}
+            aria-label="Profile"
+          >
+            <User size={18} />
+          </Link>
 
           {/* Cart */}
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={() => setCartOpen(true)}
-            className="relative"
+            className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+            }`}
             aria-label="Cart"
           >
-            <ShoppingBag size={20} />
+            <ShoppingBag size={18} />
             {cartCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+              <span
+                className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs"
+                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              >
                 {cartCount}
-              </Badge>
+              </span>
             )}
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* Search bar */}
-      {isSearchOpen && (
-        <div className="px-4 pb-3 bg-background">
+      <div className={`overflow-hidden transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className="px-4 pb-4">
           <div className="relative">
             <Input
               type="text"
               placeholder={t.search}
-              className="pr-10"
+              className={`w-full rounded-full pl-12 pr-4 py-3 border-2 transition-all ${
+                darkMode
+                  ? 'bg-white/5 border-white/20 focus:border-primary'
+                  : 'bg-black/5 border-black/10 focus:border-primary'
+              }`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               autoFocus
             />
             <Search
               size={18}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }

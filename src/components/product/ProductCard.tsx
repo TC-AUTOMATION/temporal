@@ -3,10 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, Plus, Zap } from 'lucide-react';
+import { Heart, ShoppingBag } from 'lucide-react';
 import { Product, useStore } from '@/stores/useStore';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
   product: Product;
@@ -16,7 +14,7 @@ interface ProductCardProps {
 export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
-  const { addToCart, setCartOpen } = useStore();
+  const { addToCart, setCartOpen, darkMode } = useStore();
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -45,22 +43,15 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.id}`}
-      className="group block relative"
+      className="group block"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="rounded-[2rem] overflow-hidden border-2 border-border/50 hover:border-primary/50 transition-all duration-500 bg-card shadow-lg hover:shadow-2xl hover:shadow-primary/10">
-        <div className="aspect-[3/4] relative overflow-hidden rounded-t-[2rem]">
-          <div
-            className="absolute inset-0 transition-all duration-700"
-            style={{
-              background: isHovered
-                ? 'radial-gradient(ellipse at 50% 30%, hsl(var(--primary)/0.15) 0%, transparent 70%)'
-                : 'transparent'
-            }}
-          />
-
-          <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${isHovered ? 'scale-105' : 'scale-100'}`}>
+      <div className="relative">
+        {/* Image container */}
+        <div className={`aspect-[3/4] relative overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+          {/* Product image */}
+          <div className={`absolute inset-0 transition-transform duration-500 ease-out ${isHovered ? 'scale-110' : 'scale-100'}`}>
             {product.images[0] ? (
               <Image
                 src={product.images[0]}
@@ -69,82 +60,97 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
                 className="object-cover"
               />
             ) : (
-              <div className="text-center">
-                <span className="text-7xl font-black text-foreground/10 tracking-tighter">T</span>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span
+                  className="text-8xl font-black text-foreground/5"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                >
+                  TPL
+                </span>
               </div>
             )}
           </div>
 
-          <Button
-            variant={isLiked ? "default" : "secondary"}
-            size="icon"
+          {/* Hover overlay */}
+          <div className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`} />
+
+          {/* Like button */}
+          <button
             onClick={handleLike}
-            className={`absolute top-4 right-4 rounded-full w-10 h-10 transition-all duration-300 ${isLiked ? 'scale-110 bg-primary' : 'bg-background/80 backdrop-blur-sm'}`}
+            className={`absolute top-3 right-3 w-9 h-9 flex items-center justify-center transition-all duration-300 ${
+              isLiked
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-black/50 text-white hover:bg-black/70'
+            }`}
           >
-            <Heart
-              size={18}
-              className={`transition-all ${isLiked ? 'fill-current' : ''}`}
-            />
-          </Button>
+            <Heart size={16} className={isLiked ? 'fill-current' : ''} />
+          </button>
 
-          <div className={`absolute bottom-4 left-4 right-4 transition-all duration-300 ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-            <Button
-              onClick={handleQuickAdd}
-              className="w-full rounded-full font-black uppercase tracking-widest text-sm py-6 bg-primary hover:bg-primary/90"
-              style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.15em' }}
+          {/* Quick add button - appears on hover */}
+          <button
+            onClick={handleQuickAdd}
+            className={`absolute bottom-3 left-3 right-3 py-3 bg-white text-black flex items-center justify-center gap-2 transition-all duration-300 ${
+              isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+            }`}
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
+          >
+            <ShoppingBag size={16} />
+            AJOUTER AU PANIER
+          </button>
+
+          {/* Status badge */}
+          <div className="absolute top-3 left-3">
+            <span
+              className="px-3 py-1 bg-primary text-primary-foreground text-xs"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
             >
-              <Plus size={18} strokeWidth={3} className="mr-2" />
-              AJOUTER
-            </Button>
+              NEW
+            </span>
           </div>
-
-          <Badge className="absolute top-4 left-4 rounded-full px-3 py-1 bg-background/80 backdrop-blur-sm text-foreground border-0">
-            <Zap size={12} className="text-primary mr-1" />
-            <span style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.1em' }}>LIMITED</span>
-          </Badge>
         </div>
 
-        <div className="p-5 bg-card">
-          <div className="flex items-start justify-between gap-2 mb-4">
+        {/* Product info */}
+        <div className="pt-4 space-y-2">
+          {/* Category */}
+          <p
+            className="text-xs text-muted-foreground uppercase tracking-widest"
+            style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+          >
+            {product.category}
+          </p>
+
+          {/* Name and price row */}
+          <div className="flex items-start justify-between gap-2">
             <h3
-              className="text-foreground text-xl leading-tight group-hover:text-primary transition-colors uppercase"
-              style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.05em' }}
+              className="text-foreground text-base uppercase leading-tight group-hover:text-primary transition-colors"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.02em' }}
             >
               {product.name}
             </h3>
-            <div className="text-right flex-shrink-0">
-              <span
-                className="text-primary text-2xl"
-                style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif' }}
-              >
-                {product.price}€
-              </span>
-            </div>
+            <span
+              className="text-foreground text-lg flex-shrink-0"
+              style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+            >
+              {product.price}€
+            </span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {product.colors.slice(0, 4).map((color, i) => (
-                <div
-                  key={color.name}
-                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 shadow-sm ${
-                    i === 0 ? 'border-primary ring-2 ring-primary/30' : 'border-border/50 hover:border-primary/50'
-                  }`}
-                  style={{ backgroundColor: color.hex }}
-                />
-              ))}
-            </div>
-            <div className="flex gap-1">
-              {product.sizes.filter(s => s.available).slice(0, 3).map((size) => (
-                <span
-                  key={size.name}
-                  className="text-xs text-muted-foreground px-2 py-1 rounded-full bg-muted/50"
-                  style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.05em' }}
-                >
-                  {size.name}
-                </span>
-              ))}
-            </div>
+          {/* Colors */}
+          <div className="flex items-center gap-1.5 pt-1">
+            {product.colors.slice(0, 4).map((color, i) => (
+              <div
+                key={color.name}
+                className={`w-4 h-4 rounded-full border transition-all ${
+                  darkMode ? 'border-white/20' : 'border-black/10'
+                }`}
+                style={{ backgroundColor: color.hex }}
+              />
+            ))}
+            {product.colors.length > 4 && (
+              <span className="text-xs text-muted-foreground ml-1">
+                +{product.colors.length - 4}
+              </span>
+            )}
           </div>
         </div>
       </div>

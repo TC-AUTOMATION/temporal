@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Temporal - Streetwear",
+  title: "Temporal - French Streetwear Brand",
   description: "Bienvenue dans l'univers Temporal",
+  icons: {
+    icon: "/temporal-logo-t.png",
+  },
 };
 
 export default function RootLayout({

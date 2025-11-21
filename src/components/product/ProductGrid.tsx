@@ -5,6 +5,7 @@ import { products } from '@/lib/products';
 import ProductCard from './ProductCard';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
+import { Flame } from 'lucide-react';
 
 interface ProductGridProps {
   category?: string;
@@ -38,30 +39,52 @@ export default function ProductGrid({ category }: ProductGridProps) {
   }, []);
 
   return (
-    <section ref={gridRef} className="py-20 bg-background">
+    <section id="collection" ref={gridRef} className="py-20 bg-background relative overflow-hidden">
+
       {/* Section header */}
-      <div className={`text-center mb-16 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="w-20 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
-          <span className="text-primary text-xs tracking-[0.5em] uppercase">Collection</span>
-          <div className="w-20 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+      <div className={`text-center mb-20 relative z-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-6 py-2 mb-8">
+          <Flame size={16} className="text-primary" />
+          <span
+            className="text-primary text-sm"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
+          >
+            NOUVELLE COLLECTION
+          </span>
         </div>
-        <h2 className="text-3xl md:text-4xl font-black text-foreground uppercase tracking-wider">
-          {t.decemberDrop}
+
+        {/* Main title with effect */}
+        <h2
+          className="text-5xl md:text-7xl lg:text-8xl text-foreground uppercase leading-none mb-6"
+          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.02em' }}
+        >
+          <span className="block">{t.decemberDrop}</span>
         </h2>
-        <p className="text-muted-foreground mt-4 tracking-widest text-sm uppercase">
-          Limited Edition • Premium Quality
+
+        {/* Decorative line */}
+        <div className="flex items-center justify-center gap-6 mb-6">
+          <div className="h-[2px] w-24 md:w-40 bg-gradient-to-r from-transparent to-primary" />
+          <div className="w-3 h-3 bg-primary rotate-45" />
+          <div className="h-[2px] w-24 md:w-40 bg-gradient-to-l from-transparent to-primary" />
+        </div>
+
+        <p
+          className="text-muted-foreground tracking-[0.3em] uppercase"
+          style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '1rem' }}
+        >
+          Édition Limitée • Qualité Premium • Made in France
         </p>
       </div>
 
       {/* Products grid */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
           {filteredProducts.map((product, index) => (
             <div
               key={product.id}
-              className={`transition-all duration-500 ${
-                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              className={`transition-all duration-700 ${
+                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
               }`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
@@ -69,6 +92,16 @@ export default function ProductGrid({ category }: ProductGridProps) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Bottom CTA */}
+      <div className={`text-center mt-16 relative z-10 transition-all duration-700 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        <p
+          className="text-muted-foreground mb-6"
+          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+        >
+          STOCK LIMITÉ — NE RATE PAS LE DROP
+        </p>
       </div>
     </section>
   );

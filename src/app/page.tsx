@@ -7,7 +7,6 @@ import MarqueeBanner from '@/components/ui/MarqueeBanner';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import CartDrawer from '@/components/cart/CartDrawer';
-import SearchOverlay from '@/components/layout/SearchOverlay';
 import Footer from '@/components/layout/Footer';
 import HeroSection from '@/components/home/HeroSection';
 import ProductGrid from '@/components/product/ProductGrid';
@@ -40,7 +39,6 @@ export default function Home() {
         <Header />
         <Sidebar />
         <CartDrawer />
-        <SearchOverlay />
         <main className="bg-background">
           <HeroSection />
           <ProductGrid />

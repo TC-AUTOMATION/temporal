@@ -1,0 +1,40 @@
+# Configuration Caddy pour Temporal
+# À placer sur le VPS dans /etc/caddy/Caddyfile
+
+temporal.chloe-dev.fr {
+    # Logs
+    log {
+        output file /var/log/caddy/temporal.log
+        format json
+    }
+
+    # En-têtes de sécurité
+    header {
+        # Sécurité
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Permissions Policy
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+        # Retirer les headers qui exposent des infos
+        -Server
+        -X-Powered-By
+    }
+
+    # Reverse proxy vers le conteneur Next.js
+    handle {
+        reverse_proxy temporal:3000
+    }
+
+    # Compression automatique
+    encode gzip zstd
+
+    # HTTPS automatique via Let's Encrypt
+    tls {
+        email chloe@chloe-dev.fr
+    }
+}

@@ -1,61 +1,118 @@
 'use client';
 
-import { Instagram, Twitter } from 'lucide-react';
+import { Instagram, Twitter, ArrowRight, Zap } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import TemporalLogo from '@/components/ui/TemporalLogo';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
+import { useStore } from '@/stores/useStore';
 
 export default function Footer() {
+  const { darkMode } = useStore();
+
   return (
-    <footer className="bg-background text-foreground border-t border-border">
-      {/* Gradient top border */}
+    <footer className={`relative overflow-hidden ${darkMode ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}>
+      {/* Background decorations */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      </div>
+
+      {/* Top gradient line */}
       <div className="h-1 bg-gradient-to-r from-transparent via-primary to-transparent" />
 
       {/* Main footer content */}
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
+        {/* Big brand statement */}
+        <div className="text-center mb-20">
+          <h2
+            className="text-4xl md:text-6xl lg:text-7xl uppercase mb-6"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+          >
+            JOIN THE <span className="text-primary">MOVEMENT</span>
+          </h2>
+          <p className={`max-w-xl mx-auto mb-8 ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
+            Streetwear premium pour ceux qui osent être différents. Éditions limitées, qualité exceptionnelle.
+          </p>
+
+          {/* Newsletter */}
+          <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+            <input
+              type="email"
+              placeholder="TON@EMAIL.COM"
+              className={`flex-1 rounded-full px-6 py-4 focus:outline-none focus:border-primary transition-all ${darkMode ? 'bg-white/10 border border-white/20 text-white placeholder:text-white/40' : 'bg-black/5 border border-black/20 text-black placeholder:text-black/40'}`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            />
+            <button
+              type="submit"
+              className="bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-4 flex items-center justify-center gap-2 transition-all hover:scale-105"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
+            >
+              <Zap size={18} />
+              REJOINDRE
+            </button>
+          </form>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           {/* Brand section */}
           <div className="md:col-span-1">
             <div className="mb-6">
-              <TemporalLogo size={80} />
+              <TemporalLogo size={100} />
             </div>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Streetwear premium pour ceux qui osent être différents.
-              Éditions limitées, qualité exceptionnelle.
+            <p
+              className={`uppercase tracking-wider text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
+            >
+              EST. 2024 • FRANCE
             </p>
+
             {/* Social links */}
             <div className="flex gap-3 mt-6">
-              <Button variant="secondary" size="icon" className="rounded-full" asChild>
-                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer">
-                  <Instagram size={18} />
-                </a>
-              </Button>
-              <Button variant="secondary" size="icon" className="rounded-full" asChild>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer">
-                  <Twitter size={18} />
-                </a>
-              </Button>
-              <Button variant="secondary" size="icon" className="rounded-full" asChild>
-                <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer">
-                  <span className="font-bold text-sm">TT</span>
-                </a>
-              </Button>
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-12 h-12 rounded-full hover:bg-primary flex items-center justify-center transition-all hover:scale-110 ${darkMode ? 'bg-white/10' : 'bg-black/10'}`}
+              >
+                <Instagram size={20} />
+              </a>
+              <a
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-12 h-12 rounded-full hover:bg-primary flex items-center justify-center transition-all hover:scale-110 ${darkMode ? 'bg-white/10' : 'bg-black/10'}`}
+              >
+                <Twitter size={20} />
+              </a>
+              <a
+                href="https://tiktok.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-12 h-12 rounded-full hover:bg-primary flex items-center justify-center transition-all hover:scale-110 ${darkMode ? 'bg-white/10' : 'bg-black/10'}`}
+              >
+                <span style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '0.9rem' }}>TT</span>
+              </a>
             </div>
           </div>
 
           {/* Shop links */}
           <div>
-            <h4 className="text-foreground font-bold uppercase tracking-wider mb-6 text-sm">Shop</h4>
-            <ul className="space-y-3">
+            <h4
+              className="mb-6"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '1.1rem' }}
+            >
+              SHOP
+            </h4>
+            <ul className="space-y-4">
               {['Vestes', 'T-shirts', 'Pantalons', 'Accessoires', 'Nouveautés'].map((item) => (
                 <li key={item}>
                   <Link
                     href={`/shop?category=${item.toLowerCase()}`}
-                    className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                    className={`hover:text-primary transition-all flex items-center gap-2 group ${darkMode ? 'text-white/60' : 'text-black/60'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    {item}
+                    <ArrowRight size={14} className="opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                    {item.toUpperCase()}
                   </Link>
                 </li>
               ))}
@@ -64,8 +121,13 @@ export default function Footer() {
 
           {/* Help links */}
           <div>
-            <h4 className="text-foreground font-bold uppercase tracking-wider mb-6 text-sm">Aide</h4>
-            <ul className="space-y-3">
+            <h4
+              className="mb-6"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '1.1rem' }}
+            >
+              AIDE
+            </h4>
+            <ul className="space-y-4">
               {[
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Livraison', href: '/shipping' },
@@ -76,53 +138,88 @@ export default function Footer() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
-                    className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                    className={`hover:text-primary transition-all flex items-center gap-2 group ${darkMode ? 'text-white/60' : 'text-black/60'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    {item.label}
+                    <ArrowRight size={14} className="opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                    {item.label.toUpperCase()}
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Newsletter */}
+          {/* Contact */}
           <div>
-            <h4 className="text-foreground font-bold uppercase tracking-wider mb-6 text-sm">Newsletter</h4>
-            <p className="text-muted-foreground text-sm mb-4">
-              Inscris-toi pour recevoir les dernières news et accéder aux drops en avant-première.
-            </p>
-            <form className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="ton@email.com"
-                className="rounded-full"
-              />
-              <Button type="submit" className="rounded-full px-6">
-                GO
-              </Button>
-            </form>
+            <h4
+              className="mb-6"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '1.1rem' }}
+            >
+              CONTACT
+            </h4>
+            <div className={`space-y-4 ${darkMode ? 'text-white/60' : 'text-black/60'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+              <p>CONTACT@TEMPORAL.FR</p>
+              <p>PARIS, FRANCE</p>
+            </div>
+
+            {/* Payment icons placeholder */}
+            <div className="mt-8">
+              <p
+                className={`text-xs mb-3 ${darkMode ? 'text-white/40' : 'text-black/40'}`}
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
+              >
+                PAIEMENT SÉCURISÉ
+              </p>
+              <div className="flex gap-2">
+                {['VISA', 'MC', 'AMEX', 'PP'].map((payment) => (
+                  <div
+                    key={payment}
+                    className={`w-12 h-8 rounded flex items-center justify-center text-xs ${darkMode ? 'bg-white/10 text-white/60' : 'bg-black/10 text-black/60'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                  >
+                    {payment}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        <Separator className="my-8" />
+        {/* Divider */}
+        <div className={`h-[1px] bg-gradient-to-r from-transparent to-transparent mb-8 ${darkMode ? 'via-white/20' : 'via-black/20'}`} />
 
         {/* Bottom section */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Legal links */}
-          <div className="flex flex-wrap justify-center gap-6 text-xs text-muted-foreground">
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Confidentialité</Link>
-            <Link href="/terms" className="hover:text-foreground transition-colors">CGV</Link>
-            <Link href="/legal" className="hover:text-foreground transition-colors">Mentions légales</Link>
-            <Link href="/cookies" className="hover:text-foreground transition-colors">Cookies</Link>
+          <div
+            className={`flex flex-wrap justify-center gap-6 ${darkMode ? 'text-white/40' : 'text-black/40'}`}
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em', fontSize: '0.8rem' }}
+          >
+            <Link href="/privacy" className="hover:text-primary transition-colors">CONFIDENTIALITÉ</Link>
+            <Link href="/terms" className="hover:text-primary transition-colors">CGV</Link>
+            <Link href="/legal" className="hover:text-primary transition-colors">MENTIONS LÉGALES</Link>
+            <Link href="/cookies" className="hover:text-primary transition-colors">COOKIES</Link>
           </div>
 
           {/* Copyright */}
-          <p className="text-xs text-muted-foreground">
-            © 2024 TEMPORAL. Tous droits réservés.
+          <p
+            className={darkMode ? 'text-white/40' : 'text-black/40'}
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em', fontSize: '0.8rem' }}
+          >
+            © 2024 TEMPORAL. TOUS DROITS RÉSERVÉS.
           </p>
         </div>
       </div>
 
+      {/* Giant background text */}
+      <div className="absolute bottom-0 left-0 right-0 overflow-hidden pointer-events-none">
+        <p
+          className={`text-[15vw] leading-none whitespace-nowrap ${darkMode ? 'text-white/[0.02]' : 'text-black/[0.03]'}`}
+          style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+        >
+          TEMPORAL TEMPORAL TEMPORAL
+        </p>
+      </div>
     </footer>
   );
 }

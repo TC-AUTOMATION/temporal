@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --temporal-purple: #5B2D8E;
+  --temporal-black: #000000;
+  --temporal-white: #FFFFFF;
+  --background: var(--temporal-white);
+  --foreground: var(--temporal-black);
+}
+
+.dark {
+  --background: var(--temporal-black);
+  --foreground: var(--temporal-white);
+}
+
+@theme inline {
+  --color-temporal-purple: var(--temporal-purple);
+  --color-temporal-black: var(--temporal-black);
+  --color-temporal-white: var(--temporal-white);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--temporal-purple);
+  border-radius: 4px;
+}
+
+@keyframes rotate360 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-rotate {
+  animation: rotate360 10s linear infinite;
+}
+
+.animate-twinkle {
+  animation: twinkle var(--twinkle-duration, 2s) ease-in-out infinite;
+  animation-delay: var(--twinkle-delay, 0s);
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.line-through-custom {
+  text-decoration: line-through;
+  opacity: 0.4;
+}

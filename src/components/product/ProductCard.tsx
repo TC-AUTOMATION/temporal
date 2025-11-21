@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Eye, Heart, ShoppingBag } from 'lucide-react';
+import { Heart, Plus, Zap } from 'lucide-react';
 import { Product, useStore } from '@/stores/useStore';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
   product: Product;
@@ -13,16 +15,8 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [imageIndex, setImageIndex] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
   const { addToCart, setCartOpen } = useStore();
-
-  const allImages = [...product.images, ...product.modelImages];
-
-  const handleImageCycle = () => {
-    if (allImages.length > 1) {
-      setImageIndex((prev) => (prev + 1) % allImages.length);
-    }
-  };
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -42,134 +36,116 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
     }
   };
 
+  const handleLike = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLiked(!isLiked);
+  };
+
   return (
     <Link
       href={`/products/${product.id}`}
-      className="group block relative animate-slide-up"
+      className="group block relative"
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setImageIndex(0);
-      }}
-      style={{ animationDelay: `${index * 0.1}s` }}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="card-streetwear rounded-lg overflow-hidden">
-        {/* Image container */}
-        <div
-          className="aspect-[3/4] relative overflow-hidden bg-gradient-to-br from-gray-900 to-black"
-          onClick={handleImageCycle}
-        >
-          {/* Placeholder or actual image */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {allImages[imageIndex] ? (
+      <div className="rounded-[2rem] overflow-hidden border-2 border-border/50 hover:border-primary/50 transition-all duration-500 bg-card shadow-lg hover:shadow-2xl hover:shadow-primary/10">
+        <div className="aspect-[3/4] relative overflow-hidden rounded-t-[2rem]">
+          <div
+            className="absolute inset-0 transition-all duration-700"
+            style={{
+              background: isHovered
+                ? 'radial-gradient(ellipse at 50% 30%, hsl(var(--primary)/0.15) 0%, transparent 70%)'
+                : 'transparent'
+            }}
+          />
+
+          <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${isHovered ? 'scale-105' : 'scale-100'}`}>
+            {product.images[0] ? (
               <Image
-                src={allImages[imageIndex]}
+                src={product.images[0]}
                 alt={product.name}
                 fill
-                className={`object-cover transition-all duration-700 ${
-                  isHovered ? 'scale-110' : 'scale-100'
-                }`}
+                className="object-cover"
               />
             ) : (
-              <div className="text-center p-4">
-                <div className="text-6xl font-black text-white/5 mb-2 tracking-tighter">TPL</div>
-                <div className="text-white/40 text-sm font-medium">{product.name}</div>
+              <div className="text-center">
+                <span className="text-7xl font-black text-foreground/10 tracking-tighter">T</span>
               </div>
             )}
           </div>
 
-          {/* Overlay gradient on hover */}
-          <div
-            className={`absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent transition-opacity duration-300 ${
-              isHovered ? 'opacity-80' : 'opacity-40'
-            }`}
-          />
-
-          {/* Quick actions */}
-          <div
-            className={`absolute inset-x-0 bottom-0 p-4 transition-all duration-300 ${
-              isHovered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
-            }`}
+          <Button
+            variant={isLiked ? "default" : "secondary"}
+            size="icon"
+            onClick={handleLike}
+            className={`absolute top-4 right-4 rounded-full w-10 h-10 transition-all duration-300 ${isLiked ? 'scale-110 bg-primary' : 'bg-background/80 backdrop-blur-sm'}`}
           >
-            <div className="flex gap-2">
-              <button
-                onClick={handleQuickAdd}
-                className="flex-1 py-3 bg-[#5B2D8E] text-white text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#7B4DB0] transition-colors rounded"
-              >
-                <ShoppingBag size={16} />
-                Add
-              </button>
-              <button
-                onClick={(e) => e.preventDefault()}
-                className="p-3 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-colors rounded"
-              >
-                <Heart size={16} />
-              </button>
-            </div>
+            <Heart
+              size={18}
+              className={`transition-all ${isLiked ? 'fill-current' : ''}`}
+            />
+          </Button>
+
+          <div className={`absolute bottom-4 left-4 right-4 transition-all duration-300 ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+            <Button
+              onClick={handleQuickAdd}
+              className="w-full rounded-full font-black uppercase tracking-widest text-sm py-6 bg-primary hover:bg-primary/90"
+              style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.15em' }}
+            >
+              <Plus size={18} strokeWidth={3} className="mr-2" />
+              AJOUTER
+            </Button>
           </div>
 
-          {/* Image indicators */}
-          {allImages.length > 1 && (
-            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-              {allImages.map((_, i) => (
-                <div
-                  key={i}
-                  className={`h-1 rounded-full transition-all ${
-                    i === imageIndex ? 'bg-[#5B2D8E] w-6' : 'bg-white/40 w-1.5'
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Corner accent */}
-          <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden pointer-events-none">
-            <div className="absolute top-3 right-3 w-8 h-px bg-gradient-to-l from-[#5B2D8E] to-transparent" />
-            <div className="absolute top-3 right-3 w-px h-8 bg-gradient-to-b from-[#5B2D8E] to-transparent" />
-          </div>
-
-          {/* View indicator */}
-          <div
-            className={`absolute top-4 left-4 flex items-center gap-2 text-white/60 text-xs transition-all duration-300 ${
-              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
-            }`}
-          >
-            <Eye size={14} />
-            <span>{Math.floor(Math.random() * 50) + 10}</span>
-          </div>
+          <Badge className="absolute top-4 left-4 rounded-full px-3 py-1 bg-background/80 backdrop-blur-sm text-foreground border-0">
+            <Zap size={12} className="text-primary mr-1" />
+            <span style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.1em' }}>LIMITED</span>
+          </Badge>
         </div>
 
-        {/* Product info */}
-        <div className="p-4 bg-[#0a0a0a]">
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="font-bold text-white group-hover:text-[#5B2D8E] transition-colors uppercase tracking-wide text-sm">
+        <div className="p-5 bg-card">
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <h3
+              className="text-foreground text-xl leading-tight group-hover:text-primary transition-colors uppercase"
+              style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.05em' }}
+            >
               {product.name}
             </h3>
-            <span className="text-[#5B2D8E] font-black text-lg">{product.price}€</span>
+            <div className="text-right flex-shrink-0">
+              <span
+                className="text-primary text-2xl"
+                style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif' }}
+              >
+                {product.price}€
+              </span>
+            </div>
           </div>
 
-          {/* Color options */}
           <div className="flex items-center justify-between">
-            <div className="flex gap-1.5">
-              {product.colors.slice(0, 3).map((color) => (
+            <div className="flex items-center gap-2">
+              {product.colors.slice(0, 4).map((color, i) => (
                 <div
                   key={color.name}
-                  className="w-4 h-4 rounded-full border-2 border-white/10 hover:border-[#5B2D8E] transition-colors"
+                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 shadow-sm ${
+                    i === 0 ? 'border-primary ring-2 ring-primary/30' : 'border-border/50 hover:border-primary/50'
+                  }`}
                   style={{ backgroundColor: color.hex }}
                 />
               ))}
             </div>
-            <span className="text-white/30 text-xs uppercase tracking-wider">
-              {product.sizes.filter((s) => s.available).length} sizes
-            </span>
+            <div className="flex gap-1">
+              {product.sizes.filter(s => s.available).slice(0, 3).map((size) => (
+                <span
+                  key={size.name}
+                  className="text-xs text-muted-foreground px-2 py-1 rounded-full bg-muted/50"
+                  style={{ fontFamily: '"Bebas Neue", "Impact", sans-serif', letterSpacing: '0.05em' }}
+                >
+                  {size.name}
+                </span>
+              ))}
+            </div>
           </div>
-
-          {/* Hover underline */}
-          <div
-            className={`h-0.5 bg-gradient-to-r from-[#5B2D8E] to-[#7B4DB0] mt-4 transition-all duration-500 origin-left ${
-              isHovered ? 'scale-x-100' : 'scale-x-0'
-            }`}
-          />
         </div>
       </div>
     </Link>

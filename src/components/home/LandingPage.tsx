@@ -40,13 +40,12 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
 
   if (showPassword) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 relative overflow-hidden">
         <Starfield />
-        <div className="absolute inset-0 noise pointer-events-none" />
 
         <div className="relative z-10 w-full max-w-md">
           <div className="flex justify-center mb-12">
-            <TemporalLogo size={80} animate />
+            <TemporalLogo size={80} />
           </div>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-6">
@@ -56,15 +55,14 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mot de passe"
-                className="w-full px-6 py-4 bg-white/5 backdrop-blur-sm border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-[#5B2D8E] transition-colors text-center tracking-widest"
+                className="w-full px-6 py-4 bg-gray-100 border border-gray-200 text-black placeholder-gray-400 focus:outline-none focus:border-[#5B2D8E] transition-colors text-center tracking-widest rounded-lg"
                 autoFocus
               />
-              <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#5B2D8E]/20 via-transparent to-[#5B2D8E]/20 blur-xl" />
             </div>
 
             <button
               type="submit"
-              className="btn-primary w-full rounded"
+              className="w-full py-4 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors rounded-lg"
             >
               Entrer
             </button>
@@ -76,31 +74,30 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
 
   if (showOptions) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 relative overflow-hidden">
         <Starfield />
-        <div className="absolute inset-0 noise pointer-events-none" />
 
         <div className="relative z-10 w-full max-w-md text-center">
           <div className="flex justify-center mb-8">
-            <TemporalLogo size={80} animate />
+            <TemporalLogo size={80} />
           </div>
 
-          <div className="glass rounded-2xl p-8">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8">
             <Sparkles className="w-8 h-8 text-[#5B2D8E] mx-auto mb-4" />
-            <p className="text-white/80 mb-8 text-lg">
+            <p className="text-gray-700 mb-8 text-lg">
               Email enregistré avec succès!
             </p>
 
             <div className="space-y-4">
               <a
                 href="/profile/create"
-                className="btn-outline block w-full rounded text-white hover:bg-white/5"
+                className="block w-full py-3 border-2 border-[#5B2D8E] text-[#5B2D8E] font-bold uppercase tracking-wider rounded-lg hover:bg-[#5B2D8E] hover:text-white transition-colors"
               >
                 {t.createAccount}
               </a>
               <button
                 onClick={onEnter}
-                className="btn-primary w-full rounded"
+                className="w-full py-3 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors rounded-lg"
               >
                 {t.enterSite}
               </button>
@@ -112,39 +109,32 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-black flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-white flex flex-col relative overflow-hidden">
       {/* Starfield background */}
       <Starfield />
 
-      {/* Noise overlay */}
-      <div className="absolute inset-0 noise pointer-events-none" />
-
       {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black/80 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white/80 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#5B2D8E]/5 via-transparent to-[#5B2D8E]/5 pointer-events-none" />
 
       {/* Top bar with password link */}
       <div className={`relative z-20 flex justify-end p-6 transition-all duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
         <button
           onClick={() => setShowPassword(true)}
-          className="flex items-center gap-2 text-white/40 hover:text-white text-xs tracking-wider transition-colors group"
+          className="flex items-center gap-2 text-gray-400 hover:text-gray-800 text-xs tracking-wider transition-colors group"
         >
           <Lock size={12} className="group-hover:text-[#5B2D8E] transition-colors" />
-          <span className="underline-animation">{t.enterPassword}</span>
+          <span>{t.enterPassword}</span>
         </button>
       </div>
 
       {/* Logo */}
       <div className={`relative z-10 flex justify-center pt-4 transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-        <TemporalLogo size={60} animate />
+        <TemporalLogo size={60} />
       </div>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10">
-        {/* Decorative elements */}
-        <div className="absolute left-10 top-1/4 w-32 h-32 border border-[#5B2D8E]/10 rotate-45 animate-float hidden lg:block" />
-        <div className="absolute right-10 bottom-1/4 w-24 h-24 border border-white/5 animate-float hidden lg:block" style={{ animationDelay: '2s' }} />
-
         {/* Title */}
         <div className={`text-center mb-12 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div className="flex items-center justify-center gap-3 mb-6">
@@ -153,11 +143,11 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
             <div className="w-12 h-px bg-gradient-to-l from-transparent to-[#5B2D8E]" />
           </div>
 
-          <h1 className="text-responsive-xl font-black text-white uppercase tracking-tight leading-none mb-6">
-            <span className="block animate-glitch-text">{t.firstDrop}</span>
+          <h1 className="text-4xl md:text-6xl font-black text-black uppercase tracking-tight leading-none mb-6">
+            {t.firstDrop}
           </h1>
 
-          <p className="text-white/40 text-sm md:text-base tracking-widest max-w-md mx-auto">
+          <p className="text-gray-500 text-sm md:text-base tracking-widest max-w-md mx-auto">
             {t.signUpEmail}
           </p>
         </div>
@@ -169,7 +159,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
         >
           <div className="relative group">
             {/* Glow effect */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#5B2D8E]/50 via-[#7B4DB0]/50 to-[#5B2D8E]/50 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-[#5B2D8E]/30 via-[#7B4DB0]/30 to-[#5B2D8E]/30 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
             <div className="relative flex">
               <input
@@ -177,12 +167,12 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t.email}
-                className="flex-1 px-6 py-4 bg-white/5 backdrop-blur-sm border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-[#5B2D8E] transition-all text-base rounded-l-lg"
+                className="flex-1 px-6 py-4 bg-gray-100 border border-gray-200 text-black placeholder-gray-400 focus:outline-none focus:border-[#5B2D8E] transition-all text-base rounded-l-lg"
                 required
               />
               <button
                 type="submit"
-                className="px-8 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors flex items-center gap-2 rounded-r-lg group"
+                className="px-8 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors flex items-center gap-2 rounded-r-lg"
               >
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </button>
@@ -192,16 +182,16 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
 
         {/* Bottom decoration */}
         <div className={`mt-16 flex items-center gap-2 transition-all duration-1000 delay-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="w-1 h-1 bg-white/20 rounded-full" />
-          <div className="w-1 h-1 bg-[#5B2D8E] rounded-full animate-pulse-slow" />
-          <div className="w-1 h-1 bg-white/20 rounded-full" />
+          <div className="w-1 h-1 bg-gray-300 rounded-full" />
+          <div className="w-1 h-1 bg-[#5B2D8E] rounded-full" />
+          <div className="w-1 h-1 bg-gray-300 rounded-full" />
         </div>
       </div>
 
       {/* Side text */}
       <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden lg:block">
         <p
-          className="text-white/10 text-[10px] tracking-[0.5em] uppercase font-light"
+          className="text-gray-200 text-[10px] tracking-[0.5em] uppercase font-light"
           style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
         >
           Premium Streetwear
@@ -210,7 +200,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
 
       <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden lg:block">
         <p
-          className="text-white/10 text-[10px] tracking-[0.5em] uppercase font-light"
+          className="text-gray-200 text-[10px] tracking-[0.5em] uppercase font-light"
           style={{ writingMode: 'vertical-rl' }}
         >
           Limited Edition

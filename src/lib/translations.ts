@@ -1,6 +1,6 @@
 export const translations = {
   fr: {
-    welcome: "Bienvenue dans l'univers Temporal",
+    welcome: "BIENVENUE DANS L'UNIVERS TEMPORAL",
     search: "Recherche...",
     ensembles: "Ensembles",
     vestes: "Vestes",
@@ -52,7 +52,7 @@ export const translations = {
     measures: "mesure",
   },
   en: {
-    welcome: "Welcome to the Temporal universe",
+    welcome: "WELCOME TO THE TEMPORAL UNIVERSE",
     search: "Search...",
     ensembles: "Sets",
     vestes: "Jackets",

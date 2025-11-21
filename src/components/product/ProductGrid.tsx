@@ -38,50 +38,37 @@ export default function ProductGrid({ category }: ProductGridProps) {
   }, []);
 
   return (
-    <section ref={gridRef} className="relative py-20 bg-black">
-      {/* Background effects */}
-      <div className="absolute inset-0 noise pointer-events-none opacity-50" />
-      <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black to-transparent z-10" />
-
+    <section ref={gridRef} className="py-20 bg-background">
       {/* Section header */}
-      <div className={`text-center mb-16 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+      <div className={`text-center mb-16 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
         <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="w-20 h-px bg-gradient-to-r from-transparent via-[#5B2D8E] to-transparent" />
-          <span className="text-[#5B2D8E] text-xs tracking-[0.5em] uppercase">Collection</span>
-          <div className="w-20 h-px bg-gradient-to-r from-transparent via-[#5B2D8E] to-transparent" />
+          <div className="w-20 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+          <span className="text-primary text-xs tracking-[0.5em] uppercase">Collection</span>
+          <div className="w-20 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
         </div>
-        <h2 className="text-responsive-lg font-black text-white uppercase tracking-wider">
+        <h2 className="text-3xl md:text-4xl font-black text-foreground uppercase tracking-wider">
           {t.decemberDrop}
         </h2>
-        <p className="text-white/40 mt-4 tracking-widest text-sm uppercase">
+        <p className="text-muted-foreground mt-4 tracking-widest text-sm uppercase">
           Limited Edition • Premium Quality
         </p>
       </div>
 
       {/* Products grid */}
       <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {filteredProducts.map((product, index) => (
             <div
               key={product.id}
-              className={`transition-all duration-700 ${
-                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
+              className={`transition-all duration-500 ${
+                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
-              style={{ transitionDelay: `${index * 150}ms` }}
+              style={{ transitionDelay: `${index * 100}ms` }}
             >
               <ProductCard product={product} index={index} />
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Bottom decoration */}
-      <div className="flex items-center justify-center mt-20 gap-4">
-        <div className="w-1 h-1 bg-[#5B2D8E] rounded-full animate-pulse-slow" />
-        <div className="w-2 h-2 bg-[#5B2D8E] rounded-full animate-pulse-slow" style={{ animationDelay: '0.2s' }} />
-        <div className="w-3 h-3 bg-[#5B2D8E] rounded-full animate-pulse-slow" style={{ animationDelay: '0.4s' }} />
-        <div className="w-2 h-2 bg-[#5B2D8E] rounded-full animate-pulse-slow" style={{ animationDelay: '0.6s' }} />
-        <div className="w-1 h-1 bg-[#5B2D8E] rounded-full animate-pulse-slow" style={{ animationDelay: '0.8s' }} />
       </div>
     </section>
   );

@@ -6,28 +6,33 @@ import MarqueeBanner from '@/components/ui/MarqueeBanner';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import CartDrawer from '@/components/cart/CartDrawer';
+import SearchOverlay from '@/components/layout/SearchOverlay';
+import Footer from '@/components/layout/Footer';
 import TemporalLogo from '@/components/ui/TemporalLogo';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 export default function AboutPage() {
-  const { language, darkMode } = useStore();
+  const { language } = useStore();
   const t = translations[language];
 
   return (
-    <div className={darkMode ? 'dark' : ''}>
-      <div className={`min-h-screen ${darkMode ? 'bg-black text-white' : 'bg-white text-black'}`}>
-        <MarqueeBanner />
-        <Header showLogo />
-        <Sidebar />
-        <CartDrawer />
+    <div className="min-h-screen bg-background text-foreground">
+      <MarqueeBanner />
+      <Header showLogo />
+      <Sidebar />
+      <CartDrawer />
+      <SearchOverlay />
 
-        <main className="max-w-2xl mx-auto px-4 py-12">
-          <div className="flex justify-center mb-8">
-            <TemporalLogo size={120} animate />
-          </div>
+      <main className="max-w-2xl mx-auto px-4 py-12">
+        <div className="flex justify-center mb-8">
+          <TemporalLogo size={120} animate />
+        </div>
 
-          <h1 className="text-3xl font-bold text-center mb-8">{t.quiSommesNous}</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">{t.quiSommesNous}</h1>
 
-          <div className="space-y-6 text-lg leading-relaxed opacity-80">
+        <Card>
+          <CardContent className="p-8 space-y-6 text-lg leading-relaxed text-muted-foreground">
             <p>
               Temporal est né d'une passion pour le streetwear et d'une vision unique
               de la mode urbaine. Notre marque représente plus qu'un simple vêtement -
@@ -52,15 +57,19 @@ export default function AboutPage() {
               Rejoins l'univers Temporal et fais partie de notre communauté grandissante.
               Ensemble, créons le streetwear de demain.
             </p>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="mt-12 text-center">
-            <p className="text-[#5B2D8E] font-medium">
-              Vivez l'expérience Temporal
-            </p>
-          </div>
-        </main>
-      </div>
+        <Separator className="my-8" />
+
+        <div className="text-center">
+          <p className="text-primary font-medium text-lg">
+            Vivez l'expérience Temporal
+          </p>
+        </div>
+      </main>
+
+      <Footer />
     </div>
   );
 }

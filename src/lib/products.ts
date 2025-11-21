@@ -5,8 +5,12 @@ export const products: Product[] = [
     id: 'veste-tpl-noir',
     name: 'Veste TPL',
     price: 189,
-    images: ['/images/veste-noir-1.jpg', '/images/veste-noir-2.jpg', '/images/veste-noir-3.jpg'],
-    modelImages: ['/images/veste-noir-model-1.jpg', '/images/veste-noir-model-2.jpg'],
+    images: [
+      '/clothes/veste-face-noire.png',
+      '/clothes/veste-side-blanche.png',
+      '/clothes/veste-dos-noir.png',
+    ],
+    modelImages: ['/clothes/veste-face-noire.png'],
     colors: [
       { name: 'Noir', hex: '#000000', available: true },
       { name: 'Blanc', hex: '#FFFFFF', available: true },
@@ -25,8 +29,12 @@ export const products: Product[] = [
     id: 'veste-tpl-blanc',
     name: 'Veste TPL',
     price: 189,
-    images: ['/images/veste-blanc-1.jpg', '/images/veste-blanc-2.jpg'],
-    modelImages: ['/images/veste-blanc-model-1.jpg'],
+    images: [
+      '/clothes/veste-face-blanche.png',
+      '/clothes/veste-side-blanche.png',
+      '/clothes/veste-dos-blanc.png',
+    ],
+    modelImages: ['/clothes/veste-face-blanche.png'],
     colors: [
       { name: 'Noir', hex: '#000000', available: true },
       { name: 'Blanc', hex: '#FFFFFF', available: true },
@@ -45,10 +53,37 @@ export const products: Product[] = [
     id: 'jogging-tpl-noir',
     name: 'Jogging TPL',
     price: 129,
-    images: ['/images/jogging-noir-1.jpg', '/images/jogging-noir-2.jpg'],
-    modelImages: ['/images/jogging-noir-model-1.jpg'],
+    images: [
+      '/clothes/jogging-avant-noir.png',
+      '/clothes/jogging-dos-noir.png',
+    ],
+    modelImages: ['/clothes/jogging-avant-noir.png'],
     colors: [
       { name: 'Noir', hex: '#000000', available: true },
+      { name: 'Blanc', hex: '#FFFFFF', available: true },
+    ],
+    sizes: [
+      { name: 'S', available: true },
+      { name: 'M', available: true },
+      { name: 'L', available: true },
+      { name: 'XL', available: true },
+    ],
+    category: 'pantalons',
+    description: 'Jogging Temporal confort premium. Broderie logo discret.',
+    modelInfo: 'Noé mesure 174cm et porte du L',
+  },
+  {
+    id: 'jogging-tpl-blanc',
+    name: 'Jogging TPL',
+    price: 129,
+    images: [
+      '/clothes/jogging-avant-blanc.png',
+      '/clothes/jogging-dos-blanc.png',
+    ],
+    modelImages: ['/clothes/jogging-avant-blanc.png'],
+    colors: [
+      { name: 'Noir', hex: '#000000', available: true },
+      { name: 'Blanc', hex: '#FFFFFF', available: true },
     ],
     sizes: [
       { name: 'S', available: true },
@@ -64,8 +99,36 @@ export const products: Product[] = [
     id: 'tshirt-tpl-noir',
     name: 'T-shirt TPL',
     price: 59,
-    images: ['/images/tshirt-noir-1.jpg', '/images/tshirt-noir-2.jpg'],
-    modelImages: ['/images/tshirt-noir-model-1.jpg'],
+    images: [
+      '/clothes/t-shirt-face-noir.png',
+      '/clothes/t-shirt-side-noir.png',
+      '/clothes/t-shirt-dos-noir.png',
+    ],
+    modelImages: ['/clothes/t-shirt-face-noir.png'],
+    colors: [
+      { name: 'Noir', hex: '#000000', available: true },
+      { name: 'Blanc', hex: '#FFFFFF', available: true },
+    ],
+    sizes: [
+      { name: 'S', available: true },
+      { name: 'M', available: true },
+      { name: 'L', available: true },
+      { name: 'XL', available: true },
+    ],
+    category: 'tshirts',
+    description: 'T-shirt Temporal 100% coton. Logo brodé sur la poitrine.',
+    modelInfo: 'Noé mesure 174cm et porte du L',
+  },
+  {
+    id: 'tshirt-tpl-blanc',
+    name: 'T-shirt TPL',
+    price: 59,
+    images: [
+      '/clothes/t-shirt-face-blanc.png',
+      '/clothes/t-shirt-side-blanc.png',
+      '/clothes/t-shirt-dos-blanc.png',
+    ],
+    modelImages: ['/clothes/t-shirt-face-blanc.png'],
     colors: [
       { name: 'Noir', hex: '#000000', available: true },
       { name: 'Blanc', hex: '#FFFFFF', available: true },
@@ -84,10 +147,33 @@ export const products: Product[] = [
     id: 'bonnet-tpl-noir',
     name: 'Bonnet TPL',
     price: 39,
-    images: ['/images/bonnet-noir-1.jpg', '/images/bonnet-noir-2.jpg'],
-    modelImages: ['/images/bonnet-noir-model-1.jpg'],
+    images: [
+      '/clothes/bonnet-face-noir.png',
+      '/clothes/bonnet-dos-noir.png',
+    ],
+    modelImages: ['/clothes/bonnet-face-noir.png'],
     colors: [
       { name: 'Noir', hex: '#000000', available: true },
+      { name: 'Blanc', hex: '#FFFFFF', available: true },
+    ],
+    sizes: [
+      { name: 'Unique', available: true },
+    ],
+    category: 'accessoires',
+    description: 'Bonnet Temporal brodé. Taille unique.',
+  },
+  {
+    id: 'bonnet-tpl-blanc',
+    name: 'Bonnet TPL',
+    price: 39,
+    images: [
+      '/clothes/bonnet-face-blanc.png',
+      '/clothes/bonnet-dos-blanc.png',
+    ],
+    modelImages: ['/clothes/bonnet-face-blanc.png'],
+    colors: [
+      { name: 'Noir', hex: '#000000', available: true },
+      { name: 'Blanc', hex: '#FFFFFF', available: true },
     ],
     sizes: [
       { name: 'Unique', available: true },

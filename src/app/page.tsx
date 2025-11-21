@@ -7,6 +7,8 @@ import MarqueeBanner from '@/components/ui/MarqueeBanner';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import CartDrawer from '@/components/cart/CartDrawer';
+import SearchOverlay from '@/components/layout/SearchOverlay';
+import Footer from '@/components/layout/Footer';
 import HeroSection from '@/components/home/HeroSection';
 import ProductGrid from '@/components/product/ProductGrid';
 
@@ -33,15 +35,17 @@ export default function Home() {
 
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <div className={darkMode ? 'bg-black text-white' : 'bg-white text-black'}>
+      <div className="bg-background text-foreground">
         <MarqueeBanner />
         <Header />
         <Sidebar />
         <CartDrawer />
-        <main>
+        <SearchOverlay />
+        <main className="bg-background">
           <HeroSection />
           <ProductGrid />
         </main>
+        <Footer />
       </div>
     </div>
   );

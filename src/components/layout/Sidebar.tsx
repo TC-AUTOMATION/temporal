@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, ChevronRight, Sparkles, Instagram, User, Flame, Shirt, Layers, Footprints, Watch, X, Zap } from 'lucide-react';
+import { Search, ChevronRight, Sparkles, Instagram, User, Flame, Shirt, Layers, Footprints, Watch, X, Zap, Shield, LogOut } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 import TemporalLogo from '@/components/ui/TemporalLogo';
 
 export default function Sidebar() {
   const { language, darkMode, isSidebarOpen, setSidebarOpen, setSearchOpen } = useStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const t = translations[language];
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -189,40 +191,79 @@ export default function Sidebar() {
           </Link>
         </div>
 
+        {/* Admin link for admin users */}
+        {isAuthenticated && user?.isAdmin && (
+          <div className={`px-3 md:px-4 pb-2 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+            <Link
+              href="/admin"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center justify-between px-3 py-2.5 md:px-4 md:py-3 bg-gradient-to-r from-primary/20 to-purple-500/20 border border-primary/30 transition-all hover:scale-[1.02] group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-primary flex items-center justify-center">
+                  <Shield size={14} className="text-white" />
+                </div>
+                <span
+                  className="text-primary text-sm"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  GESTION ADMIN
+                </span>
+              </div>
+              <ChevronRight size={16} className="text-primary group-hover:translate-x-1 transition-all" />
+            </Link>
+          </div>
+        )}
+
         {/* Footer */}
         <div className={`p-3 md:p-4 border-t flex-shrink-0 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
           <div className="flex items-center justify-between">
-            <Link href="/login" onClick={() => setSidebarOpen(false)}>
-              <button
-                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm transition-all hover:scale-105"
-                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
-              >
-                <User size={14} />
-                CONNEXION
-              </button>
-            </Link>
-            <div className="flex gap-2">
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`w-9 h-9 flex items-center justify-center transition-all hover:scale-110 ${
-                  darkMode ? 'bg-white/10 hover:bg-primary' : 'bg-black/5 hover:bg-primary hover:text-white'
-                }`}
-              >
-                <Instagram size={16} />
-              </a>
-              <a
-                href="https://tiktok.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`w-9 h-9 flex items-center justify-center transition-all hover:scale-110 ${
-                  darkMode ? 'bg-white/10 hover:bg-primary' : 'bg-black/5 hover:bg-primary hover:text-white'
-                }`}
-              >
-                <span style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '0.75rem' }}>TT</span>
-              </a>
-            </div>
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link href="/profile" onClick={() => setSidebarOpen(false)}>
+                  <button
+                    className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm transition-all hover:scale-105"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  >
+                    <User size={14} />
+                    MON PROFIL
+                  </button>
+                </Link>
+                <button
+                  onClick={() => {
+                    logout();
+                    setSidebarOpen(false);
+                  }}
+                  className={`w-9 h-9 flex items-center justify-center transition-all hover:scale-110 ${
+                    darkMode ? 'bg-white/10 hover:bg-red-500/20' : 'bg-black/5 hover:bg-red-500/20'
+                  }`}
+                  title="Déconnexion"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" onClick={() => setSidebarOpen(false)}>
+                <button
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm transition-all hover:scale-105"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  <User size={14} />
+                  CONNEXION
+                </button>
+              </Link>
+            )}
+            <a
+              href="https://www.instagram.com/temporal_clothes/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`w-9 h-9 flex items-center justify-center transition-all hover:scale-110 ${
+                darkMode ? 'bg-white/10 hover:bg-primary' : 'bg-black/5 hover:bg-primary hover:text-white'
+              }`}
+              aria-label="Instagram Temporal"
+            >
+              <Instagram size={16} />
+            </a>
           </div>
         </div>
       </div>

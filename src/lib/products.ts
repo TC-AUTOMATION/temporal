@@ -7,7 +7,6 @@ export const products: Product[] = [
     price: 189,
     images: [
       '/clothes/veste-face-noire.png',
-      '/clothes/veste-side-blanche.png',
       '/clothes/veste-dos-noir.png',
     ],
     modelImages: ['/clothes/veste-face-noire.png'],

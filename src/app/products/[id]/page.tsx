@@ -293,7 +293,7 @@ export default function ProductPage() {
                     className={`text-xs ${darkMode ? 'text-white/50' : 'text-black/50'}`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                   >
-                    LIVRAISON 48H
+                    EXPÉDITION RAPIDE
                   </p>
                 </div>
                 <div className="text-center">

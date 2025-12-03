@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, Zap } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import TemporalLogo from '@/components/ui/TemporalLogo';
@@ -17,17 +17,15 @@ export default function HeroSection() {
   useEffect(() => {
     setIsLoaded(true);
     const handleScroll = () => {
-      if (window.scrollY <= 500) {
-        setScrollY(window.scrollY);
-      }
+      setScrollY(window.scrollY);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const logoTranslateY = Math.max(-250, -scrollY * 0.5);
-  const logoScale = Math.max(0.12, 1 - scrollY / 600);
+  const scrollProgress = Math.min(scrollY / 300, 1);
+  const logoScale = Math.max(0.16, 1 - scrollProgress);
   const contentOpacity = Math.max(0, 1 - scrollY / 300);
 
   return (
@@ -41,18 +39,19 @@ export default function HeroSection() {
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background z-[1]" />
 
       {/* Main content */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
-        {/* Logo avec parallax */}
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 -mt-16">
+        {/* Logo with parallax */}
         <div
-          className={`transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
+          className={`transition-opacity duration-1000 delay-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
           style={{
-            transform: `translateY(${logoTranslateY}px) scale(${logoScale})`,
+            transform: `translateY(${-scrollProgress * 300}px) scale(${logoScale})`,
+            transition: 'transform 0.3s ease-out, opacity 1s',
           }}
         >
-          <TemporalLogo size={280} />
+          <TemporalLogo size={400} />
         </div>
 
-        {/* Streetwear subtitle */}
+        {/* Tagline */}
         <div
           className={`mt-8 text-center transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ opacity: contentOpacity }}
@@ -63,43 +62,15 @@ export default function HeroSection() {
               className="text-primary text-lg md:text-xl tracking-[0.3em] uppercase"
               style={{ fontFamily: '"Bebas Neue", sans-serif' }}
             >
-              Parce que le temps, lui, n’attend pas
+              {t.heroTagline}
             </p>
             <div className="h-[1px] w-16 md:w-32 bg-gradient-to-l from-transparent to-primary" />
           </div>
         </div>
 
-        {/* CTA Buttons */}
-        <div
-          className={`mt-12 flex flex-col sm:flex-row gap-4 transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-          style={{ opacity: contentOpacity }}
-        >
-          <Link href="#collection">
-            <button
-              className="group relative px-10 py-4 bg-primary text-primary-foreground rounded-full overflow-hidden transition-all hover:scale-105 hover:shadow-2xl hover:shadow-primary/30"
-              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '1.1rem' }}
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                <Zap size={18} />
-                DÉCOUVRIR LE DROP
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_100%] animate-shimmer" />
-            </button>
-          </Link>
-
-          <Link href="/shop">
-            <button
-              className="px-10 py-4 border-2 border-foreground/30 text-foreground rounded-full transition-all hover:border-primary hover:text-primary hover:scale-105"
-              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '1.1rem' }}
-            >
-              VOIR LA COLLECTION
-            </button>
-          </Link>
-        </div>
-
         {/* Stats */}
         <div
-          className={`mt-16 grid grid-cols-3 gap-8 md:gap-16 transition-all duration-1000 delay-[900ms] ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`mt-12 grid grid-cols-3 gap-8 md:gap-16 transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
           style={{ opacity: contentOpacity }}
         >
           <div className="text-center">
@@ -109,7 +80,9 @@ export default function HeroSection() {
             >
               100%
             </p>
-            <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider mt-1">Premium</p>
+            <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider mt-1">
+              {t.premium}
+            </p>
           </div>
           <div className="text-center">
             <p
@@ -118,7 +91,9 @@ export default function HeroSection() {
             >
               LTD
             </p>
-            <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider mt-1">Édition</p>
+            <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider mt-1">
+              {t.edition}
+            </p>
           </div>
           <div className="text-center">
             <p
@@ -127,24 +102,27 @@ export default function HeroSection() {
             >
               24H
             </p>
-            <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider mt-1">Shipping</p>
+            <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider mt-1">
+              {t.shipping}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Scroll indicator */}
-      <div
-        className="absolute bottom-8 left-0 right-0 z-20 text-center"
+      <Link
+        href="#collection"
+        className="absolute bottom-8 left-0 right-0 z-20 text-center group cursor-pointer"
         style={{ opacity: contentOpacity }}
       >
         <p
-          className="text-muted-foreground text-xs uppercase tracking-[0.3em] mb-2"
+          className="text-foreground text-sm md:text-base uppercase tracking-[0.3em] mb-3 group-hover:text-primary transition-colors"
           style={{ fontFamily: '"Bebas Neue", sans-serif' }}
         >
-          Scroll
+          DÉCOUVRIR
         </p>
-        <ChevronDown size={24} className="text-primary mx-auto animate-bounce" />
-      </div>
+        <ChevronDown size={28} className="text-primary mx-auto animate-bounce" strokeWidth={2.5} />
+      </Link>
 
       {/* Decorative elements */}
       <div className="absolute top-1/4 left-8 w-[1px] h-32 bg-gradient-to-b from-primary/50 to-transparent hidden lg:block" />
@@ -152,10 +130,14 @@ export default function HeroSection() {
 
       {/* Corner accents */}
       <div className="absolute top-20 left-8 text-muted-foreground/30 hidden lg:block">
-        <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '0.7rem' }}>EST. 2024</p>
+        <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '0.7rem' }}>
+          EST. 2025
+        </p>
       </div>
       <div className="absolute top-20 right-8 text-muted-foreground/30 hidden lg:block">
-        <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '0.7rem' }}>FRANCE</p>
+        <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em', fontSize: '0.7rem' }}>
+          FRANCE
+        </p>
       </div>
     </section>
   );

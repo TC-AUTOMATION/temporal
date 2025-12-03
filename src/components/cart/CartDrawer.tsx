@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, Plus, Minus, ShoppingBag, Sparkles, X, Zap } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, X, Zap, ArrowRight } from 'lucide-react';
+import TemporalStar from '@/components/ui/TemporalStar';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import { products } from '@/lib/products';
@@ -196,6 +197,17 @@ export default function CartDrawer() {
                           {item.price.toFixed(2)}€
                         </p>
                       </div>
+
+                      {/* Link to product page */}
+                      <Link
+                        href={`/products/${item.id}`}
+                        onClick={handleClose}
+                        className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-xs border border-primary text-primary hover:bg-primary hover:text-white transition-all"
+                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                      >
+                        VOIR LA PAGE DU PRODUIT
+                        <ArrowRight size={12} />
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -208,7 +220,7 @@ export default function CartDrawer() {
               <div className={`my-6 h-[1px] ${darkMode ? 'bg-white/10' : 'bg-black/10'}`} />
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <Sparkles size={16} className="text-primary" />
+                  <TemporalStar size={18} className="text-primary" />
                   <h3
                     className="text-primary text-sm"
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
@@ -300,13 +312,12 @@ export default function CartDrawer() {
               </div>
             </div>
 
-            <Link href="/checkout" onClick={handleClose}>
+            <Link href="/checkout" onClick={handleClose} className="block">
               <button
-                className="w-full py-4 bg-primary text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+                className="w-full py-4 bg-primary text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] rounded-lg"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '1.1rem' }}
               >
-                <Zap size={18} />
-                CHECKOUT
+                PASSER AU PAIEMENT
               </button>
             </Link>
           </div>

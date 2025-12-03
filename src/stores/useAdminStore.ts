@@ -112,7 +112,31 @@ export interface DashboardStats {
   activePromoCodes: number;
 }
 
+export interface TicketMessage {
+  id: string;
+  content: string;
+  isAdmin: boolean;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  ticketNumber: string;
+  customerName: string;
+  customerEmail: string;
+  subject: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high';
+  messages: TicketMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface AdminState {
+  // Countdown
+  countdownDate: string;
+  setCountdownDate: (date: string) => void;
+
   // Products
   products: AdminProduct[];
   addProduct: (product: Omit<AdminProduct, 'id' | 'createdAt' | 'updatedAt' | 'totalStock'>) => void;
@@ -147,14 +171,25 @@ interface AdminState {
   categories: string[];
   addCategory: (category: string) => void;
   deleteCategory: (category: string) => void;
+
+  // Tickets
+  tickets: Ticket[];
+  addTicket: (ticket: Omit<Ticket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) => void;
+  updateTicketStatus: (id: string, status: Ticket['status']) => void;
+  addTicketMessage: (ticketId: string, content: string, isAdmin: boolean) => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 const generateOrderNumber = () => `TP-${Date.now().toString(36).toUpperCase()}`;
+const generateTicketNumber = () => `TK-${Date.now().toString(36).toUpperCase()}`;
 
 export const useAdminStore = create<AdminState>()(
   persist(
     (set, get) => ({
+      // Countdown - default to 7 days from now
+      countdownDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      setCountdownDate: (date) => set({ countdownDate: date }),
+
       // Initial Products from existing data
       products: [
         {
@@ -552,6 +587,62 @@ export const useAdminStore = create<AdminState>()(
 
       deleteCategory: (category) => set((state) => ({
         categories: state.categories.filter((c) => c !== category),
+      })),
+
+      // Tickets
+      tickets: [
+        {
+          id: '1',
+          ticketNumber: 'TK-DEMO001',
+          customerName: 'Jean Dupont',
+          customerEmail: 'jean.dupont@email.com',
+          subject: 'Question sur ma commande',
+          status: 'open',
+          priority: 'medium',
+          messages: [
+            {
+              id: '1',
+              content: 'Bonjour, je voudrais savoir quand ma commande sera expédiée ?',
+              isAdmin: false,
+              createdAt: new Date(Date.now() - 86400000).toISOString(),
+            },
+          ],
+          createdAt: new Date(Date.now() - 86400000).toISOString(),
+          updatedAt: new Date(Date.now() - 86400000).toISOString(),
+        },
+      ],
+
+      addTicket: (ticket) => set((state) => ({
+        tickets: [...state.tickets, {
+          ...ticket,
+          id: generateId(),
+          ticketNumber: generateTicketNumber(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }],
+      })),
+
+      updateTicketStatus: (id, status) => set((state) => ({
+        tickets: state.tickets.map((t) =>
+          t.id === id ? { ...t, status, updatedAt: new Date().toISOString() } : t
+        ),
+      })),
+
+      addTicketMessage: (ticketId, content, isAdmin) => set((state) => ({
+        tickets: state.tickets.map((t) =>
+          t.id === ticketId
+            ? {
+                ...t,
+                messages: [...t.messages, {
+                  id: generateId(),
+                  content,
+                  isAdmin,
+                  createdAt: new Date().toISOString(),
+                }],
+                updatedAt: new Date().toISOString(),
+              }
+            : t
+        ),
       })),
     }),
     {

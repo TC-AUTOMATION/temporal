@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Save, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Save, FolderOpen, Clock } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { categories, addCategory, deleteCategory, products } = useAdminStore();
+  const { categories, addCategory, deleteCategory, products, countdownDate, setCountdownDate } = useAdminStore();
   const [newCategory, setNewCategory] = useState('');
 
   const handleAddCategory = () => {
@@ -23,8 +23,36 @@ export default function SettingsPage() {
     return products.filter((p) => p.category === category).length;
   };
 
+  const formatDateForInput = (isoDate: string) => {
+    const date = new Date(isoDate);
+    return date.toISOString().slice(0, 16);
+  };
+
   return (
     <div className="space-y-6 max-w-4xl">
+      {/* Countdown Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Compte à rebours Landing Page
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Date du drop</label>
+            <Input
+              type="datetime-local"
+              value={formatDateForInput(countdownDate)}
+              onChange={(e) => setCountdownDate(new Date(e.target.value).toISOString())}
+            />
+            <p className="text-sm text-muted-foreground mt-1">
+              Le compte à rebours sur la landing page indiquera le temps restant jusqu'à cette date
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Categories Management */}
       <Card>
         <CardHeader>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, ShoppingBag } from 'lucide-react';
+import { Heart, ShoppingBag, ChevronDown } from 'lucide-react';
 import { Product, useStore } from '@/stores/useStore';
 
 interface ProductCardProps {
@@ -14,24 +14,39 @@ interface ProductCardProps {
 export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [showSizeSelector, setShowSizeSelector] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const { addToCart, setCartOpen, darkMode } = useStore();
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const availableSize = product.sizes.find((s) => s.available);
-    if (availableSize) {
+
+    if (!showSizeSelector) {
+      setShowSizeSelector(true);
+      return;
+    }
+
+    if (selectedSize) {
       addToCart({
         id: product.id,
         name: product.name,
         price: product.price,
-        size: availableSize.name,
+        size: selectedSize,
         color: product.colors[0]?.name || '',
         quantity: 1,
         image: product.images[0],
       });
       setCartOpen(true);
+      setShowSizeSelector(false);
+      setSelectedSize(null);
     }
+  };
+
+  const handleSizeSelect = (e: React.MouseEvent, sizeName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedSize(sizeName);
   };
 
   const handleLike = (e: React.MouseEvent) => {
@@ -50,15 +65,25 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
       <div className="relative">
         {/* Image container */}
         <div className={`aspect-[3/4] relative overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
-          {/* Product image */}
+          {/* Product image - shows second image on hover if available */}
           <div className={`absolute inset-0 transition-transform duration-500 ease-out ${isHovered ? 'scale-110' : 'scale-100'}`}>
             {product.images[0] ? (
-              <Image
-                src={product.images[0]}
-                alt={product.name}
-                fill
-                className="object-cover"
-              />
+              <>
+                <Image
+                  src={product.images[0]}
+                  alt={product.name}
+                  fill
+                  className={`object-cover transition-opacity duration-500 ${isHovered && product.images[1] ? 'opacity-0' : 'opacity-100'}`}
+                />
+                {product.images[1] && (
+                  <Image
+                    src={product.images[1]}
+                    alt={`${product.name} - vue 2`}
+                    fill
+                    className={`object-cover transition-opacity duration-500 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                  />
+                )}
+              </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
                 <span
@@ -87,16 +112,48 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
           </button>
 
           {/* Quick add button - appears on hover */}
-          <button
-            onClick={handleQuickAdd}
-            className={`absolute bottom-3 left-3 right-3 py-3 bg-white text-black flex items-center justify-center gap-2 transition-all duration-300 ${
+          <div
+            className={`absolute bottom-3 left-3 right-3 transition-all duration-300 ${
               isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
             }`}
-            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
           >
-            <ShoppingBag size={16} />
-            AJOUTER AU PANIER
-          </button>
+            {showSizeSelector && (
+              <div className="bg-white p-2 mb-2">
+                <p
+                  className="text-black text-xs text-center mb-2"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  CHOISIS TA TAILLE
+                </p>
+                <div className="flex gap-1 justify-center flex-wrap">
+                  {product.sizes.filter(s => s.available).map((size) => (
+                    <button
+                      key={size.name}
+                      onClick={(e) => handleSizeSelect(e, size.name)}
+                      className={`px-3 py-1 text-xs border transition-all ${
+                        selectedSize === size.name
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-black border-black/20 hover:border-black'
+                      }`}
+                      style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                    >
+                      {size.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={handleQuickAdd}
+              className={`w-full py-3 bg-white text-black flex items-center justify-center gap-2 transition-all ${
+                showSizeSelector && !selectedSize ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary hover:text-white'
+              }`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
+            >
+              <ShoppingBag size={16} />
+              {showSizeSelector ? 'CONFIRMER' : 'AJOUTER AU PANIER'}
+            </button>
+          </div>
 
           {/* Status badge */}
           <div className="absolute top-3 left-3">

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Lock } from 'lucide-react';
 import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalStar from '@/components/ui/TemporalStar';
 import Starfield from '@/components/ui/Starfield';
 import { useStore } from '@/stores/useStore';
+import { useAdminStore } from '@/stores/useAdminStore';
 import { translations } from '@/lib/translations';
 
 interface LandingPageProps {
@@ -17,12 +19,37 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
   const [password, setPassword] = useState('');
   const [showOptions, setShowOptions] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const { language } = useStore();
+  const { countdownDate } = useAdminStore();
   const t = translations[language];
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const targetDate = new Date(countdownDate).getTime();
+      const now = new Date().getTime();
+      const diff = targetDate - now;
+
+      if (diff > 0) {
+        setCountdown({
+          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((diff / (1000 * 60)) % 60),
+          seconds: Math.floor((diff / 1000) % 60),
+        });
+      } else {
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [countdownDate]);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +67,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
 
   if (showPassword) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4 relative overflow-hidden">
         <Starfield />
 
         <div className="relative z-10 w-full max-w-md">
@@ -49,20 +76,18 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           </div>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-6">
-            <div className="relative">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mot de passe"
-                className="w-full px-6 py-4 bg-gray-100 border border-gray-200 text-black placeholder-gray-400 focus:outline-none focus:border-[#5B2D8E] transition-colors text-center tracking-widest rounded-lg"
-                autoFocus
-              />
-            </div>
-
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mot de passe"
+              className="w-full px-6 py-4 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary transition-colors text-center tracking-widest"
+              autoFocus
+            />
             <button
               type="submit"
-              className="w-full py-4 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors rounded-lg"
+              className="w-full py-4 bg-primary text-white uppercase tracking-widest hover:bg-primary/90 transition-colors"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
             >
               Entrer
             </button>
@@ -74,7 +99,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
 
   if (showOptions) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4 relative overflow-hidden">
         <Starfield />
 
         <div className="relative z-10 w-full max-w-md text-center">
@@ -82,22 +107,22 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
             <TemporalLogo size={80} />
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8">
-            <Sparkles className="w-8 h-8 text-[#5B2D8E] mx-auto mb-4" />
-            <p className="text-gray-700 mb-8 text-lg">
-              Email enregistré avec succès!
-            </p>
+          <div className="border border-white/10 p-8">
+            <TemporalStar size={32} className="mx-auto mb-4" />
+            <p className="text-white/70 mb-8">Email enregistré avec succès!</p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <a
                 href="/profile/create"
-                className="block w-full py-3 border-2 border-[#5B2D8E] text-[#5B2D8E] font-bold uppercase tracking-wider rounded-lg hover:bg-[#5B2D8E] hover:text-white transition-colors"
+                className="block w-full py-3 border border-primary text-primary uppercase tracking-widest hover:bg-primary hover:text-white transition-colors"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
               >
                 {t.createAccount}
               </a>
               <button
                 onClick={onEnter}
-                className="w-full py-3 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors rounded-lg"
+                className="w-full py-3 bg-primary text-white uppercase tracking-widest hover:bg-primary/90 transition-colors"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
               >
                 {t.enterSite}
               </button>
@@ -109,102 +134,110 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col relative overflow-hidden">
-      {/* Starfield background */}
+    <div className="min-h-screen bg-black flex flex-col relative overflow-hidden">
       <Starfield />
-
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white/80 pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#5B2D8E]/5 via-transparent to-[#5B2D8E]/5 pointer-events-none" />
 
       {/* Top bar with password link */}
       <div className={`relative z-20 flex justify-end p-6 transition-all duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
         <button
           onClick={() => setShowPassword(true)}
-          className="flex items-center gap-2 text-gray-400 hover:text-gray-800 text-xs tracking-wider transition-colors group"
+          className="flex items-center gap-2 text-white/30 hover:text-white/60 text-xs tracking-widest transition-colors"
         >
-          <Lock size={12} className="group-hover:text-[#5B2D8E] transition-colors" />
-          <span>{t.enterPassword}</span>
+          <Lock size={12} />
+          <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+            {t.enterPassword.toUpperCase()}
+          </span>
         </button>
       </div>
 
-      {/* Logo */}
-      <div className={`relative z-10 flex justify-center pt-4 transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-        <TemporalLogo size={60} />
-      </div>
-
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10">
-        {/* Title */}
-        <div className={`text-center mb-12 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="w-12 h-px bg-gradient-to-r from-transparent to-[#5B2D8E]" />
-            <Sparkles className="w-5 h-5 text-[#5B2D8E]" />
-            <div className="w-12 h-px bg-gradient-to-l from-transparent to-[#5B2D8E]" />
-          </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10 -mt-10">
+        {/* Logo */}
+        <div className={`mb-12 transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
+          <TemporalLogo size={120} />
+        </div>
 
-          <h1 className="text-4xl md:text-6xl font-black text-black uppercase tracking-tight leading-none mb-6">
+        {/* Star decoration */}
+        <div className={`mb-6 transition-all duration-1000 delay-400 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+          <TemporalStar size={24} />
+        </div>
+
+        {/* Title */}
+        <div className={`text-center mb-10 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+          <h1
+            className="text-4xl md:text-6xl text-white uppercase leading-none mb-4"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+          >
             {t.firstDrop}
           </h1>
-
-          <p className="text-gray-500 text-sm md:text-base tracking-widest max-w-md mx-auto">
+          <p className="text-white/40 text-sm tracking-widest">
             {t.signUpEmail}
           </p>
+        </div>
+
+        {/* Countdown */}
+        <div className={`mb-12 transition-all duration-1000 delay-600 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+          <div className="flex items-center gap-4 md:gap-8">
+            {[
+              { value: countdown.days, label: language === 'fr' ? 'J' : 'D' },
+              { value: countdown.hours, label: 'H' },
+              { value: countdown.minutes, label: 'M' },
+              { value: countdown.seconds, label: 'S' },
+            ].map((item, index) => (
+              <div key={index} className="text-center">
+                <div
+                  className="text-5xl md:text-7xl text-white"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                >
+                  {String(item.value).padStart(2, '0')}
+                </div>
+                <div
+                  className="text-white/30 text-xs tracking-widest mt-1"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                >
+                  {item.label}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Email form */}
         <form
           onSubmit={handleEmailSubmit}
-          className={`w-full max-w-lg transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+          className={`w-full max-w-md transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
         >
-          <div className="relative group">
-            {/* Glow effect */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#5B2D8E]/30 via-[#7B4DB0]/30 to-[#5B2D8E]/30 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-            <div className="relative flex">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t.email}
-                className="flex-1 px-6 py-4 bg-gray-100 border border-gray-200 text-black placeholder-gray-400 focus:outline-none focus:border-[#5B2D8E] transition-all text-base rounded-l-lg"
-                required
-              />
-              <button
-                type="submit"
-                className="px-8 bg-[#5B2D8E] text-white font-bold uppercase tracking-wider hover:bg-[#7B4DB0] transition-colors flex items-center gap-2 rounded-r-lg"
-              >
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
+          <div className="flex">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t.email}
+              className="flex-1 px-5 py-4 bg-white/5 border border-white/10 border-r-0 text-white placeholder-white/30 focus:outline-none focus:border-primary/50 transition-colors text-sm"
+              required
+            />
+            <button
+              type="submit"
+              className="px-6 bg-primary text-white hover:bg-primary/90 transition-colors"
+            >
+              <ArrowRight size={20} />
+            </button>
           </div>
         </form>
+      </div>
 
-        {/* Bottom decoration */}
-        <div className={`mt-16 flex items-center gap-2 transition-all duration-1000 delay-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="w-1 h-1 bg-gray-300 rounded-full" />
-          <div className="w-1 h-1 bg-[#5B2D8E] rounded-full" />
-          <div className="w-1 h-1 bg-gray-300 rounded-full" />
+      {/* Footer */}
+      <div className={`relative z-10 pb-8 flex justify-center transition-all duration-1000 delay-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-px bg-white/10" />
+          <span
+            className="text-white/20 text-[10px] tracking-widest"
+            style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+          >
+            TEMPORAL 2025
+          </span>
+          <div className="w-8 h-px bg-white/10" />
         </div>
-      </div>
-
-      {/* Side text */}
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden lg:block">
-        <p
-          className="text-gray-200 text-[10px] tracking-[0.5em] uppercase font-light"
-          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-        >
-          Premium Streetwear
-        </p>
-      </div>
-
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden lg:block">
-        <p
-          className="text-gray-200 text-[10px] tracking-[0.5em] uppercase font-light"
-          style={{ writingMode: 'vertical-rl' }}
-        >
-          Limited Edition
-        </p>
       </div>
     </div>
   );

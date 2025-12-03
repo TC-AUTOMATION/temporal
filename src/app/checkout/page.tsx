@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import TemporalLogo from '@/components/ui/TemporalLogo';
-import { Truck, Package, Check, ArrowLeft, Lock } from 'lucide-react';
+import { Truck, Package, Check, ArrowLeft, Lock, Info } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -17,6 +17,7 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<'delivery' | 'payment' | 'confirmed'>('delivery');
   const [promoCode, setPromoCode] = useState('');
   const [newsletter, setNewsletter] = useState(true);
+  const [showHandDeliveryConfirm, setShowHandDeliveryConfirm] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -264,12 +265,30 @@ export default function CheckoutPage() {
                 >
                   <Package size={32} className={deliveryMethod === 'handDelivery' ? 'text-primary' : ''} />
                   <div>
-                    <h3
-                      className="text-lg"
-                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
-                    >
-                      EN MAIN PROPRE
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3
+                        className="text-lg"
+                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                      >
+                        EN MAIN PROPRE
+                      </h3>
+                      {/* Info tooltip */}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                            darkMode ? 'bg-white/20 text-white' : 'bg-black/10 text-black'
+                          }`}
+                        >
+                          <Info size={12} />
+                        </button>
+                        <div className="absolute left-0 top-7 z-10 w-64 p-3 text-xs bg-black text-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg">
+                          <div className="absolute -top-1 left-2 w-2 h-2 bg-black rotate-45" />
+                          Cette option est réservée aux proches et amis. Vous devrez récupérer votre commande en personne.
+                        </div>
+                      </div>
+                    </div>
                     <p className={`text-sm ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
                       Récupérez votre commande sur place
                     </p>
@@ -283,13 +302,34 @@ export default function CheckoutPage() {
                 </button>
               </div>
 
+              {/* Hand delivery confirmation modal */}
+              {showHandDeliveryConfirm && deliveryMethod === 'handDelivery' && (
+                <div className={`mt-6 p-4 border ${darkMode ? 'border-primary/50 bg-primary/10' : 'border-primary/50 bg-primary/5'}`}>
+                  <p
+                    className="text-sm mb-3"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    ⚠️ CONFIRMATION LIVRAISON MAIN PROPRE
+                  </p>
+                  <p className={`text-xs mb-4 ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
+                    Cette option est réservée aux proches et amis. En confirmant, vous acceptez de récupérer votre commande en personne à l'adresse qui vous sera communiquée.
+                  </p>
+                </div>
+              )}
+
               <button
-                onClick={() => deliveryMethod && setStep('payment')}
+                onClick={() => {
+                  if (deliveryMethod === 'handDelivery' && !showHandDeliveryConfirm) {
+                    setShowHandDeliveryConfirm(true);
+                    return;
+                  }
+                  if (deliveryMethod) setStep('payment');
+                }}
                 disabled={!deliveryMethod}
                 className="w-full mt-8 py-4 bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                CONTINUER
+                {showHandDeliveryConfirm && deliveryMethod === 'handDelivery' ? 'CONFIRMER LA LIVRAISON MAIN PROPRE' : 'CONTINUER'}
               </button>
 
               {/* Footer links */}

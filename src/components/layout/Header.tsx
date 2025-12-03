@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Menu, Search, User, ShoppingBag, X, Sun, Moon } from 'lucide-react';
+import { Menu, Search, User, ShoppingBag, X } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalStar from '@/components/ui/TemporalStar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
@@ -51,7 +52,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(true)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+            className={`w-10 h-10 flex items-center justify-center transition-all hover:scale-110 ${
               darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
             }`}
             aria-label="Menu"
@@ -59,17 +60,23 @@ export default function Header({ showLogo = false }: HeaderProps) {
             <Menu size={20} />
           </button>
 
-          {/* Theme toggle */}
+          {/* Theme toggle with Temporal Star */}
           <button
             onClick={toggleDarkMode}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
-              darkMode
-                ? 'bg-primary/20 text-primary hover:bg-primary/30'
-                : 'bg-primary/10 text-primary hover:bg-primary/20'
+            className={`relative w-16 h-8 rounded-full transition-all ${
+              darkMode ? 'bg-white/20' : 'bg-black/10'
             }`}
             aria-label="Toggle theme"
           >
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            <div
+              className={`absolute top-1 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
+                darkMode
+                  ? 'left-9 bg-white rotate-180'
+                  : 'left-1 bg-black rotate-0'
+              }`}
+            >
+              <TemporalStar size={14} color={darkMode ? '#000000' : '#FFFFFF'} strokeWidth={8} />
+            </div>
           </button>
         </div>
 
@@ -104,7 +111,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setLanguage('fr')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              className={`w-10 h-10 flex items-center justify-center transition-all hover:scale-110 ${
                 language === 'fr'
                   ? 'bg-primary text-primary-foreground'
                   : darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
@@ -115,7 +122,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
             </button>
             <button
               onClick={() => setLanguage('en')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+              className={`w-10 h-10 flex items-center justify-center transition-all hover:scale-110 ${
                 language === 'en'
                   ? 'bg-primary text-primary-foreground'
                   : darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
@@ -129,7 +136,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
           {/* Search */}
           <button
             onClick={() => setSearchOpen(!isSearchOpen)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+            className={`w-10 h-10 flex items-center justify-center transition-all hover:scale-110 ${
               isSearchOpen
                 ? 'bg-primary text-primary-foreground'
                 : darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
@@ -142,7 +149,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
           {/* Profile */}
           <Link
             href="/profile"
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+            className={`w-10 h-10 flex items-center justify-center transition-all hover:scale-110 ${
               darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
             }`}
             aria-label="Profile"
@@ -153,7 +160,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
           {/* Cart */}
           <button
             onClick={() => setCartOpen(true)}
-            className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+            className={`relative w-10 h-10 flex items-center justify-center transition-all hover:scale-110 ${
               darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
             }`}
             aria-label="Cart"
@@ -161,7 +168,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
             <ShoppingBag size={18} />
             {cartCount > 0 && (
               <span
-                className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs"
+                className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground flex items-center justify-center text-xs"
                 style={{ fontFamily: '"Bebas Neue", sans-serif' }}
               >
                 {cartCount}
@@ -178,7 +185,7 @@ export default function Header({ showLogo = false }: HeaderProps) {
             <Input
               type="text"
               placeholder={t.search}
-              className={`w-full rounded-full pl-12 pr-4 py-3 border-2 transition-all ${
+              className={`w-full pl-12 pr-4 py-3 border-2 transition-all ${
                 darkMode
                   ? 'bg-white/5 border-white/20 focus:border-primary'
                   : 'bg-black/5 border-black/10 focus:border-primary'

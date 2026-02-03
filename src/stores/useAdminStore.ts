@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  products as productsApi,
+  orders as ordersApi,
+  promo as promoApi,
+  categories as categoriesApi,
+  type Product as ApiProduct,
+  type Order as ApiOrder,
+  type PromoCode as ApiPromoCode,
+  type Category as ApiCategory,
+} from '@/lib/api/client';
 
 // Types
 export interface ProductSize {
@@ -17,17 +27,32 @@ export interface ProductColor {
 export interface AdminProduct {
   id: string;
   name: string;
+  nameFr?: string;
+  nameEn?: string;
   description: string;
+  descriptionFr?: string;
+  descriptionEn?: string;
+  materials?: string;
+  materialsFr?: string;
+  materialsEn?: string;
+  careInstructions?: string;
+  careInstructionsFr?: string;
+  careInstructionsEn?: string;
   price: number;
   originalPrice?: number;
   category: string;
+  categoryFr?: string;
+  categoryEn?: string;
   sizes: ProductSize[];
   colors: ProductColor[];
   images: string[];
   modelImages: string[];
   modelInfo?: string;
+  modelInfoFr?: string;
+  modelInfoEn?: string;
   isActive: boolean;
   isFeatured: boolean;
+  isNew?: boolean;
   createdAt: string;
   updatedAt: string;
   totalStock: number;
@@ -67,6 +92,7 @@ export interface Order {
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
   deliveryMethod: 'delivery' | 'handDelivery';
   trackingNumber?: string;
+  trackingUrl?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -75,32 +101,16 @@ export interface Order {
 export interface PromoCode {
   id: string;
   code: string;
-  type: 'percentage' | 'fixed';
+  type: 'percentage' | 'fixed' | 'free_shipping';
   value: number;
   minPurchase?: number;
+  maxDiscount?: number;
   maxUses?: number;
   usedCount: number;
   validFrom: string;
-  validUntil: string;
+  validUntil?: string;
   isActive: boolean;
-  applicableProducts?: string[]; // Product IDs, empty = all products
-  applicableCategories?: string[];
   createdAt: string;
-}
-
-export interface Pack {
-  id: string;
-  name: string;
-  description: string;
-  products: { productId: string; quantity: number }[];
-  originalPrice: number;
-  packPrice: number;
-  discount: number;
-  images: string[];
-  isActive: boolean;
-  stock: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface DashboardStats {
@@ -112,11 +122,24 @@ export interface DashboardStats {
   activePromoCodes: number;
 }
 
-export interface TicketMessage {
+export interface Contest {
   id: string;
-  content: string;
-  isAdmin: boolean;
-  createdAt: string;
+  number: string;
+  prizeName: string;
+  prizeNameEn: string;
+  prizeValue: number;
+  purchaseAmount: number;
+  description: string;
+  descriptionEn: string;
+  prizeImage: string;
+  isActive: boolean;
+}
+
+export interface MarqueeItem {
+  id: string;
+  textFr: string;
+  textEn: string;
+  isActive: boolean;
 }
 
 export interface Ticket {
@@ -127,438 +150,483 @@ export interface Ticket {
   subject: string;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   priority: 'low' | 'medium' | 'high';
-  messages: TicketMessage[];
+  messages: { id: string; content: string; isAdmin: boolean; createdAt: string }[];
   createdAt: string;
   updatedAt: string;
 }
 
+export interface PackProduct {
+  productId: string;
+  quantity: number;
+}
+
+export interface Pack {
+  id: string;
+  nameFr: string;
+  nameEn: string;
+  descriptionFr: string;
+  descriptionEn: string;
+  products: PackProduct[];
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 interface AdminState {
+  // Loading states
+  isLoading: boolean;
+  error: string | null;
+
   // Countdown
   countdownDate: string;
   setCountdownDate: (date: string) => void;
 
+  // Contests
+  contests: Contest[];
+  updateContest: (id: string, updates: Partial<Contest>) => void;
+
+  // Marquee
+  marqueeItems: MarqueeItem[];
+  addMarqueeItem: (item: Omit<MarqueeItem, 'id'>) => void;
+  updateMarqueeItem: (id: string, updates: Partial<MarqueeItem>) => void;
+  deleteMarqueeItem: (id: string) => void;
+
   // Products
   products: AdminProduct[];
-  addProduct: (product: Omit<AdminProduct, 'id' | 'createdAt' | 'updatedAt' | 'totalStock'>) => void;
-  updateProduct: (id: string, updates: Partial<AdminProduct>) => void;
-  deleteProduct: (id: string) => void;
-  updateStock: (productId: string, size: string, quantity: number) => void;
+  fetchProducts: () => Promise<void>;
+  addProduct: (product: Partial<AdminProduct>) => Promise<void>;
+  updateProduct: (id: string, updates: Partial<AdminProduct>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
 
   // Orders
   orders: Order[];
-  addOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt'>) => void;
-  updateOrderStatus: (id: string, status: Order['status']) => void;
-  updatePaymentStatus: (id: string, status: Order['paymentStatus']) => void;
-  updateOrder: (id: string, updates: Partial<Order>) => void;
+  fetchOrders: () => Promise<void>;
+  updateOrderStatus: (id: string, status: Order['status'], trackingNumber?: string, trackingUrl?: string) => Promise<void>;
 
   // Promo Codes
   promoCodes: PromoCode[];
-  addPromoCode: (promo: Omit<PromoCode, 'id' | 'usedCount' | 'createdAt'>) => void;
-  updatePromoCode: (id: string, updates: Partial<PromoCode>) => void;
-  deletePromoCode: (id: string) => void;
-  validatePromoCode: (code: string, cartTotal: number) => { valid: boolean; discount: number; message: string };
-
-  // Packs
-  packs: Pack[];
-  addPack: (pack: Omit<Pack, 'id' | 'createdAt' | 'updatedAt' | 'originalPrice' | 'discount'>) => void;
-  updatePack: (id: string, updates: Partial<Pack>) => void;
-  deletePack: (id: string) => void;
+  fetchPromoCodes: () => Promise<void>;
+  addPromoCode: (promo: Partial<PromoCode>) => Promise<void>;
+  updatePromoCode: (id: string, updates: Partial<PromoCode>) => Promise<void>;
+  deletePromoCode: (id: string) => Promise<void>;
 
   // Dashboard
   getDashboardStats: () => DashboardStats;
 
   // Categories
-  categories: string[];
-  addCategory: (category: string) => void;
-  deleteCategory: (category: string) => void;
+  categories: { id: string; name: string; slug: string }[];
+  fetchCategories: () => Promise<void>;
 
   // Tickets
   tickets: Ticket[];
-  addTicket: (ticket: Omit<Ticket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) => void;
-  updateTicketStatus: (id: string, status: Ticket['status']) => void;
-  addTicketMessage: (ticketId: string, content: string, isAdmin: boolean) => void;
+  fetchTickets: () => Promise<void>;
+  addTicket: (ticket: Omit<Ticket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateTicketStatus: (id: string, status: Ticket['status']) => Promise<void>;
+  addTicketReply: (ticketId: string, content: string, isAdmin: boolean) => Promise<void>;
+
+  // Packs
+  packs: Pack[];
+  addPack: (pack: Omit<Pack, 'id' | 'createdAt'>) => void;
+  updatePack: (id: string, updates: Partial<Pack>) => void;
+  deletePack: (id: string) => void;
+
+  // Utility
+  clearError: () => void;
+}
+
+// Helper to convert API product to admin product format
+function apiProductToAdmin(p: ApiProduct): AdminProduct {
+  const sizeMap = new Map<string, ProductSize>();
+  const colorMap = new Map<string, ProductColor>();
+
+  for (const v of p.variants) {
+    // Aggregate sizes
+    const existingSize = sizeMap.get(v.size);
+    if (existingSize) {
+      existingSize.stock += v.stock;
+      existingSize.available = existingSize.stock > 0;
+    } else {
+      sizeMap.set(v.size, { name: v.size, stock: v.stock, available: v.stock > 0 });
+    }
+
+    // Aggregate colors
+    if (!colorMap.has(v.color)) {
+      colorMap.set(v.color, { name: v.color, hex: v.colorHex || '#000000', available: v.stock > 0 });
+    }
+  }
+
+  return {
+    id: p.id,
+    name: p.name,
+    nameEn: (p as any).nameEn || undefined,
+    description: p.description || '',
+    descriptionEn: (p as any).descriptionEn || undefined,
+    materials: (p as any).materials || undefined,
+    materialsEn: (p as any).materialsEn || undefined,
+    careInstructions: (p as any).careInstructions || undefined,
+    careInstructionsEn: (p as any).careInstructionsEn || undefined,
+    price: p.price,
+    originalPrice: p.originalPrice || undefined,
+    category: p.category.slug,
+    sizes: Array.from(sizeMap.values()),
+    colors: Array.from(colorMap.values()),
+    images: p.images,
+    modelImages: [],
+    modelInfo: p.modelInfo || undefined,
+    isActive: p.isActive,
+    isFeatured: p.isFeatured,
+    isNew: (p as any).isNew,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totalStock: p.variants.reduce((sum, v) => sum + v.stock, 0),
+    sku: p.sku,
+  };
+}
+
+// Helper to convert API order to admin order format
+function apiOrderToAdmin(o: ApiOrder): Order {
+  return {
+    id: o.id,
+    orderNumber: o.orderNumber,
+    customer: {
+      firstName: o.customerFirstName,
+      lastName: o.customerLastName,
+      email: o.customerEmail,
+      phone: o.customerPhone || undefined,
+      address: o.shippingStreet || undefined,
+      city: o.shippingCity || undefined,
+      postalCode: o.shippingPostalCode || undefined,
+      country: o.shippingCountry || 'France',
+    },
+    items: o.items.map(item => ({
+      productId: item.productId,
+      productName: item.productName,
+      size: item.size || '',
+      color: item.color || '',
+      quantity: item.quantity,
+      price: item.unitPrice,
+      image: item.product?.images?.[0],
+    })),
+    subtotal: o.subtotal,
+    shipping: o.shippingCost,
+    discount: o.discount,
+    total: o.total,
+    promoCode: o.promoCode?.code,
+    status: o.status.toLowerCase() as Order['status'],
+    paymentStatus: o.paymentStatus.toLowerCase() as Order['paymentStatus'],
+    deliveryMethod: o.deliveryMethod === 'HAND_DELIVERY' ? 'handDelivery' : 'delivery',
+    trackingNumber: o.trackingNumber || undefined,
+    trackingUrl: o.trackingUrl || undefined,
+    notes: o.customerNotes || undefined,
+    createdAt: o.createdAt,
+    updatedAt: o.createdAt,
+  };
+}
+
+// Helper to convert API promo to admin promo format
+function apiPromoToAdmin(p: ApiPromoCode): PromoCode {
+  return {
+    id: p.id,
+    code: p.code,
+    type: p.type.toLowerCase() as PromoCode['type'],
+    value: p.value,
+    minPurchase: p.minPurchase || undefined,
+    maxDiscount: p.maxDiscount || undefined,
+    maxUses: p.maxUses || undefined,
+    usedCount: p.usedCount,
+    validFrom: p.validFrom,
+    validUntil: p.validUntil || undefined,
+    isActive: p.isActive,
+    createdAt: p.createdAt,
+  };
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
-const generateOrderNumber = () => `TP-${Date.now().toString(36).toUpperCase()}`;
-const generateTicketNumber = () => `TK-${Date.now().toString(36).toUpperCase()}`;
 
 export const useAdminStore = create<AdminState>()(
   persist(
     (set, get) => ({
+      isLoading: false,
+      error: null,
+
       // Countdown - default to 7 days from now
       countdownDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       setCountdownDate: (date) => set({ countdownDate: date }),
 
-      // Initial Products from existing data
-      products: [
+      // Contests - default values
+      contests: [
         {
           id: '1',
-          name: 'Hoodie Temporal Classic',
-          description: 'Hoodie oversize premium avec logo brodé Temporal. Coupe moderne et confortable.',
-          price: 89,
-          originalPrice: 110,
-          category: 'vestes',
-          sizes: [
-            { name: 'S', stock: 5, available: true },
-            { name: 'M', stock: 12, available: true },
-            { name: 'L', stock: 8, available: true },
-            { name: 'XL', stock: 3, available: true },
-          ],
-          colors: [
-            { name: 'Noir', hex: '#000000', available: true },
-            { name: 'Blanc', hex: '#FFFFFF', available: true },
-          ],
-          images: ['/clothes/hoodie-black.jpg'],
-          modelImages: [],
-          modelInfo: 'Modèle porte la taille L (174cm)',
+          number: '01',
+          prizeName: 'BONNET TEMPORAL',
+          prizeNameEn: 'TEMPORAL BEANIE',
+          prizeValue: 39,
+          purchaseAmount: 150,
+          description: 'Chaque commande de 150€ ou plus te donne automatiquement une participation au tirage au sort.',
+          descriptionEn: 'Every order of 150€ or more automatically gives you one entry into the draw.',
+          prizeImage: '/clothes/bonnet-face-noir.png',
           isActive: true,
-          isFeatured: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          totalStock: 28,
-          sku: 'TPL-HOD-001',
         },
         {
           id: '2',
-          name: 'T-Shirt Temporal Logo',
-          description: 'T-shirt oversize avec logo Temporal imprimé. 100% coton biologique.',
-          price: 45,
-          category: 'tshirts',
-          sizes: [
-            { name: 'S', stock: 15, available: true },
-            { name: 'M', stock: 20, available: true },
-            { name: 'L', stock: 18, available: true },
-            { name: 'XL', stock: 10, available: true },
-          ],
-          colors: [
-            { name: 'Noir', hex: '#000000', available: true },
-            { name: 'Blanc', hex: '#FFFFFF', available: true },
-            { name: 'Violet', hex: '#5B2D8E', available: true },
-          ],
-          images: ['/clothes/tshirt-black.jpg'],
-          modelImages: [],
+          number: '02',
+          prizeName: 'VESTE TEMPORAL',
+          prizeNameEn: 'TEMPORAL JACKET',
+          prizeValue: 189,
+          purchaseAmount: 200,
+          description: 'Chaque commande de 200€ ou plus te donne automatiquement une participation au tirage au sort.',
+          descriptionEn: 'Every order of 200€ or more automatically gives you one entry into the draw.',
+          prizeImage: '/clothes/veste-face-noire.png',
           isActive: true,
-          isFeatured: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          totalStock: 63,
-          sku: 'TPL-TSH-001',
-        },
-        {
-          id: '3',
-          name: 'Pantalon Cargo Temporal',
-          description: 'Pantalon cargo avec poches multiples et logo brodé.',
-          price: 95,
-          category: 'pantalons',
-          sizes: [
-            { name: 'S', stock: 8, available: true },
-            { name: 'M', stock: 12, available: true },
-            { name: 'L', stock: 10, available: true },
-            { name: 'XL', stock: 5, available: true },
-          ],
-          colors: [
-            { name: 'Noir', hex: '#000000', available: true },
-            { name: 'Beige', hex: '#D4C4B0', available: true },
-          ],
-          images: ['/clothes/cargo-black.jpg'],
-          modelImages: [],
-          isActive: true,
-          isFeatured: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          totalStock: 35,
-          sku: 'TPL-PNT-001',
-        },
-        {
-          id: '4',
-          name: 'Casquette Temporal',
-          description: 'Casquette brodée avec logo Temporal. Taille ajustable.',
-          price: 35,
-          category: 'accessoires',
-          sizes: [
-            { name: 'Unique', stock: 25, available: true },
-          ],
-          colors: [
-            { name: 'Noir', hex: '#000000', available: true },
-            { name: 'Blanc', hex: '#FFFFFF', available: true },
-          ],
-          images: ['/clothes/cap-black.jpg'],
-          modelImages: [],
-          isActive: true,
-          isFeatured: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          totalStock: 25,
-          sku: 'TPL-CAP-001',
         },
       ],
+      updateContest: (id, updates) =>
+        set((state) => ({
+          contests: state.contests.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+        })),
 
-      addProduct: (product) => set((state) => {
-        const totalStock = product.sizes.reduce((sum, s) => sum + s.stock, 0);
-        const newProduct: AdminProduct = {
-          ...product,
-          id: generateId(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          totalStock,
-        };
-        return { products: [...state.products, newProduct] };
-      }),
-
-      updateProduct: (id, updates) => set((state) => ({
-        products: state.products.map((p) => {
-          if (p.id === id) {
-            const updated = { ...p, ...updates, updatedAt: new Date().toISOString() };
-            if (updates.sizes) {
-              updated.totalStock = updates.sizes.reduce((sum, s) => sum + s.stock, 0);
-            }
-            return updated;
-          }
-          return p;
-        }),
-      })),
-
-      deleteProduct: (id) => set((state) => ({
-        products: state.products.filter((p) => p.id !== id),
-      })),
-
-      updateStock: (productId, size, quantity) => set((state) => ({
-        products: state.products.map((p) => {
-          if (p.id === productId) {
-            const newSizes = p.sizes.map((s) => {
-              if (s.name === size) {
-                const newStock = Math.max(0, s.stock + quantity);
-                return { ...s, stock: newStock, available: newStock > 0 };
-              }
-              return s;
-            });
-            return {
-              ...p,
-              sizes: newSizes,
-              totalStock: newSizes.reduce((sum, s) => sum + s.stock, 0),
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return p;
-        }),
-      })),
-
-      // Orders
-      orders: [
+      // Marquee items - default values
+      marqueeItems: [
         {
           id: '1',
-          orderNumber: 'TP-DEMO001',
-          customer: {
-            firstName: 'Jean',
-            lastName: 'Dupont',
-            email: 'jean.dupont@email.com',
-            phone: '0612345678',
-            address: '123 Rue de la Mode',
-            city: 'Paris',
-            postalCode: '75001',
-            country: 'France',
-          },
-          items: [
-            { productId: '1', productName: 'Hoodie Temporal Classic', size: 'M', color: 'Noir', quantity: 1, price: 89 },
-            { productId: '2', productName: 'T-Shirt Temporal Logo', size: 'L', color: 'Blanc', quantity: 2, price: 45 },
-          ],
-          subtotal: 179,
-          shipping: 5.90,
-          discount: 0,
-          total: 184.90,
-          status: 'confirmed',
-          paymentStatus: 'paid',
-          deliveryMethod: 'delivery',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          updatedAt: new Date().toISOString(),
+          textFr: 'TENTER DE GAGNER LA PIÈCE UNIQUE',
+          textEn: 'TRY TO WIN THE UNIQUE PIECE',
+          isActive: true,
         },
         {
           id: '2',
-          orderNumber: 'TP-DEMO002',
-          customer: {
-            firstName: 'Marie',
-            lastName: 'Martin',
-            email: 'marie.martin@email.com',
-            country: 'France',
-          },
-          items: [
-            { productId: '3', productName: 'Pantalon Cargo Temporal', size: 'S', color: 'Noir', quantity: 1, price: 95 },
-          ],
-          subtotal: 95,
-          shipping: 0,
-          discount: 10,
-          total: 85,
-          promoCode: 'WELCOME10',
-          status: 'pending',
-          paymentStatus: 'pending',
-          deliveryMethod: 'handDelivery',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          textFr: 'VIVEZ L\'EXPÉRIENCE TEMPORAL',
+          textEn: 'LIVE THE TEMPORAL EXPERIENCE',
+          isActive: true,
         },
       ],
+      addMarqueeItem: (item) =>
+        set((state) => ({
+          marqueeItems: [...state.marqueeItems, { ...item, id: generateId() }],
+        })),
+      updateMarqueeItem: (id, updates) =>
+        set((state) => ({
+          marqueeItems: state.marqueeItems.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+        })),
+      deleteMarqueeItem: (id) =>
+        set((state) => ({
+          marqueeItems: state.marqueeItems.filter((m) => m.id !== id),
+        })),
 
-      addOrder: (order) => set((state) => ({
-        orders: [...state.orders, {
-          ...order,
-          id: generateId(),
-          orderNumber: generateOrderNumber(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }],
-      })),
+      // Products
+      products: [],
 
-      updateOrderStatus: (id, status) => set((state) => ({
-        orders: state.orders.map((o) =>
-          o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o
-        ),
-      })),
-
-      updatePaymentStatus: (id, status) => set((state) => ({
-        orders: state.orders.map((o) =>
-          o.id === id ? { ...o, paymentStatus: status, updatedAt: new Date().toISOString() } : o
-        ),
-      })),
-
-      updateOrder: (id, updates) => set((state) => ({
-        orders: state.orders.map((o) =>
-          o.id === id ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o
-        ),
-      })),
-
-      // Promo Codes
-      promoCodes: [
-        {
-          id: '1',
-          code: 'WELCOME10',
-          type: 'percentage',
-          value: 10,
-          minPurchase: 50,
-          maxUses: 100,
-          usedCount: 23,
-          validFrom: new Date().toISOString(),
-          validUntil: new Date(Date.now() + 30 * 86400000).toISOString(),
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          code: 'TEMPORAL20',
-          type: 'fixed',
-          value: 20,
-          minPurchase: 100,
-          maxUses: 50,
-          usedCount: 8,
-          validFrom: new Date().toISOString(),
-          validUntil: new Date(Date.now() + 15 * 86400000).toISOString(),
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-
-      addPromoCode: (promo) => set((state) => ({
-        promoCodes: [...state.promoCodes, {
-          ...promo,
-          id: generateId(),
-          usedCount: 0,
-          createdAt: new Date().toISOString(),
-        }],
-      })),
-
-      updatePromoCode: (id, updates) => set((state) => ({
-        promoCodes: state.promoCodes.map((p) =>
-          p.id === id ? { ...p, ...updates } : p
-        ),
-      })),
-
-      deletePromoCode: (id) => set((state) => ({
-        promoCodes: state.promoCodes.filter((p) => p.id !== id),
-      })),
-
-      validatePromoCode: (code, cartTotal) => {
-        const promo = get().promoCodes.find((p) => p.code.toUpperCase() === code.toUpperCase());
-
-        if (!promo) {
-          return { valid: false, discount: 0, message: 'Code promo invalide' };
+      fetchProducts: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const result = await productsApi.list({ limit: 100 });
+          const adminProducts = result.products.map(apiProductToAdmin);
+          set({ products: adminProducts, isLoading: false });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors du chargement des produits';
+          set({ error: message, isLoading: false });
         }
-
-        if (!promo.isActive) {
-          return { valid: false, discount: 0, message: 'Ce code promo n\'est plus actif' };
-        }
-
-        const now = new Date();
-        if (new Date(promo.validFrom) > now || new Date(promo.validUntil) < now) {
-          return { valid: false, discount: 0, message: 'Ce code promo a expiré' };
-        }
-
-        if (promo.maxUses && promo.usedCount >= promo.maxUses) {
-          return { valid: false, discount: 0, message: 'Ce code promo a atteint sa limite d\'utilisation' };
-        }
-
-        if (promo.minPurchase && cartTotal < promo.minPurchase) {
-          return { valid: false, discount: 0, message: `Minimum d'achat requis: ${promo.minPurchase}€` };
-        }
-
-        const discount = promo.type === 'percentage'
-          ? (cartTotal * promo.value) / 100
-          : promo.value;
-
-        return { valid: true, discount: Math.min(discount, cartTotal), message: 'Code promo appliqué!' };
       },
 
-      // Packs
-      packs: [
-        {
-          id: '1',
-          name: 'Pack Essentiel',
-          description: 'Le combo parfait pour commencer: 1 Hoodie + 1 T-Shirt',
-          products: [
-            { productId: '1', quantity: 1 },
-            { productId: '2', quantity: 1 },
-          ],
-          originalPrice: 134,
-          packPrice: 115,
-          discount: 14,
-          images: [],
-          isActive: true,
-          stock: 10,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
+      addProduct: async (product) => {
+        set({ isLoading: true, error: null });
+        try {
+          const newProduct = await productsApi.create(product as Partial<ApiProduct>);
+          const adminProduct = apiProductToAdmin(newProduct);
+          set((state) => ({
+            products: [...state.products, adminProduct],
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la création du produit';
+          set({ error: message, isLoading: false });
+        }
+      },
 
-      addPack: (pack) => set((state) => {
-        const products = get().products;
-        let originalPrice = 0;
-        pack.products.forEach((item) => {
-          const product = products.find((p) => p.id === item.productId);
-          if (product) {
-            originalPrice += product.price * item.quantity;
+      updateProduct: async (id, updates) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updatedProduct = await productsApi.update(id, updates as Partial<ApiProduct>);
+          const adminProduct = apiProductToAdmin(updatedProduct);
+          set((state) => ({
+            products: state.products.map((p) => (p.id === id ? adminProduct : p)),
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la mise à jour du produit';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      deleteProduct: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          await productsApi.delete(id);
+          set((state) => ({
+            products: state.products.filter((p) => p.id !== id),
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la suppression du produit';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      // Orders
+      orders: [],
+
+      fetchOrders: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const result = await ordersApi.list({ limit: 100 });
+          const adminOrders = result.orders.map(apiOrderToAdmin);
+          set({ orders: adminOrders, isLoading: false });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors du chargement des commandes';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      updateOrderStatus: async (id, status, trackingNumber, trackingUrl) => {
+        set({ isLoading: true, error: null });
+        try {
+          const statusMap: Record<string, ApiOrder['status']> = {
+            pending: 'PENDING',
+            confirmed: 'CONFIRMED',
+            preparing: 'PREPARING',
+            shipped: 'SHIPPED',
+            delivered: 'DELIVERED',
+            cancelled: 'CANCELLED',
+            refunded: 'REFUNDED',
+          };
+          await ordersApi.updateStatus(id, {
+            status: statusMap[status],
+            trackingNumber,
+            trackingUrl,
+          });
+          set((state) => ({
+            orders: state.orders.map((o) =>
+              o.id === id ? { ...o, status, trackingNumber, trackingUrl, updatedAt: new Date().toISOString() } : o
+            ),
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la mise à jour de la commande';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      // Promo Codes
+      promoCodes: [],
+
+      fetchPromoCodes: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const promos = await promoApi.list();
+          const adminPromos = promos.map(apiPromoToAdmin);
+          set({ promoCodes: adminPromos, isLoading: false });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors du chargement des codes promo';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      addPromoCode: async (promo) => {
+        set({ isLoading: true, error: null });
+        try {
+          const typeMap: Record<string, 'PERCENTAGE' | 'FIXED' | 'FREE_SHIPPING'> = {
+            percentage: 'PERCENTAGE',
+            fixed: 'FIXED',
+            free_shipping: 'FREE_SHIPPING',
+          };
+          const newPromo = await promoApi.create({
+            ...promo,
+            type: typeMap[promo.type || 'percentage'],
+          } as Partial<ApiPromoCode>);
+          const adminPromo = apiPromoToAdmin(newPromo);
+          set((state) => ({
+            promoCodes: [...state.promoCodes, adminPromo],
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la création du code promo';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      updatePromoCode: async (id, updates) => {
+        set({ isLoading: true, error: null });
+        try {
+          const typeMap: Record<string, 'PERCENTAGE' | 'FIXED' | 'FREE_SHIPPING'> = {
+            percentage: 'PERCENTAGE',
+            fixed: 'FIXED',
+            free_shipping: 'FREE_SHIPPING',
+          };
+
+          const updateData: Record<string, unknown> = { ...updates };
+          if (updates.type) {
+            updateData.type = typeMap[updates.type];
           }
-        });
-        const discount = Math.round(((originalPrice - pack.packPrice) / originalPrice) * 100);
 
-        return {
-          packs: [...state.packs, {
-            ...pack,
-            id: generateId(),
-            originalPrice,
-            discount,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }],
-        };
-      }),
+          const response = await fetch(`/api/promo/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          });
 
-      updatePack: (id, updates) => set((state) => ({
-        packs: state.packs.map((p) =>
-          p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-        ),
-      })),
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la mise à jour du code promo');
+          }
 
-      deletePack: (id) => set((state) => ({
-        packs: state.packs.filter((p) => p.id !== id),
-      })),
+          const result = await response.json();
+          const updatedPromo = apiPromoToAdmin(result.data);
+
+          set((state) => ({
+            promoCodes: state.promoCodes.map((p) => (p.id === id ? updatedPromo : p)),
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la mise à jour du code promo';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      deletePromoCode: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch(`/api/promo/${id}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la suppression du code promo');
+          }
+
+          const result = await response.json();
+
+          // If it was deactivated instead of deleted, update the promo code
+          if (result.data._deactivated) {
+            set((state) => ({
+              promoCodes: state.promoCodes.map((p) => (p.id === id ? { ...p, isActive: false } : p)),
+              isLoading: false,
+            }));
+          } else {
+            // Otherwise, remove it from the list
+            set((state) => ({
+              promoCodes: state.promoCodes.filter((p) => p.id !== id),
+              isLoading: false,
+            }));
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la suppression du code promo';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
 
       // Dashboard Stats
       getDashboardStats: () => {
@@ -579,74 +647,262 @@ export const useAdminStore = create<AdminState>()(
       },
 
       // Categories
-      categories: ['vestes', 'tshirts', 'pantalons', 'accessoires', 'ensembles'],
+      categories: [],
 
-      addCategory: (category) => set((state) => ({
-        categories: [...state.categories, category.toLowerCase()],
-      })),
-
-      deleteCategory: (category) => set((state) => ({
-        categories: state.categories.filter((c) => c !== category),
-      })),
+      fetchCategories: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const cats = await categoriesApi.list();
+          set({
+            categories: cats.map((c: ApiCategory) => ({ id: c.id, name: c.name, slug: c.slug })),
+            isLoading: false,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors du chargement des catégories';
+          set({ error: message, isLoading: false });
+        }
+      },
 
       // Tickets
-      tickets: [
-        {
-          id: '1',
-          ticketNumber: 'TK-DEMO001',
-          customerName: 'Jean Dupont',
-          customerEmail: 'jean.dupont@email.com',
-          subject: 'Question sur ma commande',
-          status: 'open',
-          priority: 'medium',
-          messages: [
-            {
-              id: '1',
-              content: 'Bonjour, je voudrais savoir quand ma commande sera expédiée ?',
-              isAdmin: false,
-              createdAt: new Date(Date.now() - 86400000).toISOString(),
-            },
+      tickets: [],
+
+      fetchTickets: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/tickets');
+          if (!response.ok) {
+            throw new Error('Erreur lors du chargement des tickets');
+          }
+          const result = await response.json();
+
+          // Transform API tickets to admin format
+          const tickets = result.data.map((t: any) => ({
+            id: t.id,
+            ticketNumber: t.ticketNumber,
+            customerName: `${t.user.firstName || ''} ${t.user.lastName || ''}`.trim() || t.user.email,
+            customerEmail: t.user.email,
+            subject: t.subject,
+            status: t.status.toLowerCase() as Ticket['status'],
+            priority: t.priority.toLowerCase() as Ticket['priority'],
+            messages: [
+              {
+                id: t.id,
+                content: t.message,
+                isAdmin: false,
+                createdAt: t.createdAt,
+              },
+              ...t.replies.map((r: any) => ({
+                id: r.id,
+                content: r.message,
+                isAdmin: r.isAdmin,
+                createdAt: r.createdAt,
+              })),
+            ],
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+          }));
+
+          set({ tickets, isLoading: false });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors du chargement des tickets';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      addTicket: async (ticket) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subject: ticket.subject,
+              message: ticket.messages[0]?.content || '',
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la création du ticket');
+          }
+
+          const result = await response.json();
+          const t = result.data;
+
+          const newTicket: Ticket = {
+            id: t.id,
+            ticketNumber: t.ticketNumber,
+            customerName: `${t.user.firstName || ''} ${t.user.lastName || ''}`.trim() || t.user.email,
+            customerEmail: t.user.email,
+            subject: t.subject,
+            status: t.status.toLowerCase() as Ticket['status'],
+            priority: t.priority.toLowerCase() as Ticket['priority'],
+            messages: [
+              {
+                id: t.id,
+                content: t.message,
+                isAdmin: false,
+                createdAt: t.createdAt,
+              },
+            ],
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+          };
+
+          set((state) => ({
+            tickets: [newTicket, ...state.tickets],
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la création du ticket';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      updateTicketStatus: async (id, status) => {
+        set({ isLoading: true, error: null });
+        try {
+          const statusMap: Record<string, string> = {
+            open: 'OPEN',
+            in_progress: 'IN_PROGRESS',
+            resolved: 'RESOLVED',
+            closed: 'CLOSED',
+          };
+
+          const response = await fetch(`/api/tickets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: statusMap[status] }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de la mise à jour du ticket');
+          }
+
+          const result = await response.json();
+          const t = result.data;
+
+          const updatedTicket: Ticket = {
+            id: t.id,
+            ticketNumber: t.ticketNumber,
+            customerName: `${t.user.firstName || ''} ${t.user.lastName || ''}`.trim() || t.user.email,
+            customerEmail: t.user.email,
+            subject: t.subject,
+            status: t.status.toLowerCase() as Ticket['status'],
+            priority: t.priority.toLowerCase() as Ticket['priority'],
+            messages: [
+              {
+                id: t.id,
+                content: t.message,
+                isAdmin: false,
+                createdAt: t.createdAt,
+              },
+              ...t.replies.map((r: any) => ({
+                id: r.id,
+                content: r.message,
+                isAdmin: r.isAdmin,
+                createdAt: r.createdAt,
+              })),
+            ],
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+          };
+
+          set((state) => ({
+            tickets: state.tickets.map((ticket) => (ticket.id === id ? updatedTicket : ticket)),
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de la mise à jour du ticket';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      addTicketReply: async (ticketId, content, isAdmin) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch(`/api/tickets/${ticketId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: content }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de l\'ajout de la réponse');
+          }
+
+          const result = await response.json();
+          const t = result.data;
+
+          const updatedTicket: Ticket = {
+            id: t.id,
+            ticketNumber: t.ticketNumber,
+            customerName: `${t.user.firstName || ''} ${t.user.lastName || ''}`.trim() || t.user.email,
+            customerEmail: t.user.email,
+            subject: t.subject,
+            status: t.status.toLowerCase() as Ticket['status'],
+            priority: t.priority.toLowerCase() as Ticket['priority'],
+            messages: [
+              {
+                id: t.id,
+                content: t.message,
+                isAdmin: false,
+                createdAt: t.createdAt,
+              },
+              ...t.replies.map((r: any) => ({
+                id: r.id,
+                content: r.message,
+                isAdmin: r.isAdmin,
+                createdAt: r.createdAt,
+              })),
+            ],
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+          };
+
+          set((state) => ({
+            tickets: state.tickets.map((ticket) => (ticket.id === ticketId ? updatedTicket : ticket)),
+            isLoading: false,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de l\'ajout de la réponse';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      clearError: () => set({ error: null }),
+
+      // Packs
+      packs: [],
+      addPack: (pack) =>
+        set((state) => ({
+          packs: [
+            ...state.packs,
+            { ...pack, id: generateId(), createdAt: new Date().toISOString() },
           ],
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          updatedAt: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ],
-
-      addTicket: (ticket) => set((state) => ({
-        tickets: [...state.tickets, {
-          ...ticket,
-          id: generateId(),
-          ticketNumber: generateTicketNumber(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }],
-      })),
-
-      updateTicketStatus: (id, status) => set((state) => ({
-        tickets: state.tickets.map((t) =>
-          t.id === id ? { ...t, status, updatedAt: new Date().toISOString() } : t
-        ),
-      })),
-
-      addTicketMessage: (ticketId, content, isAdmin) => set((state) => ({
-        tickets: state.tickets.map((t) =>
-          t.id === ticketId
-            ? {
-                ...t,
-                messages: [...t.messages, {
-                  id: generateId(),
-                  content,
-                  isAdmin,
-                  createdAt: new Date().toISOString(),
-                }],
-                updatedAt: new Date().toISOString(),
-              }
-            : t
-        ),
-      })),
+        })),
+      updatePack: (id, updates) =>
+        set((state) => ({
+          packs: state.packs.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        })),
+      deletePack: (id) =>
+        set((state) => ({
+          packs: state.packs.filter((p) => p.id !== id),
+        })),
     }),
     {
       name: 'temporal-admin-store',
+      partialize: (state) => ({
+        countdownDate: state.countdownDate,
+        contests: state.contests,
+        marqueeItems: state.marqueeItems,
+        packs: state.packs,
+      }),
     }
   )
 );

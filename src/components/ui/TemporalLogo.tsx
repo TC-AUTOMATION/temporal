@@ -1,7 +1,5 @@
 'use client';
 
-import Image from 'next/image';
-
 interface TemporalLogoProps {
   className?: string;
   animate?: boolean;
@@ -10,13 +8,23 @@ interface TemporalLogoProps {
 
 export default function TemporalLogo({ className = '', size = 200 }: TemporalLogoProps) {
   return (
-    <Image
-      src="/temporal-logo.svg"
-      alt="Temporal Logo"
-      width={size}
-      height={size}
+    <video
+      autoPlay
+      loop
+      muted
+      playsInline
       className={className}
-      priority
-    />
+      style={{
+        width: size,
+        height: size,
+        objectFit: 'contain',
+        background: 'transparent'
+      }}
+    >
+      {/* Safari/iOS: HEVC with alpha (prioritaire) */}
+      <source src="/hero-video.mov" type='video/mp4; codecs="hvc1"' />
+      {/* Chrome/Firefox: WebM with alpha */}
+      <source src="/hero-video.webm" type="video/webm" />
+    </video>
   );
 }

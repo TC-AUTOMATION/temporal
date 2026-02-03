@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAdminStore, Order } from '@/stores/useAdminStore';
+import { useStore } from '@/stores/useStore';
 import {
   Search,
   Eye,
@@ -18,30 +19,88 @@ import {
   CreditCard,
   Calendar,
   Hash,
+  HandMetal,
+  AlertCircle,
 } from 'lucide-react';
 
-const statusOptions = [
-  { value: 'pending', label: 'En attente', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-  { value: 'confirmed', label: 'Confirmée', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  { value: 'preparing', label: 'Préparation', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-  { value: 'shipped', label: 'Expédiée', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
-  { value: 'delivered', label: 'Livrée', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  { value: 'cancelled', label: 'Annulée', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
-  { value: 'refunded', label: 'Remboursée', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
-];
-
-const paymentStatusOptions = [
-  { value: 'pending', label: 'En attente', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-  { value: 'paid', label: 'Payée', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  { value: 'failed', label: 'Échouée', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
-  { value: 'refunded', label: 'Remboursée', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
-];
-
 export default function OrdersPage() {
-  const { orders, updateOrderStatus, updatePaymentStatus, updateOrder } = useAdminStore();
+  const { orders, updateOrderStatus, fetchOrders, isLoading } = useAdminStore();
+  const { darkMode, language } = useStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Translations
+  const t = {
+    pending: language === 'fr' ? 'En attente' : 'Pending',
+    confirmed: language === 'fr' ? 'Confirmé' : 'Confirmed',
+    preparing: language === 'fr' ? 'Préparation' : 'Preparing',
+    shipped: language === 'fr' ? 'Expédié' : 'Shipped',
+    delivered: language === 'fr' ? 'Livré' : 'Delivered',
+    cancelled: language === 'fr' ? 'Annulé' : 'Cancelled',
+    refunded: language === 'fr' ? 'Remboursé' : 'Refunded',
+    paid: language === 'fr' ? 'Payé' : 'Paid',
+    failed: language === 'fr' ? 'Échoué' : 'Failed',
+    handDelivery: language === 'fr' ? 'Remise en main propre' : 'Hand delivery',
+    handDeliveryPending: language === 'fr' ? 'COMMANDE(S) REMISE EN MAIN PROPRE EN ATTENTE' : 'HAND DELIVERY ORDER(S) PENDING',
+    handDeliveryWaiting: language === 'fr' ? 'Des clients attendent la validation pour récupérer leur commande.' : 'Customers are waiting for validation to pick up their order by hand.',
+    view: language === 'fr' ? 'VOIR' : 'VIEW',
+    inPreparation: language === 'fr' ? 'En préparation' : 'In preparation',
+    searchPlaceholder: language === 'fr' ? 'Rechercher par numéro, email ou nom...' : 'Search by number, email or name...',
+    allStatuses: language === 'fr' ? 'TOUS LES STATUTS' : 'ALL STATUSES',
+    order: language === 'fr' ? 'Commande' : 'Order',
+    customer: language === 'fr' ? 'Client' : 'Customer',
+    date: language === 'fr' ? 'Date' : 'Date',
+    total: language === 'fr' ? 'Total' : 'Total',
+    status: language === 'fr' ? 'Statut' : 'Status',
+    payment: language === 'fr' ? 'Paiement' : 'Payment',
+    actions: language === 'fr' ? 'Actions' : 'Actions',
+    details: language === 'fr' ? 'DÉTAILS' : 'DETAILS',
+    noOrders: language === 'fr' ? 'AUCUNE COMMANDE TROUVÉE' : 'NO ORDERS FOUND',
+    item: language === 'fr' ? 'article' : 'item',
+    items: language === 'fr' ? 'articles' : 'items',
+    orderStatus: language === 'fr' ? 'STATUT COMMANDE' : 'ORDER STATUS',
+    paymentStatus: language === 'fr' ? 'STATUT PAIEMENT' : 'PAYMENT STATUS',
+    managedByStripe: language === 'fr' ? '(Géré par Stripe)' : '(Managed by Stripe)',
+    trackingNumber: language === 'fr' ? 'NUMÉRO DE SUIVI' : 'TRACKING NUMBER',
+    enterTracking: language === 'fr' ? 'Entrez le numéro de suivi' : 'Enter tracking number',
+    customerInfo: language === 'fr' ? 'INFORMATIONS CLIENT' : 'CUSTOMER INFORMATION',
+    email: 'Email',
+    phone: language === 'fr' ? 'Téléphone' : 'Phone',
+    address: language === 'fr' ? 'Adresse' : 'Address',
+    delivery: language === 'fr' ? 'Livraison' : 'Delivery',
+    standardDelivery: language === 'fr' ? 'Livraison standard' : 'Standard delivery',
+    orderedItems: language === 'fr' ? 'ARTICLES COMMANDÉS' : 'ORDERED ITEMS',
+    size: language === 'fr' ? 'Taille' : 'Size',
+    color: language === 'fr' ? 'Couleur' : 'Color',
+    qty: language === 'fr' ? 'Qté' : 'Qty',
+    subtotal: language === 'fr' ? 'Sous-total' : 'Subtotal',
+    free: language === 'fr' ? 'Gratuit' : 'Free',
+    discount: language === 'fr' ? 'Réduction' : 'Discount',
+    close: language === 'fr' ? 'FERMER' : 'CLOSE',
+  };
+
+  const statusOptions = [
+    { value: 'pending', label: t.pending, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    { value: 'confirmed', label: t.confirmed, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    { value: 'preparing', label: t.preparing, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    { value: 'shipped', label: t.shipped, color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
+    { value: 'delivered', label: t.delivered, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    { value: 'cancelled', label: t.cancelled, color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    { value: 'refunded', label: t.refunded, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  ];
+
+  const paymentStatusOptions = [
+    { value: 'pending', label: t.pending, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    { value: 'paid', label: t.paid, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    { value: 'failed', label: t.failed, color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    { value: 'refunded', label: t.refunded, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  ];
+
+  // Fetch orders on mount
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const filteredOrders = orders
     .filter((o) => {
@@ -49,7 +108,9 @@ export default function OrdersPage() {
         o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
         o.customer.email.toLowerCase().includes(search.toLowerCase()) ||
         `${o.customer.firstName} ${o.customer.lastName}`.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' ||
+        o.status === statusFilter ||
+        (statusFilter === 'handDelivery' && o.deliveryMethod === 'handDelivery');
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -66,24 +127,17 @@ export default function OrdersPage() {
     );
   };
 
-  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
-    updateOrderStatus(orderId, newStatus);
+  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+    await updateOrderStatus(orderId, newStatus);
     if (selectedOrder?.id === orderId) {
       setSelectedOrder({ ...selectedOrder, status: newStatus });
     }
   };
 
-  const handlePaymentStatusChange = (orderId: string, newStatus: Order['paymentStatus']) => {
-    updatePaymentStatus(orderId, newStatus);
+  const handleTrackingUpdate = async (orderId: string, trackingNumber: string, trackingUrl?: string) => {
+    await updateOrderStatus(orderId, selectedOrder?.status || 'preparing', trackingNumber, trackingUrl);
     if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, paymentStatus: newStatus });
-    }
-  };
-
-  const handleTrackingUpdate = (orderId: string, trackingNumber: string) => {
-    updateOrder(orderId, { trackingNumber });
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, trackingNumber });
+      setSelectedOrder({ ...selectedOrder, trackingNumber, trackingUrl });
     }
   };
 
@@ -92,22 +146,47 @@ export default function OrdersPage() {
     preparing: orders.filter((o) => o.status === 'preparing').length,
     shipped: orders.filter((o) => o.status === 'shipped').length,
     delivered: orders.filter((o) => o.status === 'delivered').length,
+    handDeliveryPending: orders.filter((o) => o.deliveryMethod === 'handDelivery' && o.status === 'pending').length,
   };
 
   return (
     <div className="space-y-6">
+      {/* Alert for hand delivery pending */}
+      {orderStats.handDeliveryPending > 0 && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-orange-500/30">
+            <AlertCircle size={24} className="text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white font-medium" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+              {orderStats.handDeliveryPending} {t.handDeliveryPending}
+            </p>
+            <p className="text-sm text-white/60">
+              {t.handDeliveryWaiting}
+            </p>
+          </div>
+          <button
+            onClick={() => setStatusFilter('handDelivery')}
+            className="px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 rounded-xl text-orange-400 transition-colors"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+          >
+            {t.view}
+          </button>
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="p-4 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-yellow-500/20">
               <Clock size={20} className="text-yellow-400" />
             </div>
             <div>
-              <p className="text-2xl text-white" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+              <p className={`text-2xl ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                 {orderStats.pending}
               </p>
-              <p className="text-xs text-white/50">En attente</p>
+              <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>{t.pending}</p>
             </div>
           </div>
         </div>
@@ -117,10 +196,10 @@ export default function OrdersPage() {
               <Package size={20} className="text-purple-400" />
             </div>
             <div>
-              <p className="text-2xl text-white" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+              <p className={`text-2xl ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                 {orderStats.preparing}
               </p>
-              <p className="text-xs text-white/50">En préparation</p>
+              <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>{t.inPreparation}</p>
             </div>
           </div>
         </div>
@@ -130,10 +209,10 @@ export default function OrdersPage() {
               <Truck size={20} className="text-indigo-400" />
             </div>
             <div>
-              <p className="text-2xl text-white" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+              <p className={`text-2xl ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                 {orderStats.shipped}
               </p>
-              <p className="text-xs text-white/50">Expédiées</p>
+              <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>{t.shipped}</p>
             </div>
           </div>
         </div>
@@ -143,10 +222,23 @@ export default function OrdersPage() {
               <CheckCircle size={20} className="text-green-400" />
             </div>
             <div>
-              <p className="text-2xl text-white" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+              <p className={`text-2xl ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                 {orderStats.delivered}
               </p>
-              <p className="text-xs text-white/50">Livrées</p>
+              <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>{t.delivered}</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-orange-500/20">
+              <HandMetal size={20} className="text-orange-400" />
+            </div>
+            <div>
+              <p className={`text-2xl ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                {orderStats.handDeliveryPending}
+              </p>
+              <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>{t.handDelivery}</p>
             </div>
           </div>
         </div>
@@ -155,12 +247,12 @@ export default function OrdersPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+          <Search className={`absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 ${darkMode ? 'text-white/40' : 'text-gray-400'}`} />
           <input
-            placeholder="Rechercher par numéro, email ou nom..."
+            placeholder={t.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-primary transition-colors"
+            className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:outline-none focus:border-primary transition-colors ${darkMode ? 'bg-white/5 border-white/10 text-white placeholder-white/40' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`}
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
           />
         </div>
@@ -168,67 +260,75 @@ export default function OrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none px-4 py-3 pr-10 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary transition-colors cursor-pointer"
+            className={`appearance-none px-4 py-3 pr-10 border rounded-xl focus:outline-none focus:border-primary transition-colors cursor-pointer ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
           >
-            <option value="all" className="bg-black">TOUS LES STATUTS</option>
+            <option value="all" className={darkMode ? 'bg-black' : 'bg-white'}>{t.allStatuses}</option>
+            <option value="handDelivery" className={darkMode ? 'bg-black' : 'bg-white'}>{t.handDelivery.toUpperCase()}</option>
             {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value} className="bg-black">
+              <option key={opt.value} value={opt.value} className={darkMode ? 'bg-black' : 'bg-white'}>
                 {opt.label.toUpperCase()}
               </option>
             ))}
           </select>
-          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+          <ChevronDown size={16} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${darkMode ? 'text-white/40' : 'text-gray-400'}`} />
         </div>
       </div>
 
       {/* Orders Table */}
-      <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
+      <div className={`rounded-2xl overflow-hidden ${darkMode ? 'bg-white/5 border border-white/10' : 'bg-white border border-gray-200 shadow-sm'}`}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Commande</th>
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Client</th>
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Date</th>
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Total</th>
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Statut</th>
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Paiement</th>
-                <th className="text-left p-4 text-xs text-white/50 uppercase tracking-wider" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>Actions</th>
+              <tr className={`border-b ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.order}</th>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.customer}</th>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.date}</th>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.total}</th>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.status}</th>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.payment}</th>
+                <th className={`text-left p-4 text-xs uppercase tracking-wider ${darkMode ? 'text-white/50' : 'text-gray-500'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className={`divide-y ${darkMode ? 'divide-white/5' : 'divide-gray-100'}`}>
               {filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-white/5 transition-colors">
+                <tr key={order.id} className={`transition-colors ${darkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
                   <td className="p-4">
-                    <p className="text-white font-medium" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
-                      {order.orderNumber}
-                    </p>
-                    <p className="text-xs text-white/40">
-                      {order.items.length} article{order.items.length > 1 ? 's' : ''}
+                    <div className="flex items-center gap-2">
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                        {order.orderNumber}
+                      </p>
+                      {order.deliveryMethod === 'handDelivery' && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                          <HandMetal size={10} />
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
+                      {order.items.length} {order.items.length > 1 ? t.items : t.item}
                     </p>
                   </td>
                   <td className="p-4">
-                    <p className="text-white">
+                    <p className={darkMode ? 'text-white' : 'text-gray-900'}>
                       {order.customer.firstName} {order.customer.lastName}
                     </p>
-                    <p className="text-xs text-white/40">{order.customer.email}</p>
+                    <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>{order.customer.email}</p>
                   </td>
                   <td className="p-4">
-                    <p className="text-white">{new Date(order.createdAt).toLocaleDateString('fr-FR')}</p>
-                    <p className="text-xs text-white/40">
-                      {new Date(order.createdAt).toLocaleTimeString('fr-FR', {
+                    <p className={darkMode ? 'text-white' : 'text-gray-900'}>{new Date(order.createdAt).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}</p>
+                    <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
+                      {new Date(order.createdAt).toLocaleTimeString(language === 'fr' ? 'fr-FR' : 'en-US', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
                     </p>
                   </td>
                   <td className="p-4">
-                    <p className="text-white" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
-                      {order.total.toFixed(2)}€
+                    <p className={darkMode ? 'text-white' : 'text-gray-900'} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                      {Number(order.total).toFixed(2)}€
                     </p>
                     {order.discount > 0 && (
-                      <p className="text-xs text-green-400">-{order.discount.toFixed(2)}€</p>
+                      <p className="text-xs text-green-400">-{Number(order.discount).toFixed(2)}€</p>
                     )}
                   </td>
                   <td className="p-4">{getStatusBadge(order.status, 'order')}</td>
@@ -236,11 +336,11 @@ export default function OrdersPage() {
                   <td className="p-4">
                     <button
                       onClick={() => setSelectedOrder(order)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-primary/20 text-white/70 hover:text-primary transition-colors"
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-primary/20 hover:text-primary transition-colors ${darkMode ? 'bg-white/5 text-white/70' : 'bg-gray-100 text-gray-700'}`}
                       style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em', fontSize: '0.8rem' }}
                     >
                       <Eye size={14} />
-                      DÉTAILS
+                      {t.details}
                     </button>
                   </td>
                 </tr>
@@ -251,9 +351,9 @@ export default function OrdersPage() {
 
         {filteredOrders.length === 0 && (
           <div className="p-12 text-center">
-            <Package size={48} className="mx-auto mb-4 text-white/20" />
-            <p className="text-white/40" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-              AUCUNE COMMANDE TROUVÉE
+            <Package size={48} className={`mx-auto mb-4 ${darkMode ? 'text-white/20' : 'text-gray-300'}`} />
+            <p className={darkMode ? 'text-white/40' : 'text-gray-400'} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+              {t.noOrders}
             </p>
           </div>
         )}
@@ -270,10 +370,10 @@ export default function OrdersPage() {
                   className="text-xl"
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                 >
-                  COMMANDE {selectedOrder.orderNumber}
+                  {t.order.toUpperCase()} {selectedOrder.orderNumber}
                 </h2>
                 <p className="text-sm text-white/50">
-                  {new Date(selectedOrder.createdAt).toLocaleDateString('fr-FR', {
+                  {new Date(selectedOrder.createdAt).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
                     weekday: 'long',
                     day: 'numeric',
                     month: 'long',
@@ -295,7 +395,7 @@ export default function OrdersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-white/50 mb-2 block" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                    STATUT COMMANDE
+                    {t.orderStatus}
                   </label>
                   <select
                     value={selectedOrder.status}
@@ -311,31 +411,24 @@ export default function OrdersPage() {
                 </div>
                 <div>
                   <label className="text-xs text-white/50 mb-2 block" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                    STATUT PAIEMENT
+                    {t.paymentStatus}
                   </label>
-                  <select
-                    value={selectedOrder.paymentStatus}
-                    onChange={(e) => handlePaymentStatusChange(selectedOrder.id, e.target.value as Order['paymentStatus'])}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary transition-colors"
-                  >
-                    {paymentStatusOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-black">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white">
+                    {getStatusBadge(selectedOrder.paymentStatus, 'payment')}
+                    <span className="text-xs text-white/30 ml-2">{t.managedByStripe}</span>
+                  </div>
                 </div>
               </div>
 
               {/* Tracking */}
               <div>
                 <label className="text-xs text-white/50 mb-2 block" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                  NUMÉRO DE SUIVI
+                  {t.trackingNumber}
                 </label>
                 <input
                   value={selectedOrder.trackingNumber || ''}
                   onChange={(e) => handleTrackingUpdate(selectedOrder.id, e.target.value)}
-                  placeholder="Entrer le numéro de suivi"
+                  placeholder={t.enterTracking}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -343,7 +436,7 @@ export default function OrdersPage() {
               {/* Customer Info */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-4">
                 <h4 className="text-sm text-white/50 mb-3" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                  INFORMATIONS CLIENT
+                  {t.customerInfo}
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -351,7 +444,7 @@ export default function OrdersPage() {
                       <Mail size={14} className="text-primary" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/50">Email</p>
+                      <p className="text-xs text-white/50">{t.email}</p>
                       <p className="text-white text-sm">{selectedOrder.customer.email}</p>
                     </div>
                   </div>
@@ -361,7 +454,7 @@ export default function OrdersPage() {
                         <Phone size={14} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-xs text-white/50">Téléphone</p>
+                        <p className="text-xs text-white/50">{t.phone}</p>
                         <p className="text-white text-sm">{selectedOrder.customer.phone}</p>
                       </div>
                     </div>
@@ -372,7 +465,7 @@ export default function OrdersPage() {
                         <MapPin size={14} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-xs text-white/50">Adresse</p>
+                        <p className="text-xs text-white/50">{t.address}</p>
                         <p className="text-white text-sm">
                           {selectedOrder.customer.address}, {selectedOrder.customer.postalCode} {selectedOrder.customer.city}, {selectedOrder.customer.country}
                         </p>
@@ -384,9 +477,9 @@ export default function OrdersPage() {
                       <Truck size={14} className="text-primary" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/50">Livraison</p>
+                      <p className="text-xs text-white/50">{t.delivery}</p>
                       <p className="text-white text-sm">
-                        {selectedOrder.deliveryMethod === 'delivery' ? 'Livraison standard' : 'Remise en main propre'}
+                        {selectedOrder.deliveryMethod === 'delivery' ? t.standardDelivery : t.handDelivery}
                       </p>
                     </div>
                   </div>
@@ -396,7 +489,7 @@ export default function OrdersPage() {
               {/* Order Items */}
               <div>
                 <h4 className="text-sm text-white/50 mb-3" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                  ARTICLES COMMANDÉS
+                  {t.orderedItems}
                 </h4>
                 <div className="space-y-2">
                   {selectedOrder.items.map((item, index) => (
@@ -407,11 +500,11 @@ export default function OrdersPage() {
                       <div>
                         <p className="text-white font-medium">{item.productName}</p>
                         <p className="text-sm text-white/50">
-                          Taille: {item.size} • Couleur: {item.color} • Qté: {item.quantity}
+                          {t.size}: {item.size} • {t.color}: {item.color} • {t.qty}: {item.quantity}
                         </p>
                       </div>
                       <p className="text-white" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
-                        {(item.price * item.quantity).toFixed(2)}€
+                        {(Number(item.price) * item.quantity).toFixed(2)}€
                       </p>
                     </div>
                   ))}
@@ -421,22 +514,22 @@ export default function OrdersPage() {
               {/* Order Summary */}
               <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
                 <div className="flex justify-between text-white/70">
-                  <span>Sous-total</span>
-                  <span>{selectedOrder.subtotal.toFixed(2)}€</span>
+                  <span>{t.subtotal}</span>
+                  <span>{Number(selectedOrder.subtotal).toFixed(2)}€</span>
                 </div>
                 <div className="flex justify-between text-white/70">
-                  <span>Livraison</span>
-                  <span>{selectedOrder.shipping === 0 ? 'Gratuit' : `${selectedOrder.shipping.toFixed(2)}€`}</span>
+                  <span>{t.delivery}</span>
+                  <span>{selectedOrder.shipping === 0 ? t.free : `${Number(selectedOrder.shipping).toFixed(2)}€`}</span>
                 </div>
                 {selectedOrder.discount > 0 && (
                   <div className="flex justify-between text-green-400">
-                    <span>Réduction {selectedOrder.promoCode && `(${selectedOrder.promoCode})`}</span>
-                    <span>-{selectedOrder.discount.toFixed(2)}€</span>
+                    <span>{t.discount} {selectedOrder.promoCode && `(${selectedOrder.promoCode})`}</span>
+                    <span>-{Number(selectedOrder.discount).toFixed(2)}€</span>
                   </div>
                 )}
                 <div className="flex justify-between text-white text-xl pt-3 border-t border-white/10" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                   <span>TOTAL</span>
-                  <span className="text-primary">{selectedOrder.total.toFixed(2)}€</span>
+                  <span className="text-primary">{Number(selectedOrder.total).toFixed(2)}€</span>
                 </div>
               </div>
             </div>
@@ -448,7 +541,7 @@ export default function OrdersPage() {
                 className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-white transition-colors"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                FERMER
+                {t.close}
               </button>
             </div>
           </div>

@@ -1,55 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db/prisma';
+import { sendCodeSchema } from '@/lib/validations';
+import { generateVerificationCode, isAdminEmail } from '@/lib/auth/jwt';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { sendEmail } from '@/lib/email/send';
+import { verificationCodeEmail } from '@/lib/email/templates';
 
-// In-memory store for verification codes (in production, use Redis or database)
-const verificationCodes = new Map<string, { code: string; expiresAt: number }>();
-
+/**
+ * POST /api/auth/send-code
+ * Send a verification code to the user's email
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    const body = await request.json();
+    const validation = sendCodeSchema.safeParse(body);
 
-    if (!email) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Email is required' },
+        { error: 'Email invalide' },
         { status: 400 }
       );
     }
 
+    const email = validation.data.email.toLowerCase();
+
+    // Rate limiting: 5 requests per email per 15 minutes
+    const rateLimit = checkRateLimit({
+      identifier: `send-code:${email}`,
+      maxRequests: 5,
+      windowMs: 15 * 60 * 1000, // 15 minutes
+    });
+
+    if (!rateLimit.success) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${resetInMinutes} minutes.` },
+        { status: 429 }
+      );
+    }
+
     // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const code = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Store the code
-    verificationCodes.set(email.toLowerCase(), { code, expiresAt });
+    // Delete any existing codes for this email
+    await prisma.verificationCode.deleteMany({
+      where: { email },
+    });
 
-    // In production, send email via Resend, SendGrid, etc.
-    // For now, we'll log it and also return it for demo purposes
-    console.log(`[TEMPORAL AUTH] Code for ${email}: ${code}`);
+    // Store the new code in database
+    await prisma.verificationCode.create({
+      data: {
+        email,
+        code,
+        expiresAt,
+      },
+    });
 
-    // Send email (example with a hypothetical email service)
-    // await sendEmail({
-    //   to: email,
-    //   subject: 'Votre code de connexion Temporal',
-    //   html: `
-    //     <h1>Code de vérification</h1>
-    //     <p>Votre code de connexion est: <strong>${code}</strong></p>
-    //     <p>Ce code expire dans 10 minutes.</p>
-    //   `
-    // });
+    // Send verification email using Resend
+    const emailResult = await sendEmail({
+      to: email,
+      subject: 'Votre code de connexion Temporal',
+      html: verificationCodeEmail(code),
+    });
+
+    // Log code for debugging (even if email is sent, keep console.log for dev)
+    console.log(`[TEMPORAL AUTH] Code for ${email}: ${code} (Email sent: ${emailResult.success})`);
+
+    // Créer ou mettre à jour l'utilisateur si c'est un admin
+    if (isAdminEmail(email)) {
+      await prisma.user.upsert({
+        where: { email },
+        update: { isAdmin: true },
+        create: { email, isAdmin: true },
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Code sent successfully',
-      // Remove this in production - only for demo
-      demo_code: code
+      data: {
+        message: 'Code envoyé',
+      },
     });
   } catch (error) {
     console.error('Error sending code:', error);
     return NextResponse.json(
-      { error: 'Failed to send code' },
+      { error: 'Erreur lors de l\'envoi du code' },
       { status: 500 }
     );
   }
 }
-
-// Export the codes map for the verify endpoint
-export { verificationCodes };

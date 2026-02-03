@@ -8,8 +8,9 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import CartDrawer from '@/components/cart/CartDrawer';
 import Footer from '@/components/layout/Footer';
-import HeroSection from '@/components/home/HeroSection';
+import HeroSection, { ContestSection } from '@/components/home/HeroSection';
 import ProductGrid from '@/components/product/ProductGrid';
+import DynamicPopup from '@/components/ui/DynamicPopup';
 
 export default function Home() {
   const [hasEntered, setHasEntered] = useState(false);
@@ -34,16 +35,18 @@ export default function Home() {
 
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <div className="bg-background text-foreground">
+      <div className="text-foreground bg-background">
         <MarqueeBanner />
         <Header />
         <Sidebar />
         <CartDrawer />
-        <main className="bg-background">
+        <main>
           <HeroSection />
+          <ContestSection />
           <ProductGrid />
         </main>
         <Footer />
+        <DynamicPopup />
       </div>
     </div>
   );

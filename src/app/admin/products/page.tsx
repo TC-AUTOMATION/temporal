@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useAdminStore, AdminProduct } from '@/stores/useAdminStore';
+import { useStore } from '@/stores/useStore';
 import {
   Plus,
   Search,
@@ -12,10 +13,18 @@ import {
   EyeOff,
   Star,
   X,
+  Loader2,
 } from 'lucide-react';
 
 export default function ProductsPage() {
-  const { products, addProduct, updateProduct, deleteProduct, categories } = useAdminStore();
+  const { products, addProduct, updateProduct, deleteProduct, categories, fetchProducts, fetchCategories, isLoading } = useAdminStore();
+  const { darkMode } = useStore();
+
+  // Fetch products and categories on mount
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, [fetchProducts, fetchCategories]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,13 +33,26 @@ export default function ProductsPage() {
 
   const [formData, setFormData] = useState({
     name: '',
+    nameFr: '',
+    nameEn: '',
     description: '',
+    descriptionFr: '',
+    descriptionEn: '',
+    materials: '',
+    materialsFr: '',
+    materialsEn: '',
+    careInstructions: '',
+    careInstructionsFr: '',
+    careInstructionsEn: '',
     price: 0,
     originalPrice: 0,
     category: 'tshirts',
+    categoryFr: '',
+    categoryEn: '',
     sku: '',
     isActive: true,
     isFeatured: false,
+    isNew: true,
     sizes: [
       { name: 'S', stock: 0, available: true },
       { name: 'M', stock: 0, available: true },
@@ -41,6 +63,8 @@ export default function ProductsPage() {
     images: [''],
     modelImages: [] as string[],
     modelInfo: '',
+    modelInfoFr: '',
+    modelInfoEn: '',
   });
 
   const filteredProducts = products.filter((p) => {
@@ -54,13 +78,26 @@ export default function ProductsPage() {
     setEditingProduct(null);
     setFormData({
       name: '',
+      nameFr: '',
+      nameEn: '',
       description: '',
+      descriptionFr: '',
+      descriptionEn: '',
+      materials: '',
+      materialsFr: '',
+      materialsEn: '',
+      careInstructions: '',
+      careInstructionsFr: '',
+      careInstructionsEn: '',
       price: 0,
       originalPrice: 0,
       category: 'tshirts',
+      categoryFr: '',
+      categoryEn: '',
       sku: `TPL-${Date.now().toString(36).toUpperCase()}`,
       isActive: true,
       isFeatured: false,
+      isNew: true,
       sizes: [
         { name: 'S', stock: 0, available: true },
         { name: 'M', stock: 0, available: true },
@@ -71,6 +108,8 @@ export default function ProductsPage() {
       images: [''],
       modelImages: [],
       modelInfo: '',
+      modelInfoFr: '',
+      modelInfoEn: '',
     });
     setIsModalOpen(true);
   };
@@ -79,18 +118,33 @@ export default function ProductsPage() {
     setEditingProduct(product);
     setFormData({
       name: product.name,
+      nameFr: product.nameFr || '',
+      nameEn: product.nameEn || '',
       description: product.description,
+      descriptionFr: product.descriptionFr || '',
+      descriptionEn: product.descriptionEn || '',
+      materials: (product as any).materials || '',
+      materialsFr: (product as any).materialsFr || '',
+      materialsEn: (product as any).materialsEn || '',
+      careInstructions: (product as any).careInstructions || '',
+      careInstructionsFr: (product as any).careInstructionsFr || '',
+      careInstructionsEn: (product as any).careInstructionsEn || '',
       price: product.price,
       originalPrice: product.originalPrice || 0,
       category: product.category,
+      categoryFr: product.categoryFr || '',
+      categoryEn: product.categoryEn || '',
       sku: product.sku,
       isActive: product.isActive,
       isFeatured: product.isFeatured,
+      isNew: (product as any).isNew !== false,
       sizes: product.sizes,
       colors: product.colors,
       images: product.images.length > 0 ? product.images : [''],
       modelImages: product.modelImages,
       modelInfo: product.modelInfo || '',
+      modelInfoFr: product.modelInfoFr || '',
+      modelInfoEn: product.modelInfoEn || '',
     });
     setIsModalOpen(true);
   };
@@ -144,25 +198,25 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex gap-3 flex-1">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 ${darkMode ? 'text-white/40' : 'text-gray-400'}`} />
             <input
-              placeholder="Rechercher..."
+              placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-primary"
+              className={`w-full pl-11 pr-4 py-3 border focus:outline-none focus:border-primary ${darkMode ? 'bg-white/5 border-white/10 text-white placeholder-white/40' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`}
               style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
             />
           </div>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-4 py-3 bg-white/5 border border-white/10 text-white focus:outline-none focus:border-primary"
+            className={`px-4 py-3 border focus:outline-none focus:border-primary ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
           >
-            <option value="all">TOUTES</option>
+            <option value="all">ALL</option>
             {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat.toUpperCase()}
+              <option key={cat.id} value={cat.slug}>
+                {cat.name.toUpperCase()}
               </option>
             ))}
           </select>
@@ -173,121 +227,176 @@ export default function ProductsPage() {
           style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
         >
           <Plus className="h-4 w-4" />
-          NOUVEAU PRODUIT
+          NEW PRODUCT
         </button>
       </div>
 
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Products Grid - Same style as Shop but with dynamic admin data */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
         {filteredProducts.map((product) => (
-          <div
-            key={product.id}
-            className={`bg-white/5 border border-white/10 ${!product.isActive ? 'opacity-50' : ''}`}
-          >
-            {/* Image */}
-            <div className="aspect-square bg-white/5 relative overflow-hidden">
-              {product.images[0] ? (
-                <Image
-                  src={product.images[0]}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span
-                    className="text-6xl text-white/10"
-                    style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-                  >
-                    TPL
-                  </span>
+          <div key={product.id} className={`group ${!product.isActive ? 'opacity-50' : ''}`}>
+            <div className="relative">
+              {/* Image container - same as ProductCard */}
+              <div className={`aspect-[3/4] relative overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                {/* Product image */}
+                <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-110">
+                  {product.images[0] ? (
+                    <Image
+                      src={product.images[0]}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span
+                        className={`text-8xl font-black ${darkMode ? 'text-white/5' : 'text-black/5'}`}
+                        style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                      >
+                        TPL
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-              {product.isFeatured && (
-                <div className="absolute top-2 left-2">
-                  <Star className="h-5 w-5 text-yellow-500 fill-current" />
-                </div>
-              )}
-            </div>
 
-            {/* Info */}
-            <div className="p-4 space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <h3
-                  className="text-white uppercase line-clamp-1"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.02em' }}
-                >
-                  {product.name}
-                </h3>
-              </div>
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/40 transition-opacity duration-300 opacity-0 group-hover:opacity-100" />
 
-              <p className="text-xs text-white/40" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
-                {product.sku}
-              </p>
-
-              <div className="flex items-center gap-3">
-                <span
-                  className="text-xl text-white"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-                >
-                  {product.price}€
-                </span>
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <span className="text-sm text-white/40 line-through">
-                    {product.originalPrice}€
-                  </span>
+                {/* Featured star */}
+                {product.isFeatured && (
+                  <div className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-yellow-500 text-white">
+                    <Star size={16} className="fill-current" />
+                  </div>
                 )}
+
+                {/* Admin actions on hover */}
+                <div className="absolute bottom-3 left-3 right-3 transition-all duration-300 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEditModal(product)}
+                      className="flex-1 py-3 bg-white text-black flex items-center justify-center gap-2 hover:bg-primary hover:text-white transition-all"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      <Edit size={16} />
+                      EDIT
+                    </button>
+                    <button
+                      onClick={() => updateProduct(product.id, { isActive: !product.isActive })}
+                      className="w-12 py-3 bg-white text-black flex items-center justify-center hover:bg-primary hover:text-white transition-all"
+                    >
+                      {product.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(product.id)}
+                      className="w-12 py-3 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status badges */}
+                <div className="absolute top-3 left-3 flex flex-col gap-1">
+                  {product.isActive ? (
+                    <span
+                      className="px-3 py-1 bg-primary text-white text-xs"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      ACTIVE
+                    </span>
+                  ) : (
+                    <span
+                      className="px-3 py-1 bg-gray-500 text-white text-xs"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      INACTIVE
+                    </span>
+                  )}
+                  <span
+                    className={`px-3 py-1 text-xs ${product.totalStock > 10 ? 'bg-green-500' : product.totalStock > 0 ? 'bg-orange-500' : 'bg-red-500'} text-white`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  >
+                    STOCK: {product.totalStock}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span
-                  className={`px-2 py-1 text-xs ${product.totalStock > 10 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+              {/* Product info - same as ProductCard */}
+              <div className="pt-4 space-y-2">
+                {/* Category */}
+                <p
+                  className={`text-xs uppercase tracking-widest ${darkMode ? 'text-white/40' : 'text-black/40'}`}
                   style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                 >
-                  STOCK: {product.totalStock}
-                </span>
-                <span
-                  className="px-2 py-1 text-xs bg-white/10 text-white/60"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-                >
-                  {product.category.toUpperCase()}
-                </span>
-              </div>
+                  {product.category}
+                </p>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => openEditModal(product)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 border border-white/20 text-white/80 hover:border-primary hover:text-primary transition-colors"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '0.8rem' }}
+                {/* Name and price row */}
+                <div className="flex items-start justify-between gap-2">
+                  <h3
+                    className={`text-base uppercase leading-tight group-hover:text-primary transition-colors ${darkMode ? 'text-white' : 'text-black'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.02em' }}
+                  >
+                    {product.name}
+                  </h3>
+                  <div className="flex flex-col items-end">
+                    <span
+                      className={`text-lg flex-shrink-0 ${darkMode ? 'text-white' : 'text-black'}`}
+                      style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                    >
+                      {product.price}€
+                    </span>
+                    {product.originalPrice && product.originalPrice > product.price && (
+                      <span className={`text-sm line-through ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                        {product.originalPrice}€
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* SKU */}
+                <p
+                  className={`text-xs ${darkMode ? 'text-white/30' : 'text-black/30'}`}
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                 >
-                  <Edit className="h-3 w-3" />
-                  MODIFIER
-                </button>
-                <button
-                  onClick={() => updateProduct(product.id, { isActive: !product.isActive })}
-                  className="w-10 h-10 flex items-center justify-center border border-white/20 text-white/60 hover:border-primary hover:text-primary transition-colors"
-                >
-                  {product.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(product.id)}
-                  className="w-10 h-10 flex items-center justify-center border border-white/20 text-red-400 hover:border-red-400 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                  {product.sku}
+                </p>
+
+                {/* Colors */}
+                <div className="flex items-center gap-1 pt-1">
+                  {product.colors.slice(0, 4).map((color) => (
+                    <div
+                      key={color.name}
+                      className={`w-4 h-4 rounded-full border transition-all ${
+                        darkMode ? 'border-white/20' : 'border-black/10'
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                    />
+                  ))}
+                  {product.colors.length > 4 && (
+                    <span className={`text-xs ml-1 ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                      +{product.colors.length - 4}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {filteredProducts.length === 0 && (
+      {isLoading && (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={40} className="animate-spin text-primary" />
+        </div>
+      )}
+
+      {!isLoading && filteredProducts.length === 0 && (
         <div
-          className="text-center py-12 text-white/40"
+          className={`text-center py-12 ${darkMode ? 'text-white/40' : 'text-gray-400'}`}
           style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
         >
-          AUCUN PRODUIT TROUVÉ
+          NO PRODUCT FOUND
         </div>
       )}
 
@@ -301,7 +410,7 @@ export default function ProductsPage() {
                 className="text-xl"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                {editingProduct ? 'MODIFIER LE PRODUIT' : 'NOUVEAU PRODUIT'}
+                {editingProduct ? 'EDIT PRODUCT' : 'NEW PRODUCT'}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -312,7 +421,7 @@ export default function ProductsPage() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -320,12 +429,12 @@ export default function ProductsPage() {
                     className="text-xs text-white/50 mb-2 block"
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    NOM
+                    NAME (ID)
                   </label>
                   <input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Nom du produit"
+                    placeholder="Product name (internal)"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -345,19 +454,152 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div>
-                <label
-                  className="text-xs text-white/50 mb-2 block"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
-                >
+              {/* Bilingual Names */}
+              <div className="p-4 border border-primary/30 rounded-lg space-y-4">
+                <p className="text-xs text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                  BILINGUAL NAMES
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      NAME (FR)
+                    </label>
+                    <input
+                      value={formData.nameFr}
+                      onChange={(e) => setFormData({ ...formData, nameFr: e.target.value })}
+                      placeholder="Nom en français"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      NAME (EN)
+                    </label>
+                    <input
+                      value={formData.nameEn}
+                      onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                      placeholder="Name in English"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bilingual Descriptions */}
+              <div className="p-4 border border-primary/30 rounded-lg space-y-4">
+                <p className="text-xs text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
                   DESCRIPTION
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Description du produit"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[100px]"
-                />
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      DESCRIPTION (FR)
+                    </label>
+                    <textarea
+                      value={formData.descriptionFr}
+                      onChange={(e) => setFormData({ ...formData, descriptionFr: e.target.value })}
+                      placeholder="Description en français"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[80px]"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      DESCRIPTION (EN)
+                    </label>
+                    <textarea
+                      value={formData.descriptionEn}
+                      onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
+                      placeholder="Description in English"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[80px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bilingual Materials */}
+              <div className="p-4 border border-primary/30 rounded-lg space-y-4">
+                <p className="text-xs text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                  MATÉRIAUX / MATERIALS
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      MATÉRIAUX (FR)
+                    </label>
+                    <textarea
+                      value={formData.materialsFr}
+                      onChange={(e) => setFormData({ ...formData, materialsFr: e.target.value })}
+                      placeholder="100% Coton biologique • Grammage 220g/m²"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[80px]"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      MATERIALS (EN)
+                    </label>
+                    <textarea
+                      value={formData.materialsEn}
+                      onChange={(e) => setFormData({ ...formData, materialsEn: e.target.value })}
+                      placeholder="100% Organic Cotton • 220g/m² weight"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[80px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bilingual Care Instructions */}
+              <div className="p-4 border border-primary/30 rounded-lg space-y-4">
+                <p className="text-xs text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                  CONSIGNES D'ENTRETIEN / CARE INSTRUCTIONS
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      ENTRETIEN (FR)
+                    </label>
+                    <textarea
+                      value={formData.careInstructionsFr}
+                      onChange={(e) => setFormData({ ...formData, careInstructionsFr: e.target.value })}
+                      placeholder="Lavage machine 30°C • Ne pas sécher au sèche-linge"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[80px]"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      CARE (EN)
+                    </label>
+                    <textarea
+                      value={formData.careInstructionsEn}
+                      onChange={(e) => setFormData({ ...formData, careInstructionsEn: e.target.value })}
+                      placeholder="Machine wash 30°C • Do not tumble dry"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary min-h-[80px]"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -366,7 +608,7 @@ export default function ProductsPage() {
                     className="text-xs text-white/50 mb-2 block"
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    PRIX
+                    PRICE
                   </label>
                   <input
                     type="number"
@@ -380,7 +622,7 @@ export default function ProductsPage() {
                     className="text-xs text-white/50 mb-2 block"
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    PRIX ORIGINAL
+                    ORIGINAL PRICE
                   </label>
                   <input
                     type="number"
@@ -394,7 +636,7 @@ export default function ProductsPage() {
                     className="text-xs text-white/50 mb-2 block"
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    CATÉGORIE
+                    CATEGORY
                   </label>
                   <select
                     value={formData.category}
@@ -402,8 +644,8 @@ export default function ProductsPage() {
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white focus:outline-none focus:border-primary"
                   >
                     {categories.map((cat) => (
-                      <option key={cat} value={cat} className="bg-black">
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      <option key={cat.id} value={cat.slug} className="bg-black">
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -416,7 +658,7 @@ export default function ProductsPage() {
                   className="text-xs text-white/50 mb-2 block"
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                 >
-                  URL IMAGE PRINCIPALE
+                  MAIN IMAGE URL
                 </label>
                 <input
                   value={formData.images[0] || ''}
@@ -432,7 +674,7 @@ export default function ProductsPage() {
                   className="text-xs text-white/50 mb-3 block"
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                 >
-                  TAILLES ET STOCK
+                  SIZES AND STOCK
                 </label>
                 <div className="grid grid-cols-4 gap-3">
                   {formData.sizes.map((size, index) => (
@@ -459,7 +701,7 @@ export default function ProductsPage() {
                     className="text-xs text-white/50"
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    COULEURS
+                    COLORS
                   </label>
                   <button
                     type="button"
@@ -468,7 +710,7 @@ export default function ProductsPage() {
                     style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                   >
                     <Plus className="h-3 w-3" />
-                    AJOUTER
+                    ADD
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -477,7 +719,7 @@ export default function ProductsPage() {
                       <input
                         value={color.name}
                         onChange={(e) => updateColor(index, 'name', e.target.value)}
-                        placeholder="Nom"
+                        placeholder="Name"
                         className="flex-1 px-3 py-2 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary"
                       />
                       <input
@@ -501,7 +743,7 @@ export default function ProductsPage() {
               </div>
 
               {/* Options */}
-              <div className="flex gap-6">
+              <div className="flex gap-6 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -509,7 +751,7 @@ export default function ProductsPage() {
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4 accent-primary"
                   />
-                  <span className="text-sm text-white/70">Actif</span>
+                  <span className="text-sm text-white/70">Active</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -518,7 +760,16 @@ export default function ProductsPage() {
                     onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
                     className="w-4 h-4 accent-primary"
                   />
-                  <span className="text-sm text-white/70">Mis en avant</span>
+                  <span className="text-sm text-white/70">Featured</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isNew}
+                    onChange={(e) => setFormData({ ...formData, isNew: e.target.checked })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <span className="text-sm text-white/70">Badge "NEW"</span>
                 </label>
               </div>
             </div>
@@ -530,14 +781,14 @@ export default function ProductsPage() {
                 className="flex-1 py-3 border border-white/20 text-white/70 hover:border-white/40 transition-colors"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                ANNULER
+                CANCEL
               </button>
               <button
                 onClick={handleSave}
                 className="flex-1 py-3 bg-primary text-white hover:bg-primary/90 transition-colors"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                {editingProduct ? 'ENREGISTRER' : 'CRÉER'}
+                {editingProduct ? 'SAVE' : 'CREATE'}
               </button>
             </div>
           </div>
@@ -552,10 +803,10 @@ export default function ProductsPage() {
               className="text-xl mb-4"
               style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
             >
-              SUPPRIMER LE PRODUIT ?
+              DELETE PRODUCT?
             </h2>
             <p className="text-white/60 mb-6">
-              Cette action est irréversible. Le produit sera définitivement supprimé.
+              This action is irreversible. The product will be permanently deleted.
             </p>
             <div className="flex gap-3">
               <button
@@ -563,14 +814,14 @@ export default function ProductsPage() {
                 className="flex-1 py-3 border border-white/20 text-white/70 hover:border-white/40 transition-colors"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                ANNULER
+                CANCEL
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
                 className="flex-1 py-3 bg-red-600 text-white hover:bg-red-700 transition-colors"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                SUPPRIMER
+                DELETE
               </button>
             </div>
           </div>

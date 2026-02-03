@@ -14,14 +14,22 @@ export interface CartItem {
 export interface Product {
   id: string;
   name: string;
+  nameFr?: string;
+  nameEn?: string;
   price: number;
   images: string[];
   modelImages: string[];
   colors: { name: string; hex: string; available: boolean }[];
   sizes: { name: string; available: boolean }[];
   category: string;
+  categoryFr?: string;
+  categoryEn?: string;
   description: string;
+  descriptionFr?: string;
+  descriptionEn?: string;
   modelInfo?: string;
+  modelInfoFr?: string;
+  modelInfoEn?: string;
 }
 
 interface StoreState {
@@ -85,7 +93,7 @@ export const useStore = create<StoreState>()(
       setSidebarOpen: (open) => set({ isSidebarOpen: open }),
       setSearchOpen: (open) => set({ isSearchOpen: open }),
       cartTotal: () =>
-        get().cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        get().cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0),
     }),
     {
       name: 'temporal-store',

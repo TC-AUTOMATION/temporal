@@ -40,7 +40,73 @@ export default function CartDrawer() {
   const total = cartTotal();
 
   const cartIds = cart.map(item => item.id);
-  const suggestedProducts = products.filter(p => !cartIds.includes(p.id)).slice(0, 2);
+  const cartNames = cart.map(item => (item.name || '').toLowerCase());
+
+  // Product recommendations: same color only
+  const getSuggestedProducts = () => {
+    if (cart.length === 0) return products.slice(0, 2);
+
+    // Filter out products already in cart - check by ID and by name
+    const availableProducts = products.filter(p => {
+      const inCartById = cartIds.includes(p.id);
+      const inCartByName = cartNames.some(cartName =>
+        cartName === p.name.toLowerCase() ||
+        cartName === (p.nameFr || '').toLowerCase() ||
+        cartName === (p.nameEn || '').toLowerCase()
+      );
+      return !inCartById && !inCartByName;
+    });
+
+    // Determine cart color from multiple sources:
+    // 1. Check cart item's color field (e.g., 'Blanc', 'Noir', 'White', 'Black')
+    // 2. Check cart item's name for color keywords
+    // 3. Check cart item's id for color keywords
+    const hasWhite = cart.some(item => {
+      const colorLower = (item.color || '').toLowerCase();
+      const nameLower = (item.name || '').toLowerCase();
+      const idLower = (item.id || '').toLowerCase();
+      return colorLower.includes('blanc') || colorLower.includes('white') ||
+             nameLower.includes('blanc') || nameLower.includes('white') ||
+             idLower.includes('blanc') || idLower.includes('white');
+    });
+
+    const cartColor = hasWhite ? 'blanc' : 'noir';
+
+    // Filter products by same color - check id and name
+    const sameColorProducts = availableProducts.filter(p => {
+      const idLower = p.id.toLowerCase();
+      const nameLower = p.name.toLowerCase();
+      if (cartColor === 'blanc') {
+        return idLower.includes('blanc') || idLower.includes('white') ||
+               nameLower.includes('blanc') || nameLower.includes('white');
+      } else {
+        return idLower.includes('noir') || idLower.includes('black') ||
+               nameLower.includes('noir') || nameLower.includes('black');
+      }
+    });
+
+    // If we have same color products, return those (prioritize different categories)
+    if (sameColorProducts.length > 0) {
+      const cartCategories = cart.map(item => {
+        const p = products.find(prod => prod.id === item.id);
+        return p?.category;
+      });
+
+      // Sort: different categories first
+      const sorted = sameColorProducts.sort((a, b) => {
+        const aInCart = cartCategories.includes(a.category) ? 1 : 0;
+        const bInCart = cartCategories.includes(b.category) ? 1 : 0;
+        return aInCart - bInCart;
+      });
+
+      return sorted.slice(0, 2);
+    }
+
+    // Fallback if no same color available
+    return availableProducts.slice(0, 2);
+  };
+
+  const suggestedProducts = getSuggestedProducts();
 
   if (!isCartOpen) return null;
 
@@ -76,10 +142,10 @@ export default function CartDrawer() {
                   className="text-xl"
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                 >
-                  TON PANIER
+                  {t.yourCart}
                 </h2>
                 <p className="text-muted-foreground text-sm">
-                  {cart.length} article{cart.length > 1 ? 's' : ''}
+                  {cart.length} {cart.length > 1 ? t.cartItemsCount : t.cartItemCount}
                 </p>
               </div>
             </div>
@@ -107,9 +173,9 @@ export default function CartDrawer() {
                 className="text-muted-foreground text-lg"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                TON PANIER EST VIDE
+                {t.cartEmpty}
               </p>
-              <p className="text-muted-foreground/60 text-sm mt-1">Ajoute des pièces pour commencer</p>
+              <p className="text-muted-foreground/60 text-sm mt-1">{t.addItemsToStart}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -122,14 +188,16 @@ export default function CartDrawer() {
                       : 'bg-black/5 border border-black/10 hover:border-primary/30'
                   }`}
                 >
+                  {/* Top row: Image + Info */}
                   <div className="flex gap-4">
-                    <div className="w-20 h-20 overflow-hidden flex-shrink-0">
+                    {/* Image */}
+                    <div className="w-24 h-24 overflow-hidden flex-shrink-0">
                       {item.image ? (
                         <Image
                           src={item.image}
                           alt={item.name}
-                          width={80}
-                          height={80}
+                          width={96}
+                          height={96}
                           className="object-cover w-full h-full"
                         />
                       ) : (
@@ -139,6 +207,7 @@ export default function CartDrawer() {
                       )}
                     </div>
 
+                    {/* Info: name, size, quantity, price */}
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <div>
@@ -154,7 +223,7 @@ export default function CartDrawer() {
                             }`}
                             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                           >
-                            TAILLE: {item.size}
+                            {t.sizeLabel}: {item.size}
                           </span>
                         </div>
                         <button
@@ -194,48 +263,65 @@ export default function CartDrawer() {
                           className="text-primary text-xl"
                           style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                         >
-                          {item.price.toFixed(2)}€
+                          {Number(item.price).toFixed(2)}€
                         </p>
                       </div>
-
-                      {/* Link to product page */}
-                      <Link
-                        href={`/products/${item.id}`}
-                        onClick={handleClose}
-                        className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-xs border border-primary text-primary hover:bg-primary hover:text-white transition-all"
-                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
-                      >
-                        VOIR LA PAGE DU PRODUIT
-                        <ArrowRight size={12} />
-                      </Link>
                     </div>
                   </div>
+
+                  {/* Link to product page - at bottom */}
+                  <Link
+                    href={`/products/${item.id}`}
+                    onClick={handleClose}
+                    className={`mt-3 inline-flex items-center justify-center gap-2 px-5 py-2 text-sm border transition-all ${
+                      darkMode
+                        ? 'border-white text-white hover:bg-white hover:text-black'
+                        : 'border-black text-black hover:bg-black hover:text-white'
+                    }`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.08em' }}
+                  >
+                    {t.viewProductPage}
+                    <ArrowRight size={14} />
+                  </Link>
                 </div>
               ))}
             </div>
           )}
 
-          {cart.length > 0 && suggestedProducts.length > 0 && (
-            <>
-              <div className={`my-6 h-[1px] ${darkMode ? 'bg-white/10' : 'bg-black/10'}`} />
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <TemporalStar size={18} className="text-primary" />
-                  <h3
-                    className="text-primary text-sm"
-                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
+        </div>
+
+        {/* Footer */}
+        {cart.length > 0 && (
+          <div className={`p-4 md:p-6 border-t flex-shrink-0 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+            {/* Suggestions */}
+            {suggestedProducts.length > 0 && (
+              <div className="mb-5">
+                <p
+                  className="text-primary text-base mb-3 flex items-center gap-2"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  <span
+                    className="animate-twinkle"
+                    style={{
+                      '--twinkle-duration': '2s',
+                      '--twinkle-delay': '0s',
+                    } as React.CSSProperties}
                   >
-                    TU VAS KIFFER
-                  </h3>
-                </div>
+                    <TemporalStar
+                      size={16}
+                      color={darkMode ? '#ffffff' : '#000000'}
+                    />
+                  </span>
+                  {t.youWillLove}
+                </p>
                 <div className="space-y-2">
                   {suggestedProducts.map((product) => (
                     <div
                       key={product.id}
-                      className={`flex items-center gap-3 p-3 ${
+                      className={`flex items-center gap-3 p-2.5 transition-all group ${
                         darkMode
-                          ? 'bg-white/5 border border-white/10'
-                          : 'bg-black/5 border border-black/10'
+                          ? 'bg-white/5 border border-white/10 hover:border-primary/30'
+                          : 'bg-black/5 border border-black/10 hover:border-primary/30'
                       }`}
                     >
                       <div className="w-12 h-12 flex-shrink-0 overflow-hidden">
@@ -253,20 +339,20 @@ export default function CartDrawer() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className="text-sm truncate"
+                          className="text-xs truncate group-hover:text-primary transition-colors"
                           style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                         >
                           {product.name.toUpperCase()}
                         </p>
                         <p
-                          className="text-primary text-sm"
+                          className="text-primary text-sm mt-0.5"
                           style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                         >
-                          {product.price.toFixed(2)}€
+                          {Number(product.price).toFixed(2)}€
                         </p>
                       </div>
                       <button
-                        className="px-4 py-2 bg-primary text-white text-xs transition-all hover:scale-105"
+                        className="px-3 py-1.5 bg-primary text-white text-xs transition-all hover:scale-105"
                         style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                         onClick={() => {
                           const availableSize = product.sizes.find(s => s.available);
@@ -274,7 +360,7 @@ export default function CartDrawer() {
                             addToCart({
                               id: product.id,
                               name: product.name,
-                              price: product.price,
+                              price: Number(product.price),
                               size: availableSize.name,
                               color: product.colors[0]?.name || '',
                               quantity: 1,
@@ -289,35 +375,49 @@ export default function CartDrawer() {
                   ))}
                 </div>
               </div>
-            </>
-          )}
-        </div>
+            )}
 
-        {/* Footer */}
-        {cart.length > 0 && (
-          <div className={`p-4 md:p-6 border-t flex-shrink-0 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
-            <div className="flex justify-between items-center mb-4">
+            {/* Divider */}
+            <div className={`mb-4 h-[1px] ${darkMode ? 'bg-white/10' : 'bg-black/10'}`} />
+
+            {/* Total section */}
+            <div className="flex justify-between items-start mb-4">
               <div>
-                <span className="text-muted-foreground text-sm">Total</span>
                 <p
-                  className="text-3xl text-primary"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                  className="text-primary text-xs mb-1"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.3em' }}
                 >
-                  {total.toFixed(2)}€
+                  {t.total.toUpperCase()}
+                </p>
+                <p
+                  className="text-4xl"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                >
+                  {Number(total).toFixed(2)}€
                 </p>
               </div>
-              <div className="text-right text-xs text-muted-foreground">
-                <p>Livraison calculée au checkout</p>
-                <p>Taxes incluses</p>
+              <div className="text-right">
+                <p
+                  className={`text-xs ${darkMode ? 'text-white/50' : 'text-black/50'}`}
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  {t.shippingAtCheckout}
+                </p>
+                <p
+                  className={`text-xs mt-1 ${darkMode ? 'text-white/50' : 'text-black/50'}`}
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  {t.taxesIncluded.toUpperCase()}
+                </p>
               </div>
             </div>
 
             <Link href="/checkout" onClick={handleClose} className="block">
               <button
-                className="w-full py-4 bg-primary text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] rounded-lg"
-                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '1.1rem' }}
+                className="w-full py-4 bg-primary text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '1.1rem', borderRadius: '12px' }}
               >
-                PASSER AU PAIEMENT
+                {t.goToPayment}
               </button>
             </Link>
           </div>

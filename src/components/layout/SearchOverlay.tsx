@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
+import { translations } from '@/lib/translations';
 import { products } from '@/lib/products';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -12,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function SearchOverlay() {
-  const { isSearchOpen, setSearchOpen } = useStore();
+  const { isSearchOpen, setSearchOpen, language } = useStore();
+  const t = translations[language];
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +34,7 @@ export default function SearchOverlay() {
   return (
     <Dialog open={isSearchOpen} onOpenChange={setSearchOpen}>
       <DialogContent className="sm:max-w-lg p-0 gap-0">
-        <DialogTitle className="sr-only">Recherche</DialogTitle>
+        <DialogTitle className="sr-only">{t.searchTitle}</DialogTitle>
         {/* Search input */}
         <div className="flex items-center border-b border-border p-2">
           <Search size={20} className="ml-2 text-muted-foreground" />
@@ -41,7 +43,7 @@ export default function SearchOverlay() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher..."
+            placeholder={t.searchPlaceholder}
             className="border-0 focus-visible:ring-0 text-lg"
           />
         </div>
@@ -74,7 +76,7 @@ export default function SearchOverlay() {
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground py-8">
-                  Aucun résultat pour "{query}"
+                  {t.noResultsFor} "{query}"
                 </p>
               )}
             </div>
@@ -83,9 +85,9 @@ export default function SearchOverlay() {
           {/* Popular searches when empty */}
           {query.length === 0 && (
             <div className="p-4">
-              <p className="text-sm text-muted-foreground mb-3">Recherches populaires</p>
+              <p className="text-sm text-muted-foreground mb-3">{t.popularSearches}</p>
               <div className="flex flex-wrap gap-2">
-                {['Veste', 'T-shirt', 'Jogging', 'Bonnet'].map((term) => (
+                {['Jacket', 'T-shirt', 'Joggers', 'Beanie'].map((term) => (
                   <Badge
                     key={term}
                     variant="secondary"

@@ -1,69 +1,142 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { prisma } from '@/lib/db/prisma';
+import { verifyCodeSchema } from '@/lib/validations';
+import { generateToken, isAdminEmail } from '@/lib/auth/jwt';
+import { checkRateLimit } from '@/lib/rateLimit';
 
-// Shared verification codes store
-const verificationCodes = new Map<string, { code: string; expiresAt: number }>();
-
-// Also check the send-code endpoint's store
-import { verificationCodes as sendCodeStore } from '../send-code/route';
-
+/**
+ * POST /api/auth/verify-code
+ * Verify the code and create/login user
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { email, code } = await request.json();
+    const body = await request.json();
+    const validation = verifyCodeSchema.safeParse(body);
 
-    if (!email || !code) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Email and code are required' },
+        { error: 'Données invalides' },
         { status: 400 }
       );
     }
 
-    const emailLower = email.toLowerCase();
+    const { email: rawEmail, code } = validation.data;
+    const email = rawEmail.toLowerCase();
 
-    // Check both stores (in case of server restart, etc.)
-    const stored = sendCodeStore.get(emailLower) || verificationCodes.get(emailLower);
+    // Rate limiting: 10 attempts per email per 15 minutes
+    const rateLimit = checkRateLimit({
+      identifier: `verify-code:${email}`,
+      maxRequests: 10,
+      windowMs: 15 * 60 * 1000, // 15 minutes
+    });
 
-    if (!stored) {
+    if (!rateLimit.success) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
       return NextResponse.json(
-        { error: 'No code found for this email. Please request a new code.' },
+        { error: `Trop de tentatives. Réessayez dans ${resetInMinutes} minutes.` },
+        { status: 429 }
+      );
+    }
+
+    // Find the verification code
+    const storedCode = await prisma.verificationCode.findFirst({
+      where: {
+        email,
+        code,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!storedCode) {
+      return NextResponse.json(
+        { error: 'Code invalide ou expiré' },
         { status: 400 }
       );
     }
 
-    if (Date.now() > stored.expiresAt) {
-      // Clean up expired code
-      sendCodeStore.delete(emailLower);
-      verificationCodes.delete(emailLower);
+    // Mark code as used
+    await prisma.verificationCode.update({
+      where: { id: storedCode.id },
+      data: { used: true },
+    });
 
+    // Find or create user
+    let user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    const isAdmin = isAdminEmail(email);
+
+    if (!user) {
+      // Create new user
+      user = await prisma.user.create({
+        data: {
+          email,
+          isAdmin,
+        },
+      });
+    } else if (user.isAdmin !== isAdmin) {
+      // Update admin status if changed
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { isAdmin },
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
       return NextResponse.json(
-        { error: 'Code has expired. Please request a new code.' },
-        { status: 400 }
+        { error: 'Compte désactivé' },
+        { status: 403 }
       );
     }
 
-    if (stored.code !== code) {
-      return NextResponse.json(
-        { error: 'Invalid code. Please try again.' },
-        { status: 400 }
-      );
-    }
+    // Generate JWT token
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      isAdmin: user.isAdmin,
+    });
 
-    // Code is valid - clean up
-    sendCodeStore.delete(emailLower);
-    verificationCodes.delete(emailLower);
+    // Create session in database
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      },
+    });
 
-    // Determine if user is admin
-    const adminEmails = ['pradeltom08@gmail.com', 'chloethiel201@gmail.com'];
-    const isAdmin = adminEmails.includes(emailLower);
+    // Set cookie
+    const cookieStore = await cookies();
+    cookieStore.set('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: expiresAt,
+      path: '/',
+    });
 
     return NextResponse.json({
       success: true,
-      message: 'Code verified successfully',
-      isAdmin
+      data: {
+        message: 'Connexion réussie',
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isAdmin: user.isAdmin,
+        },
+      },
     });
   } catch (error) {
     console.error('Error verifying code:', error);
     return NextResponse.json(
-      { error: 'Failed to verify code' },
+      { error: 'Erreur lors de la vérification' },
       { status: 500 }
     );
   }

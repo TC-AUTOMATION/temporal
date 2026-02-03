@@ -1,13 +1,116 @@
 services:
+  temporal-db:
+    image: postgres:16-alpine
+    container_name: temporal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - temporal_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5434:5432"
+    # 🔒 Configuration PostgreSQL sécurisée
+    command: >
+      postgres
+      -c password_encryption=scram-sha-256
+      -c log_connections=on
+      -c log_disconnections=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-temporal} -d ${POSTGRES_DB:-temporal_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # 🔒 Limites de ressources
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # 🔒 Rotation des logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - temporal_network
+
   temporal:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: temporal
     restart: unless-stopped
+    depends_on:
+      temporal-db:
+        condition: service_healthy
     ports:
-      - "3010:3000"
+      - "127.0.0.1:3010:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@temporal-db:5432/temporal_db?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://temporal.chloe-dev.fr}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Temporal}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ADMIN_EMAILS=${ADMIN_EMAILS}
+      - BOXTAL_ACCESS_KEY=${BOXTAL_ACCESS_KEY}
+      - BOXTAL_SECRET_KEY=${BOXTAL_SECRET_KEY}
+      - BOXTAL_MAP_ACCESS_KEY=${BOXTAL_MAP_ACCESS_KEY}
+      - BOXTAL_MAP_SECRET_KEY=${BOXTAL_MAP_SECRET_KEY}
+      # SMTP OVH
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - CONTACT_EMAIL=${CONTACT_EMAIL}
+      - CONTACT_PASS=${CONTACT_PASS}
+      - NEWSLETTER_EMAIL=${NEWSLETTER_EMAIL}
+      - NEWSLETTER_PASS=${NEWSLETTER_PASS}
+    # 🔒 Healthcheck pour détection des pannes
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # 🔒 Limites de ressources
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # 🔒 Rotation des logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
+      - temporal_network
       - caddy_network
 
+volumes:
+  # 🔒 Volume externe pour protection contre suppression accidentelle
+  temporal_data:
+    external: true
+    name: temporal_database
+
 networks:
+  temporal_network:
+    driver: bridge
   caddy_network:
     external: true

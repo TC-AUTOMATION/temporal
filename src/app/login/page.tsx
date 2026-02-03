@@ -1,126 +1,109 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TemporalLogo from '@/components/ui/TemporalLogo';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
-import { Mail, ArrowLeft, Zap, Lock, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, ArrowLeft, Zap, Lock, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import Starfield from '@/components/ui/Starfield';
+
+type LoginMode = 'password' | 'otp';
+type Step = 'login' | 'code' | 'success';
 
 export default function LoginPage() {
   const router = useRouter();
   const { language, darkMode } = useStore();
-  const { login, isAuthenticated } = useAuthStore();
+  const {
+    isAuthenticated,
+    isLoading,
+    pendingEmail,
+    demoCode,
+    error,
+    login,
+    sendVerificationCode,
+    verifyCode,
+    clearError
+  } = useAuthStore();
   const t = translations[language];
 
-  const [step, setStep] = useState<'email' | 'code' | 'success'>('email');
+  const [mode, setMode] = useState<LoginMode>('password');
+  const [step, setStep] = useState<Step>('login');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [demoCode, setDemoCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
-    router.push('/profile');
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/profile');
+    }
+  }, [isAuthenticated, router]);
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/auth/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi du code');
-      }
-
-      // For demo purposes, show the code (remove in production)
-      if (data.demo_code) {
-        setDemoCode(data.demo_code);
-      }
-
+  // Update step based on pendingEmail (for OTP mode)
+  useEffect(() => {
+    if (pendingEmail && step === 'login' && mode === 'otp') {
       setStep('code');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+    }
+  }, [pendingEmail, step, mode]);
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+    const success = await login(email, password);
+    if (success) {
+      setStep('success');
+      setTimeout(() => {
+        router.push('/profile');
+      }, 1500);
+    }
+  };
+
+  const handleOTPRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+    const success = await sendVerificationCode(email);
+    if (success) {
+      setStep('code');
     }
   };
 
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/auth/verify-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Code invalide');
-      }
-
-      // Login successful
-      login(email);
+    clearError();
+    const success = await verifyCode(pendingEmail || email, code);
+    if (success) {
       setStep('success');
-
-      // Redirect after a brief moment
       setTimeout(() => {
         router.push('/profile');
       }, 1500);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleResendCode = async () => {
-    setError('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/auth/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi du code');
-      }
-
-      if (data.demo_code) {
-        setDemoCode(data.demo_code);
-      }
-
-      setError('');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    clearError();
+    await sendVerificationCode(pendingEmail || email);
   };
+
+  const switchToOTP = () => {
+    setMode('otp');
+    setPassword('');
+    clearError();
+  };
+
+  const switchToPassword = () => {
+    setMode('password');
+    setCode('');
+    setStep('login');
+    clearError();
+  };
+
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className={`min-h-screen flex flex-col relative overflow-hidden ${darkMode ? 'dark bg-black' : 'bg-white'}`}>
@@ -157,16 +140,16 @@ export default function LoginPage() {
               <div className="flex justify-center mb-6">
                 <TemporalLogo size={80} />
               </div>
-              {step === 'email' && (
+              {step === 'login' && (
                 <>
                   <h1
                     className={`text-3xl mb-2 ${darkMode ? 'text-white' : 'text-black'}`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    SE CONNECTER
+                    {t.signIn}
                   </h1>
                   <p className="text-muted-foreground">
-                    Entre dans l'univers Temporal
+                    {t.enterTemporalUniverse}
                   </p>
                 </>
               )}
@@ -176,10 +159,10 @@ export default function LoginPage() {
                     className={`text-3xl mb-2 ${darkMode ? 'text-white' : 'text-black'}`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    CODE DE VÉRIFICATION
+                    {t.verificationCode}
                   </h1>
                   <p className="text-muted-foreground">
-                    Envoyé à {email}
+                    {t.sentTo} {pendingEmail || email}
                   </p>
                 </>
               )}
@@ -192,10 +175,10 @@ export default function LoginPage() {
                     className={`text-3xl mb-2 ${darkMode ? 'text-white' : 'text-black'}`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    CONNEXION RÉUSSIE
+                    {t.loginSuccessful}
                   </h1>
                   <p className="text-muted-foreground">
-                    Redirection vers ton profil...
+                    {t.redirectingProfile}
                   </p>
                 </>
               )}
@@ -211,21 +194,103 @@ export default function LoginPage() {
             {/* Demo code display (remove in production) */}
             {demoCode && step === 'code' && (
               <div className="mb-4 p-3 rounded-lg bg-primary/20 border border-primary/30 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Code de démo (à retirer en production)</p>
+                <p className="text-xs text-muted-foreground mb-1">{t.demoCodeNotice}</p>
                 <p className="text-2xl text-primary font-bold tracking-widest">{demoCode}</p>
               </div>
             )}
 
-            {/* Form */}
-            {step === 'email' && (
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
+            {/* Login Form - Password Mode */}
+            {step === 'login' && mode === 'password' && (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="relative">
                   <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="TON@EMAIL.COM"
+                    placeholder={t.email.toUpperCase()}
+                    required
+                    autoFocus
+                    disabled={isLoading}
+                    className={`w-full pl-12 pr-4 py-4 rounded-full border-2 transition-all focus:outline-none focus:border-primary disabled:opacity-50 ${
+                      darkMode
+                        ? 'bg-white/5 border-white/20 text-white placeholder:text-white/40'
+                        : 'bg-black/5 border-black/10 text-black placeholder:text-black/40'
+                    }`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  />
+                </div>
+                <div className="relative">
+                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t.password.toUpperCase()}
+                    required
+                    disabled={isLoading}
+                    className={`w-full pl-12 pr-12 py-4 rounded-full border-2 transition-all focus:outline-none focus:border-primary disabled:opacity-50 ${
+                      darkMode
+                        ? 'bg-white/5 border-white/20 text-white placeholder:text-white/40'
+                        : 'bg-black/5 border-black/10 text-black placeholder:text-black/40'
+                    }`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-4 rounded-full bg-primary text-white flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '1.1rem' }}
+                >
+                  {isLoading ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Zap size={18} />
+                  )}
+                  {isLoading ? t.signingIn : t.signIn}
+                </button>
+
+                {/* Forgot password link */}
+                <Link href="/reset-password">
+                  <button
+                    type="button"
+                    className={`w-full py-3 rounded-full transition-all text-sm ${
+                      darkMode ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/5'
+                    }`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  >
+                    {t.forgotPassword}
+                  </button>
+                </Link>
+
+                {/* Register link */}
+                <p className={`text-center text-sm ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
+                  {t.noAccountYet}{' '}
+                  <Link href="/register" className="text-primary hover:underline">
+                    {t.signUp}
+                  </Link>
+                </p>
+              </form>
+            )}
+
+            {/* Login Form - OTP Mode */}
+            {step === 'login' && mode === 'otp' && (
+              <form onSubmit={handleOTPRequest} className="space-y-4">
+                <div className="relative">
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t.email.toUpperCase()}
                     required
                     autoFocus
                     disabled={isLoading}
@@ -248,11 +313,24 @@ export default function LoginPage() {
                   ) : (
                     <Zap size={18} />
                   )}
-                  {isLoading ? 'ENVOI EN COURS...' : 'RECEVOIR MON CODE'}
+                  {isLoading ? t.sending : t.getMyCode}
+                </button>
+
+                {/* Back to password login */}
+                <button
+                  type="button"
+                  onClick={switchToPassword}
+                  className={`w-full py-3 rounded-full transition-all text-sm ${
+                    darkMode ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
+                  {t.loginWithPassword}
                 </button>
               </form>
             )}
 
+            {/* Code verification */}
             {step === 'code' && (
               <>
                 <form onSubmit={handleCodeSubmit} className="space-y-4">
@@ -286,7 +364,7 @@ export default function LoginPage() {
                     ) : (
                       <Zap size={18} />
                     )}
-                    {isLoading ? 'VÉRIFICATION...' : 'VALIDER'}
+                    {isLoading ? t.verifying : t.validate}
                   </button>
                 </form>
 
@@ -299,14 +377,13 @@ export default function LoginPage() {
                     } disabled:opacity-50`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    RENVOYER LE CODE
+                    {t.resendCode}
                   </button>
                   <button
                     onClick={() => {
-                      setStep('email');
+                      setStep('login');
                       setCode('');
-                      setError('');
-                      setDemoCode('');
+                      clearError();
                     }}
                     disabled={isLoading}
                     className={`w-full py-3 rounded-full transition-all ${
@@ -314,7 +391,7 @@ export default function LoginPage() {
                     } disabled:opacity-50`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                   >
-                    MODIFIER L'ADRESSE EMAIL
+                    {t.changeEmail}
                   </button>
                 </div>
               </>
@@ -331,10 +408,10 @@ export default function LoginPage() {
           style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
         >
           <Link href="/privacy" className="hover:text-primary transition-colors">
-            CONFIDENTIALITÉ
+            {t.privacy}
           </Link>
           <Link href="/terms" className="hover:text-primary transition-colors">
-            CONDITIONS D'UTILISATION
+            {t.terms}
           </Link>
         </div>
       </div>

@@ -1,10 +1,84 @@
+# Dependencies
 node_modules
+.pnp
+.pnp.js
+
+# Build outputs
 .next
+out
+dist
+build
+
+# Git
 .git
 .gitignore
-README.md
-Dockerfile
-docker-compose.yml
+.gitattributes
+
+# Docker files (avoid recursive)
+Dockerfile*
+docker-compose*.yml
 .dockerignore
+
+# Environment files (security)
+.env
+.env.*
 .env*.local
+!.env.example
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test and coverage
+coverage
+.nyc_output
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+jest.config.*
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+docs
+*.md
+!prisma/*.md
+
+# Development files
+.eslintcache
+.prettierrc*
+.editorconfig
+tsconfig.tsbuildinfo
+
+# Prisma migrations (keep schema only)
+prisma/migrations
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.temp
+
+# Debug
+.debug
+
+# Misc
+*.tgz
+*.tar.gz
+*.zip

@@ -1,13 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAdminStore, Ticket } from '@/stores/useAdminStore';
+import { useStore } from '@/stores/useStore';
 import { MessageSquare, Send, Clock, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 
 export default function AdminTicketsPage() {
-  const { tickets, updateTicketStatus, addTicketMessage } = useAdminStore();
+  const { darkMode, language } = useStore();
+  const { tickets, fetchTickets, updateTicketStatus, addTicketReply } = useAdminStore();
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
+
+  // Translations
+  const t = {
+    title: 'TICKETS',
+    subtitle: language === 'fr' ? 'Gérer les demandes clients' : 'Manage customer requests',
+    pending: language === 'fr' ? 'EN ATTENTE' : 'PENDING',
+    open: language === 'fr' ? 'Ouvert' : 'Open',
+    inProgress: language === 'fr' ? 'En cours' : 'In progress',
+    resolved: language === 'fr' ? 'Résolu' : 'Resolved',
+    closed: language === 'fr' ? 'Fermé' : 'Closed',
+    noTickets: language === 'fr' ? 'AUCUN TICKET' : 'NO TICKETS',
+    selectTicket: language === 'fr' ? 'SÉLECTIONNER UN TICKET' : 'SELECT A TICKET',
+    createdOn: language === 'fr' ? 'Créé le' : 'Created on',
+    support: 'TEMPORAL SUPPORT',
+    replyPlaceholder: language === 'fr' ? 'Répondre...' : 'Reply...',
+    statusOpen: language === 'fr' ? 'OUVERT' : 'OPEN',
+    statusInProgress: language === 'fr' ? 'EN COURS' : 'IN PROGRESS',
+    statusResolved: language === 'fr' ? 'RÉSOLU' : 'RESOLVED',
+    statusClosed: language === 'fr' ? 'FERMÉ' : 'CLOSED',
+  };
+
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
 
   const getStatusIcon = (status: Ticket['status']) => {
     switch (status) {
@@ -20,10 +46,10 @@ export default function AdminTicketsPage() {
 
   const getStatusLabel = (status: Ticket['status']) => {
     switch (status) {
-      case 'open': return 'Ouvert';
-      case 'in_progress': return 'En cours';
-      case 'resolved': return 'Résolu';
-      case 'closed': return 'Fermé';
+      case 'open': return t.open;
+      case 'in_progress': return t.inProgress;
+      case 'resolved': return t.resolved;
+      case 'closed': return t.closed;
     }
   };
 
@@ -35,9 +61,9 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!selectedTicket || !replyMessage.trim()) return;
-    addTicketMessage(selectedTicket.id, replyMessage, true);
+    await addTicketReply(selectedTicket.id, replyMessage, true);
     setReplyMessage('');
     // Update ticket reference
     const updated = tickets.find(t => t.id === selectedTicket.id);
@@ -49,17 +75,17 @@ export default function AdminTicketsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1
-            className="text-3xl text-white"
+            className={`text-3xl ${darkMode ? 'text-white' : 'text-gray-900'}`}
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
           >
-            TICKETS
+            {t.title}
           </h1>
-          <p className="text-white/60 text-sm mt-1">Gérer les demandes clients</p>
+          <p className={`text-sm mt-1 ${darkMode ? 'text-white/60' : 'text-gray-500'}`}>{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary">
           <MessageSquare size={18} />
           <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-            {tickets.filter(t => t.status === 'open').length} EN ATTENTE
+            {tickets.filter(ticket => ticket.status === 'open').length} {t.pending}
           </span>
         </div>
       </div>
@@ -74,7 +100,9 @@ export default function AdminTicketsPage() {
               className={`w-full p-4 text-left border transition-all ${
                 selectedTicket?.id === ticket.id
                   ? 'border-primary bg-primary/10'
-                  : 'border-white/10 bg-white/5 hover:border-white/20'
+                  : darkMode
+                    ? 'border-white/10 bg-white/5 hover:border-white/20'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -82,14 +110,14 @@ export default function AdminTicketsPage() {
                   <div className="flex items-center gap-2 mb-1">
                     {getStatusIcon(ticket.status)}
                     <span
-                      className="text-white truncate"
+                      className={`truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}
                       style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                     >
                       {ticket.subject}
                     </span>
                   </div>
-                  <p className="text-white/50 text-sm truncate">{ticket.customerName} • {ticket.customerEmail}</p>
-                  <p className="text-white/30 text-xs mt-1">{ticket.ticketNumber}</p>
+                  <p className={`text-sm truncate ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>{ticket.customerName} • {ticket.customerEmail}</p>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>{ticket.ticketNumber}</p>
                 </div>
                 <span className={`px-2 py-1 text-xs ${getPriorityColor(ticket.priority)}`}>
                   {ticket.priority.toUpperCase()}
@@ -99,10 +127,10 @@ export default function AdminTicketsPage() {
           ))}
 
           {tickets.length === 0 && (
-            <div className="text-center py-12 text-white/40">
+            <div className={`text-center py-12 ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
               <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
               <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                AUCUN TICKET
+                {t.noTickets}
               </p>
             </div>
           )}
@@ -110,12 +138,12 @@ export default function AdminTicketsPage() {
 
         {/* Ticket detail */}
         {selectedTicket ? (
-          <div className="border border-white/10 bg-white/5">
+          <div className={`border ${darkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white'}`}>
             {/* Header */}
-            <div className="p-4 border-b border-white/10">
+            <div className={`p-4 border-b ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-2">
                 <h2
-                  className="text-xl text-white"
+                  className={`text-xl ${darkMode ? 'text-white' : 'text-gray-900'}`}
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                 >
                   {selectedTicket.subject}
@@ -126,20 +154,20 @@ export default function AdminTicketsPage() {
                     updateTicketStatus(selectedTicket.id, e.target.value as Ticket['status']);
                     setSelectedTicket({ ...selectedTicket, status: e.target.value as Ticket['status'] });
                   }}
-                  className="bg-white/10 border border-white/20 text-white px-3 py-1 text-sm"
+                  className={`px-3 py-1 text-sm border ${darkMode ? 'bg-white/10 border-white/20 text-white' : 'bg-gray-100 border-gray-200 text-gray-900'}`}
                   style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                 >
-                  <option value="open" className="bg-black">OUVERT</option>
-                  <option value="in_progress" className="bg-black">EN COURS</option>
-                  <option value="resolved" className="bg-black">RÉSOLU</option>
-                  <option value="closed" className="bg-black">FERMÉ</option>
+                  <option value="open" className={darkMode ? 'bg-black' : ''}>{t.statusOpen}</option>
+                  <option value="in_progress" className={darkMode ? 'bg-black' : ''}>{t.statusInProgress}</option>
+                  <option value="resolved" className={darkMode ? 'bg-black' : ''}>{t.statusResolved}</option>
+                  <option value="closed" className={darkMode ? 'bg-black' : ''}>{t.statusClosed}</option>
                 </select>
               </div>
-              <p className="text-white/50 text-sm">
+              <p className={`text-sm ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
                 {selectedTicket.customerName} • {selectedTicket.customerEmail}
               </p>
-              <p className="text-white/30 text-xs mt-1">
-                Créé le {new Date(selectedTicket.createdAt).toLocaleDateString('fr-FR')}
+              <p className={`text-xs mt-1 ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                {t.createdOn} {new Date(selectedTicket.createdAt).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}
               </p>
             </div>
 
@@ -151,34 +179,40 @@ export default function AdminTicketsPage() {
                   className={`p-3 ${
                     msg.isAdmin
                       ? 'bg-primary/20 border-l-2 border-primary ml-4'
-                      : 'bg-white/10 border-l-2 border-white/30 mr-4'
+                      : darkMode
+                        ? 'bg-white/10 border-l-2 border-white/30 mr-4'
+                        : 'bg-gray-100 border-l-2 border-gray-300 mr-4'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span
-                      className="text-xs text-white/60"
+                      className={`text-xs ${darkMode ? 'text-white/60' : 'text-gray-500'}`}
                       style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                     >
-                      {msg.isAdmin ? 'TEMPORAL SUPPORT' : selectedTicket.customerName}
+                      {msg.isAdmin ? t.support : selectedTicket.customerName}
                     </span>
-                    <span className="text-xs text-white/30">
-                      {new Date(msg.createdAt).toLocaleString('fr-FR')}
+                    <span className={`text-xs ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                      {new Date(msg.createdAt).toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US')}
                     </span>
                   </div>
-                  <p className="text-white/80 text-sm">{msg.content}</p>
+                  <p className={`text-sm ${darkMode ? 'text-white/80' : 'text-gray-700'}`}>{msg.content}</p>
                 </div>
               ))}
             </div>
 
             {/* Reply */}
-            <div className="p-4 border-t border-white/10">
+            <div className={`p-4 border-t ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                  placeholder="Répondre..."
-                  className="flex-1 px-4 py-3 bg-white/10 border border-white/20 text-white placeholder-white/30 focus:outline-none focus:border-primary"
+                  placeholder={t.replyPlaceholder}
+                  className={`flex-1 px-4 py-3 border focus:outline-none focus:border-primary ${
+                    darkMode
+                      ? 'bg-white/10 border-white/20 text-white placeholder-white/30'
+                      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
+                  }`}
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendReply()}
                 />
@@ -193,9 +227,9 @@ export default function AdminTicketsPage() {
             </div>
           </div>
         ) : (
-          <div className="border border-white/10 bg-white/5 flex items-center justify-center h-96">
-            <p className="text-white/40" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-              SÉLECTIONNER UN TICKET
+          <div className={`border flex items-center justify-center h-96 ${darkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
+            <p className={darkMode ? 'text-white/40' : 'text-gray-400'} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+              {t.selectTicket}
             </p>
           </div>
         )}

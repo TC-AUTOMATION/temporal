@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import TemporalLogo from '@/components/ui/TemporalLogo';
 import TemporalStar from '@/components/ui/TemporalStar';
 import Starfield from '@/components/ui/Starfield';
@@ -14,10 +14,8 @@ interface LandingPageProps {
 }
 
 export default function LandingPage({ onEnter }: LandingPageProps) {
-  const [email, setEmail] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
-  const [showOptions, setShowOptions] = useState(false);
+  const [error, setError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const { language } = useStore();
@@ -51,107 +49,22 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
     return () => clearInterval(interval);
   }, [countdownDate]);
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setShowOptions(true);
-    }
-  };
-
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === 'temporal') {
       onEnter();
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 2000);
     }
   };
-
-  if (showPassword) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4 relative overflow-hidden">
-        <Starfield />
-
-        <div className="relative z-10 w-full max-w-md">
-          <div className="flex justify-center mb-12">
-            <TemporalLogo size={80} />
-          </div>
-
-          <form onSubmit={handlePasswordSubmit} className="space-y-6">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mot de passe"
-              className="w-full px-6 py-4 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary transition-colors text-center tracking-widest"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="w-full py-4 bg-primary text-white uppercase tracking-widest hover:bg-primary/90 transition-colors"
-              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
-            >
-              Entrer
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  if (showOptions) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4 relative overflow-hidden">
-        <Starfield />
-
-        <div className="relative z-10 w-full max-w-md text-center">
-          <div className="flex justify-center mb-8">
-            <TemporalLogo size={80} />
-          </div>
-
-          <div className="border border-white/10 p-8">
-            <TemporalStar size={32} className="mx-auto mb-4" />
-            <p className="text-white/70 mb-8">Email enregistré avec succès!</p>
-
-            <div className="space-y-3">
-              <a
-                href="/profile/create"
-                className="block w-full py-3 border border-primary text-primary uppercase tracking-widest hover:bg-primary hover:text-white transition-colors"
-                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
-              >
-                {t.createAccount}
-              </a>
-              <button
-                onClick={onEnter}
-                className="w-full py-3 bg-primary text-white uppercase tracking-widest hover:bg-primary/90 transition-colors"
-                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
-              >
-                {t.enterSite}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-black flex flex-col relative overflow-hidden">
       <Starfield />
 
-      {/* Top bar with password link */}
-      <div className={`relative z-20 flex justify-end p-6 transition-all duration-1000 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
-        <button
-          onClick={() => setShowPassword(true)}
-          className="flex items-center gap-2 text-white/30 hover:text-white/60 text-xs tracking-widest transition-colors"
-        >
-          <Lock size={12} />
-          <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-            {t.enterPassword.toUpperCase()}
-          </span>
-        </button>
-      </div>
-
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10 -mt-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10">
         {/* Logo */}
         <div className={`mb-12 transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
           <TemporalLogo size={120} />
@@ -171,7 +84,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
             {t.firstDrop}
           </h1>
           <p className="text-white/40 text-sm tracking-widest">
-            {t.signUpEmail}
+            {t.discoverCollection}
           </p>
         </div>
 
@@ -202,28 +115,34 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
           </div>
         </div>
 
-        {/* Email form */}
-        <form
-          onSubmit={handleEmailSubmit}
-          className={`w-full max-w-md transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
-        >
-          <div className="flex">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t.email}
-              className="flex-1 px-5 py-4 bg-white/5 border border-white/10 border-r-0 text-white placeholder-white/30 focus:outline-none focus:border-primary/50 transition-colors text-sm"
-              required
-            />
+        {/* Password form */}
+        <div className={`w-full max-w-md transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div className="relative">
+              <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.password}
+                className={`w-full px-12 py-4 bg-white/5 border ${error ? 'border-red-500' : 'border-white/10'} text-white placeholder-white/30 focus:outline-none focus:border-primary transition-colors text-center tracking-widest`}
+                autoFocus
+              />
+            </div>
+            {error && (
+              <p className="text-red-500 text-xs text-center tracking-widest">
+                {language === 'fr' ? 'Mot de passe incorrect' : 'Incorrect password'}
+              </p>
+            )}
             <button
               type="submit"
-              className="px-6 bg-primary text-white hover:bg-primary/90 transition-colors"
+              className="w-full py-4 bg-primary text-white uppercase tracking-widest hover:bg-primary/90 transition-all hover:scale-[1.02] flex items-center justify-center gap-3"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.2em' }}
             >
-              <ArrowRight size={20} />
+              {t.enter}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
       {/* Footer */}
@@ -234,7 +153,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
             className="text-white/20 text-[10px] tracking-widest"
             style={{ fontFamily: '"Bebas Neue", sans-serif' }}
           >
-            TEMPORAL 2025
+            TEMPORAL 2026
           </span>
           <div className="w-8 h-px bg-white/10" />
         </div>

@@ -202,6 +202,13 @@ export default function TermsPage() {
                 retours@temporal.fr ou via son compte client. Les produits doivent être retournés
                 dans leur état d'origine, non portés, non lavés, avec toutes les étiquettes.
               </p>
+              <p className="text-muted-foreground leading-relaxed mt-2">
+                <strong>Important :</strong> Les articles ne peuvent être remboursés que s'ils sont retournés dans le même état
+                qu'à l'envoi. Temporal n'est pas responsable des dégradations faites sur des vêtements mal lavés ou dont
+                les instructions de lavage n'ont pas été respectées. Aucun remboursement ne sera accordé pour un article
+                endommagé par un entretien inadapté. Consultez notre <a href="/care-guide" className="text-primary hover:underline">Guide de lavage</a> pour
+                les instructions d'entretien détaillées.
+              </p>
 
               <h3 className="text-2xl font-bold mb-3 mt-6" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                 7.3 Frais de retour
@@ -217,6 +224,9 @@ export default function TermsPage() {
               <p className="text-muted-foreground leading-relaxed">
                 Le remboursement s'effectue dans un délai de 14 jours suivant la réception du retour,
                 par le même moyen de paiement que celui utilisé pour la commande.
+                Le remboursement est conditionné à la vérification de l'état de l'article retourné :
+                celui-ci doit être dans le même état qu'à l'envoi, sans trace d'utilisation abusive,
+                de lavage inadapté ou de modification.
               </p>
             </section>
 
@@ -253,7 +263,23 @@ export default function TermsPage() {
                 <li>Des dommages indirects résultant de l'utilisation des produits</li>
                 <li>Des retards ou pertes causés par les transporteurs</li>
                 <li>De l'indisponibilité temporaire du site pour maintenance</li>
+                <li><strong>Des dégradations survenues sur les vêtements suite à un lavage inadapté ou au non-respect des instructions d'entretien</strong> fournies sur les étiquettes des produits et sur la page <a href="/care-guide" className="text-primary hover:underline">Guide de lavage</a> du site</li>
               </ul>
+
+              <h3 className="text-2xl font-bold mb-3 mt-6" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                9.1 Entretien des produits
+              </h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Chaque produit Temporal est accompagné d'instructions d'entretien spécifiques, disponibles sur l'étiquette du produit,
+                sur la fiche produit du site, ainsi que sur notre page dédiée <a href="/care-guide" className="text-primary hover:underline">Guide de lavage</a>.
+                Le Client s'engage à respecter scrupuleusement ces instructions. Temporal décline toute responsabilité en cas de
+                détérioration, décoloration, rétrécissement ou tout autre dommage résultant du non-respect de ces instructions d'entretien.
+              </p>
+              <p className="text-muted-foreground leading-relaxed mt-2">
+                En cas de demande de retour ou de remboursement, les articles devront être restitués dans le même état qu'à leur réception.
+                <strong> Tout article présentant des signes de détérioration due à un entretien incorrect, d'usure anormale, de lavage
+                inadapté ou de modification ne pourra faire l'objet d'un remboursement ou d'un échange.</strong>
+              </p>
             </section>
 
             <section>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Mail, Sparkles, Gift } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
-import TemporalLogo from './TemporalLogo';
+import TemporalLogoStatic from './TemporalLogoStatic';
 
 export default function NewsletterPopup() {
   const { language, darkMode } = useStore();
@@ -109,7 +109,7 @@ export default function NewsletterPopup() {
           <div className="relative p-8 text-center">
             {/* Logo */}
             <div className="flex justify-center mb-6">
-              <TemporalLogo size={60} animate />
+              <TemporalLogoStatic size={60} />
             </div>
 
             {isSuccess ? (

@@ -312,7 +312,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
                 className="px-3 py-1 bg-primary text-primary-foreground text-xs"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                NEW
+                {t.newBadge}
               </span>
             </div>
           )}

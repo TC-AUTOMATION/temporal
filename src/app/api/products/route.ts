@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       prisma.product.count({ where }),
     ]);
 
-    return successResponse({
+    const response = successResponse({
       products,
       pagination: {
         total,
@@ -116,6 +116,11 @@ export async function GET(request: NextRequest) {
         hasMore: offset + products.length < total,
       },
     });
+    // Anti-cache headers for Safari compatibility
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
   } catch (error) {
     console.error('GET /api/products error:', error);
     return serverErrorResponse();

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
@@ -109,7 +109,7 @@ export default function ResetPasswordConfirmPage({ params }: { params: Promise<{
             {/* Header */}
             <div className="text-center mb-8">
               <div className="flex justify-center mb-6">
-                <TemporalLogo size={80} />
+                <TemporalLogoStatic size={80} />
               </div>
               {!success ? (
                 <>

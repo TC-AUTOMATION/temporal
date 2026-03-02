@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Mail, Sparkles, Gift, Bell, AlertTriangle, ShoppingBag, Loader2 } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
-import TemporalLogo from './TemporalLogo';
+import TemporalLogoStatic from './TemporalLogoStatic';
 import Link from 'next/link';
 
 interface Popup {
@@ -193,7 +193,7 @@ export default function DynamicPopup() {
           <div className="relative p-8 text-center">
             {/* Logo */}
             <div className="flex justify-center mb-6">
-              <TemporalLogo size={50} animate />
+              <TemporalLogoStatic size={50} />
             </div>
 
             {/* Newsletter Success State */}

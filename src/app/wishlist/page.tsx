@@ -8,7 +8,7 @@ import { useWishlistStore } from '@/stores/useWishlistStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
 import Image from 'next/image';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import MarqueeBanner from '@/components/ui/MarqueeBanner';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';

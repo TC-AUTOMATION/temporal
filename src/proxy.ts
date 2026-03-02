@@ -65,7 +65,7 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith('/admin')) {
     const authToken = request.cookies.get('auth_token')?.value;
     if (!authToken) {
-      const loginUrl = new URL('/connexion', request.url);
+      const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }

@@ -369,7 +369,7 @@ export default function CartDrawer() {
                           }
                         }}
                       >
-                        + ADD
+                        + {language === 'fr' ? 'AJOUTER' : 'ADD'}
                       </button>
                     </div>
                   ))}

@@ -6,7 +6,7 @@ import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 
 // Custom Jacket icon
 const JacketIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
@@ -100,7 +100,7 @@ export default function Sidebar() {
         {/* Header */}
         <div className={`p-4 md:p-6 border-b flex-shrink-0 ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
           <div className="flex items-center justify-between">
-            <TemporalLogo size={45} />
+            <TemporalLogoStatic size={45} />
             <button
               onClick={handleClose}
               className={`w-9 h-9 md:w-10 md:h-10 flex items-center justify-center transition-all hover:scale-110 ${

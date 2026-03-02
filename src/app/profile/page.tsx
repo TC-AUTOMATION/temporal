@@ -6,7 +6,7 @@ import { useStore } from '@/stores/useStore';
 import { useAuthStore, Order } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
 import Link from 'next/link';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import {
   User,
   Package,
@@ -419,7 +419,7 @@ export default function ProfilePage() {
               <ArrowLeft size={18} />
             </button>
           </Link>
-          <TemporalLogo size={40} />
+          <TemporalLogoStatic size={40} />
         </div>
         <button
           onClick={handleLogout}

@@ -62,13 +62,17 @@ export default function ProductPage() {
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
   const [showCare, setShowCare] = useState(false);
+  const [sizeGuideData, setSizeGuideData] = useState<any>(null);
 
-  // Fetch product from API
+  // Fetch product from API (with cache-busting for Safari)
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/products/${params.id}`);
+        const response = await fetch(`/api/products/${params.id}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        });
         if (!response.ok) {
           throw new Error('Product not found');
         }
@@ -91,7 +95,10 @@ export default function ProductPage() {
   useEffect(() => {
     const fetchAllProducts = async () => {
       try {
-        const response = await fetch('/api/products?limit=100');
+        const response = await fetch('/api/products?limit=100', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        });
         if (response.ok) {
           const result = await response.json();
           const products = result.data?.products || [];
@@ -139,18 +146,33 @@ export default function ProductPage() {
     setRelatedProducts(sorted.slice(0, 4));
   }, [product, allProducts]);
 
-  // Get size guide image based on product name/category
-  const getSizeGuideImage = () => {
-    if (!product) return '';
-    const name = product.name.toLowerCase();
-    const categorySlug = product.category?.slug?.toLowerCase() || '';
-
-    if (name.includes('veste') || categorySlug === 'vestes') return '/size-guides/size-veste.jpg';
-    if (name.includes('t-shirt') || categorySlug === 'tshirts') return '/size-guides/size-tshirt.jpg';
-    if (name.includes('jogging') || categorySlug === 'pantalons') return '/size-guides/size-jogging.jpg';
-    if (name.includes('bonnet')) return '/size-guides/size-bonnet.jpg';
-    return '/size-guides/size-veste.jpg';
-  };
+  // Fetch size guide data for this product's category
+  useEffect(() => {
+    const fetchSizeGuide = async () => {
+      try {
+        const res = await fetch('/api/size-guides', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+          const categorySlug = product?.category?.slug?.toLowerCase() || '';
+          const name = product?.name?.toLowerCase() || '';
+          const matched = data.data.find((g: any) =>
+            g.categorySlug === categorySlug ||
+            (name.includes('veste') && g.categorySlug === 'vestes') ||
+            (name.includes('t-shirt') && g.categorySlug === 'tshirts') ||
+            (name.includes('jogging') && g.categorySlug === 'pantalons') ||
+            (name.includes('bonnet') && g.categorySlug === 'accessoires')
+          );
+          if (matched) setSizeGuideData(matched);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    if (product) fetchSizeGuide();
+  }, [product]);
 
   // Check if product should show size guide (not for stickers/accessories)
   const shouldShowSizeGuide = () => {
@@ -218,9 +240,9 @@ export default function ProductPage() {
     return (
       <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-black text-white' : 'bg-white text-black'}`}>
         <div className="text-center">
-          <p style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '2rem', letterSpacing: '0.1em' }}>PRODUCT NOT FOUND</p>
+          <p style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '2rem', letterSpacing: '0.1em' }}>{t.productNotFound}</p>
           <Link href="/shop" className="mt-4 inline-block px-6 py-3 bg-primary text-white hover:bg-primary/90" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
-            BACK TO SHOP
+            {t.backToShop}
           </Link>
         </div>
       </div>
@@ -364,7 +386,7 @@ export default function ProductPage() {
                   className={`text-sm uppercase tracking-widest ${darkMode ? 'text-white/50' : 'text-black/50'}`}
                   style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                 >
-                  {product.category?.name || 'Product'}
+                  {product.category?.name || (language === 'fr' ? 'Produit' : 'Product')}
                 </p>
               </div>
 
@@ -718,7 +740,7 @@ export default function ProductPage() {
 
         <Footer />
 
-        {/* Size Guide Modal */}
+        {/* Size Guide Modal - Dynamic Table */}
         {showSizeGuide && (
           <>
             <div
@@ -742,13 +764,98 @@ export default function ProductPage() {
                     <X size={20} />
                   </button>
                 </div>
-                {/* Image */}
+                {/* Dynamic size table */}
                 <div className="p-4">
-                  <img
-                    src={getSizeGuideImage()}
-                    alt={t.sizeGuide}
-                    className="w-full h-auto"
-                  />
+                  {sizeGuideData ? (
+                    <>
+                      {(language === 'fr' ? sizeGuideData.tipsFr : sizeGuideData.tipsEn) && (
+                        <p className={`mb-4 text-sm ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
+                          {language === 'fr' ? sizeGuideData.tipsFr : sizeGuideData.tipsEn}
+                        </p>
+                      )}
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className={darkMode ? 'bg-primary/10' : 'bg-primary/5'}>
+                              <th className="px-3 py-3 text-left text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}>
+                                {language === 'fr' ? 'TAILLE' : 'SIZE'}
+                              </th>
+                              <th className="px-3 py-3 text-center text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}>
+                                {language === 'fr' ? 'POITRINE' : 'CHEST'}
+                              </th>
+                              <th className="px-3 py-3 text-center text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}>
+                                {language === 'fr' ? 'TAILLE' : 'WAIST'}
+                              </th>
+                              <th className="px-3 py-3 text-center text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}>
+                                {language === 'fr' ? 'HANCHES' : 'HIPS'}
+                              </th>
+                              <th className="px-3 py-3 text-center text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}>
+                                {language === 'fr' ? 'LONGUEUR' : 'LENGTH'}
+                              </th>
+                              <th className="px-3 py-3 text-center text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}>
+                                {language === 'fr' ? 'ÉPAULES' : 'SHOULDERS'}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(sizeGuideData.sizes as any[]).map((row: any, index: number) => (
+                              <tr
+                                key={index}
+                                className={`border-t ${darkMode ? 'border-white/10 hover:bg-white/5' : 'border-black/10 hover:bg-black/[0.02]'}`}
+                              >
+                                <td className="px-3 py-3">
+                                  <span
+                                    className="inline-flex items-center justify-center w-10 h-10 bg-primary text-white text-sm"
+                                    style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                  >
+                                    {row.size}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{row.chest || '-'}</td>
+                                <td className="px-3 py-3 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{row.waist || '-'}</td>
+                                <td className="px-3 py-3 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{row.hips || '-'}</td>
+                                <td className="px-3 py-3 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{row.length || '-'}</td>
+                                <td className="px-3 py-3 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>{row.shoulders || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className={`mt-3 text-xs text-center ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                        {language === 'fr' ? `Mesures en ${sizeGuideData.unit}` : `Measurements in ${sizeGuideData.unit}`}
+                      </p>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className={`text-sm ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
+                        {language === 'fr' ? 'Guide des tailles bientôt disponible' : 'Size guide coming soon'}
+                      </p>
+                      <Link
+                        href="/size-guide"
+                        className="inline-block mt-4 px-6 py-2 bg-primary text-white text-sm hover:bg-primary/90"
+                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                      >
+                        {language === 'fr' ? 'VOIR LE GUIDE COMPLET' : 'SEE FULL GUIDE'}
+                      </Link>
+                    </div>
+                  )}
+                </div>
+                {/* Link to full guide + care guide */}
+                <div className={`flex gap-3 p-4 border-t ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+                  <Link
+                    href="/size-guide"
+                    className={`flex-1 text-center py-2 text-sm transition-colors ${darkMode ? 'text-white/60 hover:text-primary' : 'text-black/60 hover:text-primary'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  >
+                    {language === 'fr' ? 'GUIDE COMPLET DES TAILLES' : 'FULL SIZE GUIDE'}
+                  </Link>
+                  <Link
+                    href="/care-guide"
+                    className={`flex-1 text-center py-2 text-sm transition-colors ${darkMode ? 'text-white/60 hover:text-primary' : 'text-black/60 hover:text-primary'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                  >
+                    {language === 'fr' ? 'GUIDE DE LAVAGE' : 'CARE GUIDE'}
+                  </Link>
                 </div>
               </div>
             </div>

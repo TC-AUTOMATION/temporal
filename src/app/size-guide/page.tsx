@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Ruler, Shirt, MessageCircle, MoveHorizontal, CircleDot, Target, Maximize2, ArrowUpDown } from 'lucide-react';
+import { ArrowLeft, Ruler, Shirt, Maximize2, MoveHorizontal, CircleDot, ArrowUpDown } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import MarqueeBanner from '@/components/ui/MarqueeBanner';
@@ -36,55 +35,65 @@ const BeanieIcon = ({ size = 24, className = '' }: { size?: number; className?: 
   </svg>
 );
 
-const sizeGuides = [
-  {
-    id: 'veste',
-    name: { fr: 'Vestes', en: 'Jackets' },
-    image: '/size-guides/size-veste.jpg',
-    Icon: JacketIcon,
-    tips: {
-      fr: 'Nos vestes ont une coupe regular. Si vous êtes entre deux tailles, prenez la taille supérieure pour un style oversized.',
-      en: 'Our jackets have a regular fit. If you\'re between sizes, size up for an oversized look.'
-    }
-  },
-  {
-    id: 'tshirt',
-    name: { fr: 'T-shirts', en: 'T-shirts' },
-    image: '/size-guides/size-tshirt.jpg',
-    Icon: Shirt,
-    tips: {
-      fr: 'Coupe regular avec une légère ampleur. Le modèle mesure 1m80 et porte une taille M.',
-      en: 'Regular fit with a slight roominess. Model is 5\'11" and wears size M.'
-    }
-  },
-  {
-    id: 'jogging',
-    name: { fr: 'Joggings', en: 'Joggers' },
-    image: '/size-guides/size-jogging.jpg',
-    Icon: PantsIcon,
-    tips: {
-      fr: 'Coupe ajustée aux chevilles avec taille élastique. Prenez votre taille habituelle.',
-      en: 'Tapered fit with elastic waistband. Take your usual size.'
-    }
-  },
-  {
-    id: 'bonnet',
-    name: { fr: 'Bonnets', en: 'Beanies' },
-    image: '/size-guides/size-bonnet.jpg',
-    Icon: BeanieIcon,
-    tips: {
-      fr: 'Taille unique élastique, s\'adapte à toutes les têtes.',
-      en: 'One size fits all with elastic fit.'
-    }
-  },
-];
+const categoryIcons: Record<string, any> = {
+  vestes: JacketIcon,
+  tshirts: Shirt,
+  pantalons: PantsIcon,
+  accessoires: BeanieIcon,
+  bonnets: BeanieIcon,
+};
+
+interface SizeRow {
+  size: string;
+  chest: string;
+  waist: string;
+  hips: string;
+  length: string;
+  shoulders: string;
+}
+
+interface SizeGuide {
+  id: string;
+  categorySlug: string;
+  nameFr: string;
+  nameEn: string;
+  tipsFr: string;
+  tipsEn: string;
+  sizes: SizeRow[];
+  unit: string;
+  sortOrder: number;
+}
 
 export default function SizeGuidePage() {
   const { language, darkMode } = useStore();
   const t = translations[language];
-  const [activeGuide, setActiveGuide] = useState('veste');
+  const [guides, setGuides] = useState<SizeGuide[]>([]);
+  const [activeGuide, setActiveGuide] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
-  const currentGuide = sizeGuides.find(g => g.id === activeGuide) || sizeGuides[0];
+  useEffect(() => {
+    const fetchGuides = async () => {
+      try {
+        const res = await fetch('/api/size-guides', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        const data = await res.json();
+        if (data.success && data.data?.length > 0) {
+          setGuides(data.data);
+          setActiveGuide(data.data[0].categorySlug);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGuides();
+  }, []);
+
+  const currentGuide = guides.find(g => g.categorySlug === activeGuide) || guides[0];
+  const IconComponent = currentGuide ? (categoryIcons[currentGuide.categorySlug] || Ruler) : Ruler;
 
   return (
     <div className={darkMode ? 'dark' : ''}>
@@ -123,65 +132,137 @@ export default function SizeGuidePage() {
             </p>
           </div>
 
-          {/* Category tabs */}
-          <div className="flex flex-wrap justify-center gap-3 mb-10">
-            {sizeGuides.map((guide) => {
-              const IconComponent = guide.Icon;
-              return (
-                <button
-                  key={guide.id}
-                  onClick={() => setActiveGuide(guide.id)}
-                  className={`px-6 py-3 flex items-center gap-3 transition-all ${
-                    activeGuide === guide.id
-                      ? 'bg-primary text-white'
-                      : darkMode
-                        ? 'bg-white/5 hover:bg-white/10 border border-white/10'
-                        : 'bg-black/5 hover:bg-black/10 border border-black/10'
-                  }`}
-                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
-                >
-                  <IconComponent size={22} />
-                  {guide.name[language]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active guide content */}
-          <div className={`border ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
-            {/* Guide header */}
-            <div className={`p-6 border-b ${darkMode ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
-              <div className="flex items-center gap-4">
-                <div className={`w-16 h-16 flex items-center justify-center ${darkMode ? 'bg-primary/20' : 'bg-primary/10'}`}>
-                  <currentGuide.Icon size={32} className="text-primary" />
-                </div>
-                <div>
-                  <h2
-                    className="text-2xl md:text-3xl uppercase"
-                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
-                  >
-                    {currentGuide.name[language]}
-                  </h2>
-                  <p className={`mt-1 ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
-                    {currentGuide.tips[language]}
-                  </p>
-                </div>
-              </div>
+          {loading ? (
+            <div className="text-center py-16">
+              <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                {t.loading}
+              </p>
             </div>
-
-            {/* Size chart image */}
-            <div className="p-4 md:p-8">
-              <div className="relative aspect-[4/3] md:aspect-[16/9] w-full overflow-hidden">
-                <Image
-                  src={currentGuide.image}
-                  alt={`${currentGuide.name[language]} size guide`}
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
+          ) : guides.length === 0 ? (
+            <div className="text-center py-16">
+              <Ruler size={48} className={`mx-auto mb-4 ${darkMode ? 'text-white/20' : 'text-black/20'}`} />
+              <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                {language === 'fr' ? 'GUIDE DES TAILLES BIENTÔT DISPONIBLE' : 'SIZE GUIDE COMING SOON'}
+              </p>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Category tabs */}
+              <div className="flex flex-wrap justify-center gap-3 mb-10">
+                {guides.map((guide) => {
+                  const TabIcon = categoryIcons[guide.categorySlug] || Ruler;
+                  return (
+                    <button
+                      key={guide.categorySlug}
+                      onClick={() => setActiveGuide(guide.categorySlug)}
+                      className={`px-6 py-3 flex items-center gap-3 transition-all ${
+                        activeGuide === guide.categorySlug
+                          ? 'bg-primary text-white'
+                          : darkMode
+                            ? 'bg-white/5 hover:bg-white/10 border border-white/10'
+                            : 'bg-black/5 hover:bg-black/10 border border-black/10'
+                      }`}
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      <TabIcon size={22} />
+                      {language === 'fr' ? guide.nameFr : guide.nameEn}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active guide content */}
+              {currentGuide && (
+                <div className={`border ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+                  {/* Guide header */}
+                  <div className={`p-6 border-b ${darkMode ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
+                    <div className="flex items-center gap-4">
+                      <div className={`w-16 h-16 flex items-center justify-center ${darkMode ? 'bg-primary/20' : 'bg-primary/10'}`}>
+                        <IconComponent size={32} className="text-primary" />
+                      </div>
+                      <div>
+                        <h2
+                          className="text-2xl md:text-3xl uppercase"
+                          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                        >
+                          {language === 'fr' ? currentGuide.nameFr : currentGuide.nameEn}
+                        </h2>
+                        <p className={`mt-1 ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
+                          {language === 'fr' ? currentGuide.tipsFr : currentGuide.tipsEn}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic size chart table */}
+                  <div className="p-4 md:p-8">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className={darkMode ? 'bg-primary/10' : 'bg-primary/5'}>
+                            <th className="px-4 py-4 text-left" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? 'TAILLE' : 'SIZE'}
+                            </th>
+                            <th className="px-4 py-4 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? 'POITRINE' : 'CHEST'} ({currentGuide.unit})
+                            </th>
+                            <th className="px-4 py-4 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? 'TAILLE' : 'WAIST'} ({currentGuide.unit})
+                            </th>
+                            <th className="px-4 py-4 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? 'HANCHES' : 'HIPS'} ({currentGuide.unit})
+                            </th>
+                            <th className="px-4 py-4 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? 'LONGUEUR' : 'LENGTH'} ({currentGuide.unit})
+                            </th>
+                            <th className="px-4 py-4 text-center" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? 'ÉPAULES' : 'SHOULDERS'} ({currentGuide.unit})
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(currentGuide.sizes as SizeRow[]).map((row, index) => (
+                            <tr
+                              key={index}
+                              className={`border-t transition-colors ${
+                                darkMode
+                                  ? 'border-white/10 hover:bg-white/5'
+                                  : 'border-black/10 hover:bg-black/[0.02]'
+                              } ${index % 2 === 0 ? (darkMode ? 'bg-white/[0.02]' : 'bg-black/[0.01]') : ''}`}
+                            >
+                              <td className="px-4 py-4">
+                                <span
+                                  className="inline-flex items-center justify-center w-12 h-12 bg-primary text-white text-lg"
+                                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                                >
+                                  {row.size}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-center text-lg" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                {row.chest || '-'}
+                              </td>
+                              <td className="px-4 py-4 text-center text-lg" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                {row.waist || '-'}
+                              </td>
+                              <td className="px-4 py-4 text-center text-lg" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                {row.hips || '-'}
+                              </td>
+                              <td className="px-4 py-4 text-center text-lg" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                {row.length || '-'}
+                              </td>
+                              <td className="px-4 py-4 text-center text-lg" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                {row.shoulders || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           {/* How to measure section */}
           <div className="mt-16">

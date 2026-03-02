@@ -2,7 +2,7 @@
 
 import { Instagram, ArrowRight, Zap, Camera } from 'lucide-react';
 import Link from 'next/link';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 
@@ -126,7 +126,7 @@ export default function Footer() {
           {/* Brand section */}
           <div className="md:col-span-1">
             <div className="mb-6">
-              <TemporalLogo size={100} />
+              <TemporalLogoStatic size={100} />
             </div>
             <p
               className={`uppercase tracking-wider text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}
@@ -202,6 +202,7 @@ export default function Footer() {
                 { label: t.deliveryFooter, href: '/shipping' },
                 { label: t.returnsFooter, href: '/returns' },
                 { label: t.sizeGuideFooter, href: '/size-guide' },
+                { label: t.careGuideFooter || (language === 'fr' ? 'Guide de lavage' : 'Care Guide'), href: '/care-guide' },
                 { label: t.trackOrder || 'Suivi commande', href: '/track' },
                 { label: t.contact, href: '/contact' },
               ].map((item) => (

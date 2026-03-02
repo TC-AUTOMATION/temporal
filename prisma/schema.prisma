@@ -605,6 +605,47 @@ model NewsletterCampaign {
   @@map("newsletter_campaigns")
 }
 
+// ==================== SIZE GUIDE ====================
+
+model SizeGuide {
+  id           String   @id @default(cuid())
+  categorySlug String   // e.g., "vestes", "tshirts", "pantalons", "accessoires"
+  nameFr       String   // e.g., "Vestes"
+  nameEn       String   // e.g., "Jackets"
+  tipsFr       String?  // Fitting tips FR
+  tipsEn       String?  // Fitting tips EN
+  sizes        Json     // Array of { size: "S", chest: "96", waist: "84", hips: "92", length: "68", shoulders: "46" }
+  unit         String   @default("cm") // "cm" or "inches"
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([categorySlug])
+  @@index([isActive, sortOrder])
+  @@map("size_guides")
+}
+
+// ==================== CARE GUIDE ====================
+
+model CareGuide {
+  id             String   @id @default(cuid())
+  categorySlug   String   // e.g., "vestes", "tshirts"
+  nameFr         String
+  nameEn         String
+  instructionsFr String   @db.Text // Rich care instructions FR
+  instructionsEn String   @db.Text // Rich care instructions EN
+  iconSymbols    Json?    // Array of { symbol: "wash-30", labelFr: "Lavage 30°C", labelEn: "Wash 30°C" }
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([categorySlug])
+  @@index([isActive, sortOrder])
+  @@map("care_guides")
+}
+
 // ==================== SHIPPING (BOXTAL) ====================
 
 model Shipment {

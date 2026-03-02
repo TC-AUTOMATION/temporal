@@ -18,7 +18,7 @@ import {
 
 export default function ProductsPage() {
   const { products, addProduct, updateProduct, deleteProduct, categories, fetchProducts, fetchCategories, isLoading } = useAdminStore();
-  const { darkMode } = useStore();
+  const { darkMode, language } = useStore();
 
   // Fetch products and categories on mount
   useEffect(() => {
@@ -200,7 +200,7 @@ export default function ProductsPage() {
           <div className="relative flex-1 max-w-md">
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 ${darkMode ? 'text-white/40' : 'text-gray-400'}`} />
             <input
-              placeholder="Search..."
+              placeholder={language === 'fr' ? 'Rechercher...' : 'Search...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`w-full pl-11 pr-4 py-3 border focus:outline-none focus:border-primary ${darkMode ? 'bg-white/5 border-white/10 text-white placeholder-white/40' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`}
@@ -213,7 +213,7 @@ export default function ProductsPage() {
             className={`px-4 py-3 border focus:outline-none focus:border-primary ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
           >
-            <option value="all">ALL</option>
+            <option value="all">{language === 'fr' ? 'TOUS' : 'ALL'}</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.slug}>
                 {cat.name.toUpperCase()}
@@ -227,7 +227,7 @@ export default function ProductsPage() {
           style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
         >
           <Plus className="h-4 w-4" />
-          NEW PRODUCT
+          {language === 'fr' ? 'NOUVEAU PRODUIT' : 'NEW PRODUCT'}
         </button>
       </div>
 
@@ -278,7 +278,7 @@ export default function ProductsPage() {
                       style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                     >
                       <Edit size={16} />
-                      EDIT
+                      {language === 'fr' ? 'MODIFIER' : 'EDIT'}
                     </button>
                     <button
                       onClick={() => updateProduct(product.id, { isActive: !product.isActive })}
@@ -410,7 +410,7 @@ export default function ProductsPage() {
                 className="text-xl"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                {editingProduct ? 'EDIT PRODUCT' : 'NEW PRODUCT'}
+                {editingProduct ? (language === 'fr' ? 'MODIFIER LE PRODUIT' : 'EDIT PRODUCT') : (language === 'fr' ? 'NOUVEAU PRODUIT' : 'NEW PRODUCT')}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}

@@ -5,7 +5,7 @@ import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
 import { stripe as stripeApi, promo as promoApi } from '@/lib/api/client';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import { Check, ArrowLeft, Lock, Zap, Shield, Clock, X, AlertTriangle, Package, CreditCard, Loader2, MapPin, ChevronDown, Edit3 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -565,7 +565,7 @@ function CheckoutContent() {
               <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>{t.back}</span>
             </Link>
             <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-              <TemporalLogo size={45} />
+              <TemporalLogoStatic size={45} />
             </Link>
             <div className={`text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
               <span className="flex items-center gap-1.5">
@@ -1002,7 +1002,7 @@ function CheckoutContent() {
             <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>{t.back}</span>
           </button>
           <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-            <TemporalLogo size={45} />
+            <TemporalLogoStatic size={45} />
           </Link>
           <div className={`text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
             <span className="flex items-center gap-1.5">

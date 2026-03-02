@@ -22,8 +22,10 @@ import {
   Mail,
   Trophy,
   ScrollText,
+  Ruler,
+  WashingMachine,
 } from 'lucide-react';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import TemporalStar from '@/components/ui/TemporalStar';
 import NotificationBell from '@/components/admin/NotificationBell';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -40,6 +42,8 @@ const navItems = [
   { href: '/admin/promos', labelFr: 'CODES PROMO', labelEn: 'PROMO CODES', icon: Tags },
   { href: '/admin/contests', labelFr: 'CONCOURS', labelEn: 'CONTESTS', icon: Trophy },
   { href: '/admin/marquee', labelFr: 'BANDEAU DÉFILANT', labelEn: 'MARQUEE BANNER', icon: ScrollText },
+  { href: '/admin/size-guides', labelFr: 'GUIDES TAILLES', labelEn: 'SIZE GUIDES', icon: Ruler },
+  { href: '/admin/care-guides', labelFr: 'GUIDES LAVAGE', labelEn: 'CARE GUIDES', icon: WashingMachine },
   { href: '/admin/packs', labelFr: 'PACKS', labelEn: 'PACKS', icon: Gift },
   { href: '/admin/popups', labelFr: 'POPUPS', labelEn: 'POPUPS', icon: Bell },
   { href: '/admin/newsletter', labelFr: 'NEWSLETTER', labelEn: 'NEWSLETTER', icon: Mail },
@@ -67,7 +71,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white text-center">
-          <TemporalLogo size={60} />
+          <TemporalLogoStatic size={60} />
           <p className="mt-4 text-white/60">{language === 'fr' ? 'Chargement...' : 'Loading...'}</p>
         </div>
       </div>
@@ -95,7 +99,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className={`h-20 flex items-center justify-between px-4 border-b ${darkMode ? 'border-white/5' : 'border-gray-200'}`}>
           {sidebarOpen ? (
             <Link href="/admin" className="flex items-center gap-3">
-              <TemporalLogo size={36} />
+              <TemporalLogoStatic size={36} />
               <div>
                 <span
                   className="text-lg tracking-wider block"
@@ -108,7 +112,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           ) : (
             <Link href="/admin" className="mx-auto">
-              <TemporalLogo size={36} />
+              <TemporalLogoStatic size={36} />
             </Link>
           )}
           <button

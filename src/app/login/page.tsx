@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
@@ -138,7 +138,7 @@ export default function LoginPage() {
             {/* Header */}
             <div className="text-center mb-8">
               <div className="flex justify-center mb-6">
-                <TemporalLogo size={80} />
+                <TemporalLogoStatic size={80} />
               </div>
               {step === 'login' && (
                 <>

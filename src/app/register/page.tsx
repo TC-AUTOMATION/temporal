@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import Starfield from '@/components/ui/Starfield';
 import { Mail, Lock, User, Zap, Loader2, CheckCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
@@ -125,7 +125,7 @@ export default function RegisterPage() {
           {/* Logo and title */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
-              <TemporalLogo size={80} />
+              <TemporalLogoStatic size={80} />
             </div>
             {step === 'register' && (
               <>

@@ -5,7 +5,7 @@ import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { MessageSquare, Send, ArrowLeft, Clock, CheckCircle, AlertCircle, XCircle, Loader2, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
-import TemporalLogo from '@/components/ui/TemporalLogo';
+import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import Footer from '@/components/layout/Footer';

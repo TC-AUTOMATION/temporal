@@ -198,7 +198,7 @@ export function ContestSection() {
     // Start when section top reaches 60% from viewport top (halfway visible)
     // Uses the full 150vh wrapper scroll distance for a slow, luxurious pace
     const scrollRange = el.offsetHeight - vh;
-    const scrolled = -rect.top + vh * 0.4; // offset so it starts when 40% visible
+    const scrolled = -rect.top + vh * 0.7; // starts when section is just 30% from bottom of viewport
     const p = clamp(scrolled / scrollRange, 0, 1);
     if (Math.abs(p - progressRef.current) > 0.002) {
       progressRef.current = p;

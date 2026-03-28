@@ -74,8 +74,8 @@ async function main() {
       price: 189,
       categoryId: categories[0].id,
       images: [
-        '/clothes/veste-face-noire.png',
-        '/clothes/veste-dos-noir.png',
+        '/clothes/veste-face-noire.webp',
+        '/clothes/veste-dos-noir.webp',
       ],
       isFeatured: true,
       variants: {
@@ -101,8 +101,8 @@ async function main() {
       price: 189,
       categoryId: categories[0].id,
       images: [
-        '/clothes/veste-face-blanche.png',
-        '/clothes/veste-dos-blanc.png',
+        '/clothes/veste-face-blanche.webp',
+        '/clothes/veste-dos-blanc.webp',
       ],
       isFeatured: true,
       variants: {
@@ -128,8 +128,8 @@ async function main() {
       price: 45,
       categoryId: categories[1].id,
       images: [
-        '/clothes/t-shirt-face-noir.png',
-        '/clothes/t-shirt-dos-noir.png',
+        '/clothes/t-shirt-face-noir.webp',
+        '/clothes/t-shirt-dos-noir.webp',
       ],
       variants: {
         create: [
@@ -154,8 +154,8 @@ async function main() {
       price: 45,
       categoryId: categories[1].id,
       images: [
-        '/clothes/t-shirt-face-blanc.png',
-        '/clothes/t-shirt-dos-blanc.png',
+        '/clothes/t-shirt-face-blanc.webp',
+        '/clothes/t-shirt-dos-blanc.webp',
       ],
       variants: {
         create: [
@@ -180,8 +180,8 @@ async function main() {
       price: 89,
       categoryId: categories[2].id,
       images: [
-        '/clothes/jogging-avant-noir.png',
-        '/clothes/jogging-dos-noir.png',
+        '/clothes/jogging-avant-noir.webp',
+        '/clothes/jogging-dos-noir.webp',
       ],
       variants: {
         create: [
@@ -206,8 +206,8 @@ async function main() {
       price: 89,
       categoryId: categories[2].id,
       images: [
-        '/clothes/jogging-avant-blanc.png',
-        '/clothes/jogging-dos-blanc.png',
+        '/clothes/jogging-avant-blanc.webp',
+        '/clothes/jogging-dos-blanc.webp',
       ],
       variants: {
         create: [
@@ -230,7 +230,7 @@ async function main() {
       description: 'Bonnet en laine mérinos, logo brodé.',
       price: 35,
       categoryId: categories[3].id,
-      images: ['/clothes/bonnet-face-noir.png', '/clothes/bonnet-dos-noir.png'],
+      images: ['/clothes/bonnet-face-noir.webp', '/clothes/bonnet-dos-noir.webp'],
       variants: {
         create: [
           { sku: 'BONNET-TPL-NOIR-U', color: 'Noir', colorHex: '#000000', size: 'Unique', stock: 30 },
@@ -249,7 +249,7 @@ async function main() {
       description: 'Bonnet en laine mérinos, logo brodé.',
       price: 35,
       categoryId: categories[3].id,
-      images: ['/clothes/bonnet-face-blanc.png', '/clothes/bonnet-dos-blanc.png'],
+      images: ['/clothes/bonnet-face-blanc.webp', '/clothes/bonnet-dos-blanc.webp'],
       variants: {
         create: [
           { sku: 'BONNET-TPL-BLANC-U', color: 'Blanc', colorHex: '#FFFFFF', size: 'Unique', stock: 25 },
@@ -269,12 +269,12 @@ async function main() {
       price: 12,
       categoryId: categories[3].id,
       images: [
-        '/stickers/black-purple.png',
-        '/stickers/purple-black.png',
-        '/stickers/white-black.png',
-        '/stickers/black-white.png',
-        '/stickers/purple-white.png',
-        '/stickers/white-purple.png',
+        '/stickers/black-purple.webp',
+        '/stickers/purple-black.webp',
+        '/stickers/white-black.webp',
+        '/stickers/black-white.webp',
+        '/stickers/purple-white.webp',
+        '/stickers/white-purple.webp',
       ],
       variants: {
         create: [
@@ -369,6 +369,45 @@ async function main() {
   });
 
   console.log('Created settings');
+
+  // Create default upsell: Washing bag (Sac de lavage)
+  // Uses the first available product as the upsell target
+  const firstProduct = await prisma.product.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (firstProduct) {
+    const existingUpsell = await prisma.upsell.findFirst({
+      where: { name: 'Sac de lavage' },
+    });
+
+    if (!existingUpsell) {
+      await prisma.upsell.create({
+        data: {
+          name: 'Sac de lavage',
+          nameEn: 'Washing bag',
+          description: 'Protege tes vetements pendant le lavage',
+          descriptionEn: 'Protect your clothes during washing',
+          productId: firstProduct.id,
+          triggerType: 'cart_total',
+          triggerValue: '50',
+          displayLocation: 'cart',
+          discountType: null,
+          discountValue: null,
+          freeThreshold: 100,
+          message: 'Protegez vos vetements avec notre sac de lavage',
+          messageEn: 'Protect your clothes with our washing bag',
+          isActive: true,
+          sortOrder: 0,
+        },
+      });
+      console.log('Created default upsell: Sac de lavage');
+    } else {
+      console.log('Default upsell already exists, skipping');
+    }
+  }
+
   console.log('Seed completed!');
 }
 

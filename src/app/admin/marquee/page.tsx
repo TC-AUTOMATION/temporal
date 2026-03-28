@@ -1,30 +1,96 @@
 'use client';
 
-import { useState } from 'react';
-import { ScrollText, Plus, Save, Trash2, Eye, EyeOff, GripVertical } from 'lucide-react';
-import { useAdminStore, MarqueeItem } from '@/stores/useAdminStore';
+import { useState, useEffect, useCallback } from 'react';
+import { ScrollText, Plus, Save, Trash2, Eye, EyeOff, GripVertical, Loader2 } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 
+interface MarqueeMessage {
+  id: string;
+  textFr: string;
+  textEn: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function AdminMarqueePage() {
-  const { marqueeItems, addMarqueeItem, updateMarqueeItem, deleteMarqueeItem } = useAdminStore();
   const { darkMode, language } = useStore();
+  const [marqueeItems, setMarqueeItems] = useState<MarqueeMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<MarqueeItem>>({});
+  const [formData, setFormData] = useState<Partial<MarqueeMessage>>({});
   const [saved, setSaved] = useState(false);
   const [newItem, setNewItem] = useState({ textFr: '', textEn: '' });
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const handleEdit = (item: MarqueeItem) => {
+  const fetchMessages = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/admin/marquee');
+      if (!res.ok) {
+        throw new Error(`Failed to fetch marquee messages (${res.status})`);
+      }
+      const json = await res.json();
+      if (json.success && json.data?.messages) {
+        setMarqueeItems(json.data.messages);
+      } else {
+        throw new Error(json.error || 'Unexpected response format');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load marquee messages');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const showSavedMessage = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleEdit = (item: MarqueeMessage) => {
     setEditingId(item.id);
     setFormData({ ...item });
   };
 
-  const handleSave = () => {
-    if (editingId && formData) {
-      updateMarqueeItem(editingId, formData);
+  const handleSave = async () => {
+    if (!editingId || !formData) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/marquee/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          textFr: formData.textFr,
+          textEn: formData.textEn,
+          isActive: formData.isActive,
+          sortOrder: formData.sortOrder,
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Failed to update message (${res.status})`);
+      }
+      const json = await res.json();
+      if (json.success && json.data?.message) {
+        setMarqueeItems((prev) =>
+          prev.map((m) => (m.id === editingId ? json.data.message : m))
+        );
+      }
       setEditingId(null);
       setFormData({});
       showSavedMessage();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -33,42 +99,121 @@ export default function AdminMarqueePage() {
     setFormData({});
   };
 
-  const handleAdd = () => {
-    if (newItem.textFr.trim() && newItem.textEn.trim()) {
-      addMarqueeItem({
-        textFr: newItem.textFr.trim(),
-        textEn: newItem.textEn.trim(),
-        isActive: true,
+  const handleAdd = async () => {
+    if (!newItem.textFr.trim() || !newItem.textEn.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/marquee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          textFr: newItem.textFr.trim(),
+          textEn: newItem.textEn.trim(),
+          isActive: true,
+        }),
       });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Failed to create message (${res.status})`);
+      }
+      const json = await res.json();
+      if (json.success && json.data?.message) {
+        setMarqueeItems((prev) => [...prev, json.data.message]);
+      }
       setNewItem({ textFr: '', textEn: '' });
       setShowAddForm(false);
       showSavedMessage();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to add message');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (marqueeItems.length <= 2) {
       alert(language === 'fr' ? 'Minimum 2 éléments requis' : 'Minimum 2 items required');
       return;
     }
-    deleteMarqueeItem(id);
-    showSavedMessage();
+    if (!confirm(language === 'fr' ? 'Supprimer ce message ?' : 'Delete this message?')) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/marquee/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Failed to delete message (${res.status})`);
+      }
+      setMarqueeItems((prev) => prev.filter((m) => m.id !== id));
+      showSavedMessage();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleActive = (item: MarqueeItem) => {
-    const activeCount = marqueeItems.filter(m => m.isActive).length;
+  const toggleActive = async (item: MarqueeMessage) => {
+    const activeCount = marqueeItems.filter((m) => m.isActive).length;
     if (item.isActive && activeCount <= 2) {
       alert(language === 'fr' ? 'Minimum 2 éléments actifs requis' : 'Minimum 2 active items required');
       return;
     }
-    updateMarqueeItem(item.id, { isActive: !item.isActive });
-    showSavedMessage();
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/marquee/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !item.isActive }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || `Failed to update message (${res.status})`);
+      }
+      const json = await res.json();
+      if (json.success && json.data?.message) {
+        setMarqueeItems((prev) =>
+          prev.map((m) => (m.id === item.id ? json.data.message : m))
+        );
+      }
+      showSavedMessage();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to toggle active state');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const showSavedMessage = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="animate-spin text-primary" size={32} />
+        <span className="ml-3 text-lg">
+          {language === 'fr' ? 'Chargement...' : 'Loading...'}
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="p-6 rounded-2xl border border-red-500/30 bg-red-500/10 text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetchMessages();
+            }}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            {language === 'fr' ? 'Réessayer' : 'Retry'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,9 +244,13 @@ export default function AdminMarqueePage() {
               {language === 'fr' ? 'Enregistré !' : 'Saved!'}
             </div>
           )}
+          {saving && (
+            <Loader2 className="animate-spin text-primary" size={20} />
+          )}
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
           >
             <Plus size={18} />
@@ -156,10 +305,10 @@ export default function AdminMarqueePage() {
           <div className="flex gap-3">
             <button
               onClick={handleAdd}
-              disabled={!newItem.textFr.trim() || !newItem.textEn.trim()}
+              disabled={!newItem.textFr.trim() || !newItem.textEn.trim() || saving}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus size={18} />
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
               {language === 'fr' ? 'Ajouter' : 'Add'}
             </button>
             <button
@@ -209,6 +358,7 @@ export default function AdminMarqueePage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => toggleActive(item)}
+                  disabled={saving}
                   className={`p-2 rounded-lg transition-colors ${
                     item.isActive
                       ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
@@ -220,6 +370,7 @@ export default function AdminMarqueePage() {
                 </button>
                 <button
                   onClick={() => handleDelete(item.id)}
+                  disabled={saving}
                   className={`p-2 rounded-lg transition-colors ${
                     darkMode ? 'hover:bg-red-500/20 text-white/50 hover:text-red-400' : 'hover:bg-red-50 text-gray-400 hover:text-red-500'
                   }`}
@@ -269,9 +420,10 @@ export default function AdminMarqueePage() {
                   <div className="flex gap-3">
                     <button
                       onClick={handleSave}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                      disabled={saving}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
-                      <Save size={18} />
+                      {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                       {language === 'fr' ? 'Enregistrer' : 'Save'}
                     </button>
                     <button

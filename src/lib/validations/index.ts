@@ -53,10 +53,12 @@ export const productSchema = z.object({
   price: z.number().positive('Le prix doit être positif'),
   originalPrice: z.number().positive().optional(),
   categoryId: z.string().min(1, 'Catégorie requise'),
-  images: z.array(z.string().url()).min(1, 'Au moins une image requise'),
+  images: z.array(z.string().min(1)).min(1, 'Au moins une image requise'),
   isActive: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   isNew: z.boolean().default(true),
+  sizeGuideId: z.string().nullable().optional(),
+  careGuideId: z.string().nullable().optional(),
 });
 
 export const productVariantSchema = z.object({

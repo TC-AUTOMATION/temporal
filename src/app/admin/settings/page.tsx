@@ -1,17 +1,59 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAdminStore } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Save, FolderOpen, Clock } from 'lucide-react';
+import { Save, FolderOpen, Clock, Loader2, Check } from 'lucide-react';
+
+interface StoreSettings {
+  storeName: string;
+  storeDescription: string;
+  contactEmail: string;
+  contactPhone: string;
+  supportEmail: string;
+  shippingCostFrance: number;
+  shippingCostEurope: number;
+  shippingCostWorld: number;
+  freeShippingThreshold: number;
+  currency: string;
+  taxRate: number;
+  facebookUrl: string;
+  instagramUrl: string;
+  twitterUrl: string;
+  maintenanceMode: boolean;
+  enableNewsletter: boolean;
+  termsUrl: string;
+  privacyUrl: string;
+  returnPolicyUrl: string;
+}
+
+type SectionKey = 'shipping' | 'store' | 'stock';
 
 export default function SettingsPage() {
   const { categories, fetchCategories, products, fetchProducts, countdownDate, setCountdownDate } = useAdminStore();
   const { darkMode, language } = useStore();
+
+  // Settings state loaded from API
+  const [settings, setSettings] = useState<StoreSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Per-section saving/success state
+  const [savingSection, setSavingSection] = useState<SectionKey | null>(null);
+  const [savedSection, setSavedSection] = useState<SectionKey | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Local form state for editable fields
+  const [shippingCostFrance, setShippingCostFrance] = useState(0);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
+  const [storeName, setStoreName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [currency, setCurrency] = useState('EUR');
+  const [taxRate, setTaxRate] = useState(0);
 
   // Translations
   const t = {
@@ -29,6 +71,8 @@ export default function SettingsPage() {
     deliveryTime: language === 'fr' ? 'Délai de livraison (jours)' : 'Delivery time (days)',
     deliveryCountries: language === 'fr' ? 'Pays de livraison' : 'Delivery countries',
     save: language === 'fr' ? 'Enregistrer' : 'Save',
+    saving: language === 'fr' ? 'Enregistrement...' : 'Saving...',
+    saved: language === 'fr' ? 'Enregistré' : 'Saved',
     storeInfo: language === 'fr' ? 'Informations de la boutique' : 'Store Information',
     storeName: language === 'fr' ? 'Nom de la boutique' : 'Store name',
     contactEmail: language === 'fr' ? 'Email de contact' : 'Contact email',
@@ -37,12 +81,77 @@ export default function SettingsPage() {
     lowStockThreshold: language === 'fr' ? 'Seuil d\'alerte stock bas' : 'Low stock alert threshold',
     stockAlertDesc: language === 'fr' ? 'Une alerte sera affichée lorsque le stock d\'un produit passe sous ce seuil' : 'An alert will be displayed when product stock falls below this threshold',
     emailNotification: language === 'fr' ? 'Recevoir une notification par email' : 'Receive email notification',
+    loadingSettings: language === 'fr' ? 'Chargement des paramètres...' : 'Loading settings...',
+    errorLoading: language === 'fr' ? 'Erreur lors du chargement des paramètres' : 'Error loading settings',
+    errorSaving: language === 'fr' ? 'Erreur lors de la sauvegarde' : 'Error saving settings',
+    taxRate: language === 'fr' ? 'Taux de TVA (%)' : 'Tax rate (%)',
   };
+
+  // Fetch settings from API on mount
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await fetch('/api/admin/settings');
+      const json = await res.json();
+      if (json.success && json.data) {
+        const data = json.data as StoreSettings;
+        setSettings(data);
+        setShippingCostFrance(data.shippingCostFrance);
+        setFreeShippingThreshold(data.freeShippingThreshold);
+        setStoreName(data.storeName);
+        setContactEmail(data.contactEmail);
+        setCurrency(data.currency);
+        setTaxRate(data.taxRate);
+      } else {
+        setFetchError(json.error || t.errorLoading);
+      }
+    } catch {
+      setFetchError(t.errorLoading);
+    } finally {
+      setLoading(false);
+    }
+  }, [t.errorLoading]);
 
   useEffect(() => {
     fetchCategories();
     fetchProducts();
-  }, [fetchCategories, fetchProducts]);
+    fetchSettings();
+  }, [fetchCategories, fetchProducts, fetchSettings]);
+
+  // Save a subset of settings to the API
+  const saveSettings = async (section: SectionKey, data: Partial<StoreSettings>) => {
+    setSavingSection(section);
+    setSavedSection(null);
+    setSaveError(null);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const updated = json.data as StoreSettings;
+        setSettings(updated);
+        // Sync local form state with response
+        setShippingCostFrance(updated.shippingCostFrance);
+        setFreeShippingThreshold(updated.freeShippingThreshold);
+        setStoreName(updated.storeName);
+        setContactEmail(updated.contactEmail);
+        setCurrency(updated.currency);
+        setTaxRate(updated.taxRate);
+        setSavedSection(section);
+        setTimeout(() => setSavedSection(null), 2000);
+      } else {
+        setSaveError(json.error || t.errorSaving);
+      }
+    } catch {
+      setSaveError(t.errorSaving);
+    } finally {
+      setSavingSection(null);
+    }
+  };
 
   const getCategoryProductCount = (categorySlug: string) => {
     return products.filter((p) => p.category === categorySlug).length;
@@ -52,6 +161,70 @@ export default function SettingsPage() {
     const date = new Date(isoDate);
     return date.toISOString().slice(0, 16);
   };
+
+  const renderSaveButton = (section: SectionKey) => {
+    const isSaving = savingSection === section;
+    const isSaved = savedSection === section;
+
+    return (
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={() => {
+            if (section === 'shipping') {
+              saveSettings(section, {
+                shippingCostFrance,
+                freeShippingThreshold,
+              });
+            } else if (section === 'store') {
+              saveSettings(section, {
+                storeName,
+                contactEmail,
+                currency,
+                taxRate,
+              });
+            } else if (section === 'stock') {
+              saveSettings(section, {
+                taxRate,
+              });
+            }
+          }}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : isSaved ? (
+            <Check className="h-4 w-4 mr-2" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          {isSaving ? t.saving : isSaved ? t.saved : t.save}
+        </Button>
+        {saveError && savingSection === null && savedSection === null && (
+          <span className="text-sm text-red-500">{saveError}</span>
+        )}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className={`h-8 w-8 animate-spin ${darkMode ? 'text-white' : 'text-gray-900'}`} />
+        <span className={`ml-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.loadingSettings}</span>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <p className="text-red-500">{fetchError}</p>
+        <Button onClick={fetchSettings}>
+          {language === 'fr' ? 'Réessayer' : 'Retry'}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -127,11 +300,22 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.standardShipping}</label>
-              <Input type="number" defaultValue={5.90} step={0.1} className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+              <Input
+                type="number"
+                value={shippingCostFrance}
+                onChange={(e) => setShippingCostFrance(parseFloat(e.target.value) || 0)}
+                step={0.1}
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
             </div>
             <div>
               <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.freeShippingFrom}</label>
-              <Input type="number" defaultValue={100} className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+              <Input
+                type="number"
+                value={freeShippingThreshold}
+                onChange={(e) => setFreeShippingThreshold(parseFloat(e.target.value) || 0)}
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -144,10 +328,7 @@ export default function SettingsPage() {
               <Input type="text" defaultValue="France, Belgique, Suisse" className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
             </div>
           </div>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
-            {t.save}
-          </Button>
+          {renderSaveButton('shipping')}
         </CardContent>
       </Card>
 
@@ -159,24 +340,46 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.storeName}</label>
-            <Input defaultValue="Temporal" className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+            <Input
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+            />
           </div>
           <div>
             <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.contactEmail}</label>
-            <Input type="email" defaultValue="contact@temporal.fr" className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+            <Input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+            />
           </div>
           <div>
             <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.currency}</label>
-            <select className={`w-full px-3 py-2 border rounded-md ${darkMode ? 'bg-white/10 border-white/20 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
-              <option value="EUR" className={darkMode ? 'bg-black' : ''}>Euro (€)</option>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md ${darkMode ? 'bg-white/10 border-white/20 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+            >
+              <option value="EUR" className={darkMode ? 'bg-black' : ''}>Euro (&euro;)</option>
               <option value="USD" className={darkMode ? 'bg-black' : ''}>Dollar ($)</option>
-              <option value="GBP" className={darkMode ? 'bg-black' : ''}>Pound (£)</option>
+              <option value="GBP" className={darkMode ? 'bg-black' : ''}>Pound (&pound;)</option>
             </select>
           </div>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
-            {t.save}
-          </Button>
+          <div>
+            <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.taxRate}</label>
+            <Input
+              type="number"
+              value={taxRate}
+              onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+              step={0.1}
+              min={0}
+              max={100}
+              className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+            />
+          </div>
+          {renderSaveButton('store')}
         </CardContent>
       </Card>
 
@@ -199,10 +402,7 @@ export default function SettingsPage() {
               {t.emailNotification}
             </label>
           </div>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
-            {t.save}
-          </Button>
+          {renderSaveButton('stock')}
         </CardContent>
       </Card>
     </div>

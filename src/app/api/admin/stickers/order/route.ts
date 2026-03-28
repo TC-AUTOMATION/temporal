@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/db/prisma';
+import { getCurrentUser } from '@/lib/auth/jwt';
 
 // PUT - Update stickers order
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user || !user.isAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { order } = await request.json();
 
     if (!order || !Array.isArray(order)) {
@@ -41,6 +48,14 @@ export async function PUT(request: NextRequest) {
 // GET - Get current stickers order
 export async function GET() {
   try {
+    const user = await getCurrentUser();
+    if (!user || !user.isAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const stickers = await prisma.product.findMany({
       where: {
         name: { contains: 'Sticker' },

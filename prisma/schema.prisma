@@ -132,6 +132,7 @@ model Product {
   variants   ProductVariant[]
   orderItems OrderItem[]
   packItems  PackItem[]
+  upsells    Upsell[]
   wishlist   Wishlist[]
 
   @@index([categoryId])
@@ -155,6 +156,35 @@ model ProductVariant {
   @@unique([productId, color, size])
   @@index([productId])
   @@map("product_variants")
+}
+
+// ==================== UPSELLS ====================
+
+model Upsell {
+  id              String   @id @default(cuid())
+  name            String
+  nameEn          String?
+  description     String?
+  descriptionEn   String?
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  triggerType     String   // "cart_total" | "product_in_cart" | "category_in_cart"
+  triggerValue    String   // e.g. "100" for cart total, product ID, or category slug
+  displayLocation String   // "cart" | "checkout" | "product_page"
+  discountType    String?  // "percentage" | "fixed" | "free"
+  discountValue   Decimal? @db.Decimal(10, 2)
+  freeThreshold   Decimal? @db.Decimal(10, 2) // cart total at which it becomes FREE
+  message         String?
+  messageEn       String?
+  image           String?
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([productId])
+  @@map("upsells")
 }
 
 // ==================== ORDERS ====================

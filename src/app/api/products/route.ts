@@ -99,6 +99,12 @@ export async function GET(request: NextRequest) {
               stock: true,
             },
           },
+          sizeGuide: {
+            select: { id: true, nameFr: true, nameEn: true },
+          },
+          careGuide: {
+            select: { id: true, nameFr: true, nameEn: true },
+          },
         },
         orderBy,
         take: limit,
@@ -210,12 +216,16 @@ export async function POST(request: NextRequest) {
         isActive: data.isActive,
         isFeatured: data.isFeatured,
         isNew: data.isNew ?? true,
+        sizeGuideId: data.sizeGuideId || null,
+        careGuideId: data.careGuideId || null,
         stripeProductId: stripeProduct.id,
         stripePriceId: stripePrice.id,
       },
       include: {
         category: true,
         variants: true,
+        sizeGuide: true,
+        careGuide: true,
       },
     });
 

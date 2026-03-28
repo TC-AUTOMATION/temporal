@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
 import { stripe as stripeApi, promo as promoApi } from '@/lib/api/client';
 import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
-import { Check, ArrowLeft, Lock, Zap, Shield, Clock, X, AlertTriangle, Package, CreditCard, Loader2, MapPin, ChevronDown, Edit3 } from 'lucide-react';
+import { Check, ArrowLeft, Lock, Zap, Shield, Clock, X, AlertTriangle, Package, CreditCard, Loader2, MapPin, ChevronDown, Edit3, Gift } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -45,7 +45,7 @@ function CheckoutLoading() {
 
 // Main checkout content
 function CheckoutContent() {
-  const { language, cart, cartTotal, clearCart, darkMode } = useStore();
+  const { language, cart, cartTotal, clearCart, darkMode, addToCart } = useStore();
   const { user, isAuthenticated } = useAuthStore();
   const t = translations[language];
   const searchParams = useSearchParams();
@@ -66,6 +66,7 @@ function CheckoutContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [shippingMethods, setShippingMethods] = useState<any[]>([]);
+  const [checkoutUpsells, setCheckoutUpsells] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -101,6 +102,33 @@ function CheckoutContent() {
       fetchShippingMethods();
     }
   }, [mounted]);
+
+  // Fetch checkout upsells
+  useEffect(() => {
+    const fetchUpsells = async () => {
+      try {
+        const total = cartTotal();
+        const productIds = cart.map((item) => item.id).join(',');
+        const res = await fetch(
+          `/api/upsells?cartTotal=${total}&productIds=${productIds}&location=checkout`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const cartProductIds = cart.map((item) => item.id);
+          const filtered = (data.data?.upsells || []).filter(
+            (u: any) => !cartProductIds.includes(u.product.id)
+          );
+          setCheckoutUpsells(filtered);
+        }
+      } catch (err) {
+        console.error('Error fetching checkout upsells:', err);
+      }
+    };
+
+    if (mounted && cart.length > 0) {
+      fetchUpsells();
+    }
+  }, [mounted, cart, cartTotal]);
 
   // Check for success/cancelled from Stripe redirect
   useEffect(() => {
@@ -325,7 +353,7 @@ function CheckoutContent() {
               <div key={`${item.id}-${item.size}`} className={`flex gap-3 sm:gap-4 p-2.5 sm:p-3 rounded-xl ${darkMode ? 'bg-white/[0.03]' : 'bg-black/[0.02]'}`}>
                 <div className={`w-16 h-16 sm:w-20 sm:h-20 relative flex-shrink-0 rounded-lg overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
                   {item.image ? (
-                    <Image src={item.image} alt={item.name} fill className="object-cover" />
+                    <img src={item.image} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <span className={`text-sm sm:text-lg ${darkMode ? 'text-white/20' : 'text-black/20'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
@@ -1197,6 +1225,130 @@ function CheckoutContent() {
                   />
                 </div>
               </div>
+
+              {/* Checkout Upsells */}
+              {checkoutUpsells.length > 0 && (
+                <div className={`p-4 sm:p-5 rounded-2xl ${darkMode ? 'bg-white/[0.02] border border-white/10' : 'bg-black/[0.02] border border-black/10'}`}>
+                  <h3
+                    className="text-base sm:text-lg flex items-center gap-2 mb-4"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    <Gift size={18} className="text-green-500" />
+                    {language === 'fr' ? 'RECOMMANDE POUR VOUS' : 'RECOMMENDED FOR YOU'}
+                  </h3>
+                  <div className="space-y-3">
+                    {checkoutUpsells.map((upsell: any) => {
+                      const upsellMessage = language === 'fr'
+                        ? upsell.message
+                        : (upsell.messageEn || upsell.message);
+                      const upsellImage = upsell.image || upsell.product.images[0];
+                      const upsellName = language === 'fr'
+                        ? upsell.name
+                        : (upsell.nameEn || upsell.name);
+
+                      return (
+                        <div
+                          key={upsell.id}
+                          className={`relative flex items-center gap-3 sm:gap-4 p-3 rounded-xl transition-all ${
+                            upsell.isFreeGift
+                              ? darkMode
+                                ? 'bg-green-500/10 border border-green-500/30'
+                                : 'bg-green-50 border border-green-200'
+                              : darkMode
+                                ? 'bg-white/[0.03] border border-white/10 hover:border-primary/30'
+                                : 'bg-black/[0.02] border border-black/10 hover:border-primary/30'
+                          }`}
+                        >
+                          {/* Free gift badge */}
+                          {upsell.isFreeGift && (
+                            <div className="absolute -top-2 -right-1 z-10">
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full shadow-lg"
+                                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                              >
+                                <Gift size={10} />
+                                {language === 'fr' ? 'CADEAU GRATUIT' : 'FREE GIFT'}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Image */}
+                          <div className={`w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                            {upsellImage ? (
+                              <img src={upsellImage} alt={upsellName} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Gift size={20} className="text-primary/50" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className="text-sm font-medium truncate"
+                              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.03em' }}
+                            >
+                              {upsellName.toUpperCase()}
+                            </p>
+                            {upsellMessage && (
+                              <p className={`text-[11px] mt-0.5 truncate ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                                {upsellMessage}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              {upsell.isFreeGift ? (
+                                <span className="text-green-500 text-sm font-bold" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                  {language === 'fr' ? 'GRATUIT' : 'FREE'}
+                                </span>
+                              ) : upsell.effectivePrice < upsell.originalPrice ? (
+                                <>
+                                  <span className="text-primary text-sm" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                    {upsell.effectivePrice.toFixed(2)}€
+                                  </span>
+                                  <span className={`text-xs line-through ${darkMode ? 'text-white/30' : 'text-black/30'}`}>
+                                    {upsell.originalPrice.toFixed(2)}€
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-primary text-sm" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                  {upsell.originalPrice.toFixed(2)}€
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Add button */}
+                          <button
+                            type="button"
+                            className={`px-4 py-2 text-xs transition-all hover:scale-105 rounded-lg flex-shrink-0 ${
+                              upsell.isFreeGift
+                                ? 'bg-green-500 text-white hover:bg-green-600'
+                                : 'bg-primary text-white hover:bg-primary/90'
+                            }`}
+                            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                            onClick={() => {
+                              addToCart({
+                                id: upsell.product.id,
+                                name: language === 'fr' ? upsell.product.name : (upsell.product.nameEn || upsell.product.name),
+                                price: upsell.isFreeGift ? 0 : upsell.effectivePrice,
+                                size: 'UNIQUE',
+                                color: '',
+                                quantity: 1,
+                                image: upsell.product.images[0] || '',
+                              });
+                              // Remove from upsells list after adding
+                              setCheckoutUpsells((prev: any[]) => prev.filter((u: any) => u.id !== upsell.id));
+                            }}
+                          >
+                            + {language === 'fr' ? 'AJOUTER' : 'ADD'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"

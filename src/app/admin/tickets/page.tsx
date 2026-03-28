@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAdminStore, Ticket } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
-import { MessageSquare, Send, Clock, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { MessageSquare, Send, Clock, Hourglass, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 
 export default function AdminTicketsPage() {
   const { darkMode, language } = useStore();
@@ -18,6 +18,7 @@ export default function AdminTicketsPage() {
     pending: language === 'fr' ? 'EN ATTENTE' : 'PENDING',
     open: language === 'fr' ? 'Ouvert' : 'Open',
     inProgress: language === 'fr' ? 'En cours' : 'In progress',
+    waitingCustomer: language === 'fr' ? 'Attente client' : 'Waiting customer',
     resolved: language === 'fr' ? 'Résolu' : 'Resolved',
     closed: language === 'fr' ? 'Fermé' : 'Closed',
     noTickets: language === 'fr' ? 'AUCUN TICKET' : 'NO TICKETS',
@@ -27,6 +28,7 @@ export default function AdminTicketsPage() {
     replyPlaceholder: language === 'fr' ? 'Répondre...' : 'Reply...',
     statusOpen: language === 'fr' ? 'OUVERT' : 'OPEN',
     statusInProgress: language === 'fr' ? 'EN COURS' : 'IN PROGRESS',
+    statusWaitingCustomer: language === 'fr' ? 'ATTENTE CLIENT' : 'WAITING CUSTOMER',
     statusResolved: language === 'fr' ? 'RÉSOLU' : 'RESOLVED',
     statusClosed: language === 'fr' ? 'FERMÉ' : 'CLOSED',
   };
@@ -39,6 +41,7 @@ export default function AdminTicketsPage() {
     switch (status) {
       case 'open': return <AlertCircle size={16} className="text-yellow-500" />;
       case 'in_progress': return <Clock size={16} className="text-blue-500" />;
+      case 'waiting_customer': return <Hourglass size={16} className="text-orange-500" />;
       case 'resolved': return <CheckCircle size={16} className="text-green-500" />;
       case 'closed': return <XCircle size={16} className="text-gray-500" />;
     }
@@ -48,6 +51,7 @@ export default function AdminTicketsPage() {
     switch (status) {
       case 'open': return t.open;
       case 'in_progress': return t.inProgress;
+      case 'waiting_customer': return t.waitingCustomer;
       case 'resolved': return t.resolved;
       case 'closed': return t.closed;
     }
@@ -159,6 +163,7 @@ export default function AdminTicketsPage() {
                 >
                   <option value="open" className={darkMode ? 'bg-black' : ''}>{t.statusOpen}</option>
                   <option value="in_progress" className={darkMode ? 'bg-black' : ''}>{t.statusInProgress}</option>
+                  <option value="waiting_customer" className={darkMode ? 'bg-black' : ''}>{t.statusWaitingCustomer}</option>
                   <option value="resolved" className={darkMode ? 'bg-black' : ''}>{t.statusResolved}</option>
                   <option value="closed" className={darkMode ? 'bg-black' : ''}>{t.statusClosed}</option>
                 </select>

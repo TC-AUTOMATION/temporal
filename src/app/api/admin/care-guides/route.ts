@@ -20,6 +20,11 @@ export async function GET() {
 
     const guides = await prisma.careGuide.findMany({
       orderBy: { sortOrder: 'asc' },
+      include: {
+        products: {
+          select: { id: true, name: true },
+        },
+      },
     });
 
     return successResponse(guides);

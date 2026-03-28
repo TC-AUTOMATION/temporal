@@ -1,13 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Trash2, Plus, Minus, ShoppingBag, X, Zap, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Trash2, Plus, Minus, ShoppingBag, X, Zap, ArrowRight, Gift } from 'lucide-react';
 import TemporalStar from '@/components/ui/TemporalStar';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import { products } from '@/lib/products';
-import Image from 'next/image';
+
 import Link from 'next/link';
+
+interface UpsellData {
+  id: string;
+  name: string;
+  nameEn: string | null;
+  message: string | null;
+  messageEn: string | null;
+  image: string | null;
+  isFreeGift: boolean;
+  effectivePrice: number;
+  originalPrice: number;
+  product: {
+    id: string;
+    name: string;
+    nameEn: string | null;
+    price: string | number;
+    images: string[];
+    category: {
+      name: string;
+      nameEn: string | null;
+      slug: string;
+    };
+  };
+}
 
 export default function CartDrawer() {
   const {
@@ -23,12 +47,45 @@ export default function CartDrawer() {
   } = useStore();
   const t = translations[language];
   const [isVisible, setIsVisible] = useState(false);
+  const [upsells, setUpsells] = useState<UpsellData[]>([]);
 
   useEffect(() => {
     if (isCartOpen) {
       setTimeout(() => setIsVisible(true), 10);
     }
   }, [isCartOpen]);
+
+  // Fetch upsells based on cart state
+  const fetchUpsells = useCallback(async () => {
+    if (cart.length === 0) {
+      setUpsells([]);
+      return;
+    }
+    try {
+      const total = cartTotal();
+      const productIds = cart.map((item) => item.id).join(',');
+      const res = await fetch(
+        `/api/upsells?cartTotal=${total}&productIds=${productIds}&location=cart`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        // Filter out upsells for products already in cart
+        const cartProductIds = cart.map((item) => item.id);
+        const filtered = (data.data?.upsells || []).filter(
+          (u: UpsellData) => !cartProductIds.includes(u.product.id)
+        );
+        setUpsells(filtered);
+      }
+    } catch (err) {
+      console.error('Error fetching upsells:', err);
+    }
+  }, [cart, cartTotal]);
+
+  useEffect(() => {
+    if (isCartOpen && cart.length > 0) {
+      fetchUpsells();
+    }
+  }, [isCartOpen, cart, fetchUpsells]);
 
   const handleClose = () => {
     setIsVisible(false);
@@ -193,11 +250,9 @@ export default function CartDrawer() {
                     {/* Image */}
                     <div className="w-24 h-24 overflow-hidden flex-shrink-0">
                       {item.image ? (
-                        <Image
+                        <img
                           src={item.image}
                           alt={item.name}
-                          width={96}
-                          height={96}
                           className="object-cover w-full h-full"
                         />
                       ) : (
@@ -288,6 +343,143 @@ export default function CartDrawer() {
             </div>
           )}
 
+          {/* Upsells section */}
+          {upsells.length > 0 && (
+            <div className={`mt-4 p-3 rounded-lg ${darkMode ? 'bg-white/[0.03]' : 'bg-black/[0.02]'}`}>
+              <p
+                className="text-sm mb-3 flex items-center gap-2"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+              >
+                <Gift size={16} className="text-green-500" />
+                <span className={darkMode ? 'text-white/80' : 'text-black/80'}>
+                  {language === 'fr' ? 'RECOMMANDE POUR VOUS' : 'RECOMMENDED FOR YOU'}
+                </span>
+              </p>
+              <div className="space-y-2">
+                {upsells.map((upsell) => {
+                  const upsellMessage = language === 'fr'
+                    ? upsell.message
+                    : (upsell.messageEn || upsell.message);
+                  const upsellImage = upsell.image || upsell.product.images[0];
+
+                  return (
+                    <div
+                      key={upsell.id}
+                      className={`relative flex items-center gap-3 p-2.5 transition-all group ${
+                        upsell.isFreeGift
+                          ? darkMode
+                            ? 'bg-green-500/10 border border-green-500/30 hover:border-green-500/50'
+                            : 'bg-green-50 border border-green-200 hover:border-green-300'
+                          : darkMode
+                            ? 'bg-white/5 border border-white/10 hover:border-primary/30'
+                            : 'bg-black/5 border border-black/10 hover:border-primary/30'
+                      }`}
+                    >
+                      {/* Free gift badge */}
+                      {upsell.isFreeGift && (
+                        <div className="absolute -top-2 -right-1 z-10">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full shadow-lg"
+                            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                          >
+                            <Gift size={10} />
+                            {language === 'fr' ? 'CADEAU GRATUIT' : 'FREE GIFT'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Image */}
+                      <div className="w-12 h-12 flex-shrink-0 overflow-hidden rounded">
+                        {upsellImage ? (
+                          <img
+                            src={upsellImage}
+                            alt={upsell.name}
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center ${darkMode ? 'bg-white/10' : 'bg-black/10'}`}>
+                            <Gift size={16} className="text-primary/50" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-xs truncate group-hover:text-primary transition-colors"
+                          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                        >
+                          {(language === 'fr' ? upsell.name : (upsell.nameEn || upsell.name)).toUpperCase()}
+                        </p>
+                        {upsellMessage && (
+                          <p className={`text-[10px] mt-0.5 truncate ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                            {upsellMessage}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {upsell.isFreeGift ? (
+                            <span
+                              className="text-green-500 text-sm font-bold"
+                              style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                            >
+                              {language === 'fr' ? 'GRATUIT' : 'FREE'}
+                            </span>
+                          ) : upsell.effectivePrice < upsell.originalPrice ? (
+                            <>
+                              <span
+                                className="text-primary text-sm"
+                                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                              >
+                                {upsell.effectivePrice.toFixed(2)}€
+                              </span>
+                              <span
+                                className={`text-[10px] line-through ${darkMode ? 'text-white/30' : 'text-black/30'}`}
+                              >
+                                {upsell.originalPrice.toFixed(2)}€
+                              </span>
+                            </>
+                          ) : (
+                            <span
+                              className="text-primary text-sm"
+                              style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                            >
+                              {upsell.originalPrice.toFixed(2)}€
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Add button */}
+                      <button
+                        className={`px-3 py-1.5 text-xs transition-all hover:scale-105 flex-shrink-0 ${
+                          upsell.isFreeGift
+                            ? 'bg-green-500 text-white'
+                            : 'bg-primary text-white'
+                        }`}
+                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                        onClick={() => {
+                          addToCart({
+                            id: upsell.product.id,
+                            name: language === 'fr' ? upsell.product.name : (upsell.product.nameEn || upsell.product.name),
+                            price: upsell.isFreeGift ? 0 : upsell.effectivePrice,
+                            size: 'UNIQUE',
+                            color: '',
+                            quantity: 1,
+                            image: upsell.product.images[0] || '',
+                          });
+                        }}
+                      >
+                        {upsell.isFreeGift
+                          ? `+ ${language === 'fr' ? 'AJOUTER' : 'ADD'}`
+                          : `+ ${language === 'fr' ? 'AJOUTER' : 'ADD'}`}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Footer */}
@@ -326,11 +518,9 @@ export default function CartDrawer() {
                     >
                       <div className="w-12 h-12 flex-shrink-0 overflow-hidden">
                         {product.images[0] ? (
-                          <Image
+                          <img
                             src={product.images[0]}
                             alt={product.name}
-                            width={48}
-                            height={48}
                             className="object-cover w-full h-full"
                           />
                         ) : (

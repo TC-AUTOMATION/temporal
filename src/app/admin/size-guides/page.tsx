@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, Ruler, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Ruler, Package, Check } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 
 interface SizeRow {
@@ -24,6 +24,7 @@ interface SizeGuide {
   unit: string;
   sortOrder: number;
   isActive: boolean;
+  products?: { id: string; name: string }[];
 }
 
 const emptySizeRow: SizeRow = { size: '', chest: '', waist: '', hips: '', length: '', shoulders: '' };
@@ -48,6 +49,11 @@ export default function SizeGuidesAdminPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<any>(emptyGuide);
   const [saving, setSaving] = useState(false);
+  const [assigningGuideId, setAssigningGuideId] = useState<string | null>(null);
+  const [allProducts, setAllProducts] = useState<{ id: string; name: string; sizeGuideId?: string | null }[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [expandedGuideId, setExpandedGuideId] = useState<string | null>(null);
 
   const fetchGuides = async () => {
     try {
@@ -60,6 +66,18 @@ export default function SizeGuidesAdminPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllProducts = async () => {
+    try {
+      const res = await fetch('/api/products?active=all&limit=200', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success) {
+        setAllProducts(data.data.products.map((p: any) => ({ id: p.id, name: p.name, sizeGuideId: p.sizeGuideId })));
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -131,6 +149,55 @@ export default function SizeGuidesAdminPage() {
     setForm({ ...form, sizes: newSizes });
   };
 
+  const openAssignModal = async (guideId: string) => {
+    setAssigningGuideId(guideId);
+    await fetchAllProducts();
+    const guide = guides.find(g => g.id === guideId);
+    setSelectedProductIds(guide?.products?.map(p => p.id) || []);
+  };
+
+  const handleAssignProducts = async () => {
+    if (!assigningGuideId) return;
+    setAssignSaving(true);
+    try {
+      const guide = guides.find(g => g.id === assigningGuideId);
+      const currentIds = guide?.products?.map(p => p.id) || [];
+
+      const toAdd = selectedProductIds.filter(id => !currentIds.includes(id));
+      const toRemove = currentIds.filter(id => !selectedProductIds.includes(id));
+
+      const updates = [
+        ...toAdd.map(id =>
+          fetch(`/api/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sizeGuideId: assigningGuideId }),
+          })
+        ),
+        ...toRemove.map(id =>
+          fetch(`/api/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sizeGuideId: null }),
+          })
+        ),
+      ];
+      await Promise.all(updates);
+      await fetchGuides();
+      setAssigningGuideId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds(prev =>
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+    );
+  };
+
   const isFormOpen = editing || creating;
 
   return (
@@ -180,7 +247,7 @@ export default function SizeGuidesAdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                SLUG CATÉGORIE
+                SLUG CAT&Eacute;GORIE
               </label>
               <input
                 type="text"
@@ -192,14 +259,14 @@ export default function SizeGuidesAdminPage() {
             </div>
             <div>
               <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                UNITÉ
+                UNIT&Eacute;
               </label>
               <select
                 value={form.unit}
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
                 className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`}
               >
-                <option value="cm">Centimètres (cm)</option>
+                <option value="cm">Centim&egrave;tres (cm)</option>
                 <option value="inches">Pouces (inches)</option>
               </select>
             </div>
@@ -311,7 +378,7 @@ export default function SizeGuidesAdminPage() {
                       {language === 'fr' ? 'LONGUEUR' : 'LENGTH'}
                     </th>
                     <th className="px-3 py-2 text-left text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                      {language === 'fr' ? 'ÉPAULES' : 'SHOULDERS'}
+                      {language === 'fr' ? '\u00c9PAULES' : 'SHOULDERS'}
                     </th>
                     <th className="px-3 py-2 w-12"></th>
                   </tr>
@@ -381,7 +448,7 @@ export default function SizeGuidesAdminPage() {
             {language === 'fr' ? 'AUCUN GUIDE DES TAILLES' : 'NO SIZE GUIDES'}
           </p>
           <p className={`text-sm mt-2 ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
-            {language === 'fr' ? 'Créez votre premier guide des tailles' : 'Create your first size guide'}
+            {language === 'fr' ? 'Cr\u00e9ez votre premier guide des tailles' : 'Create your first size guide'}
           </p>
         </div>
       ) : (
@@ -404,9 +471,22 @@ export default function SizeGuidesAdminPage() {
                       {language === 'fr' ? guide.nameFr : guide.nameEn}
                     </h3>
                     <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
-                      {guide.categorySlug} • {(guide.sizes as SizeRow[]).length} {language === 'fr' ? 'tailles' : 'sizes'} • {guide.unit}
+                      {guide.categorySlug} {'\u2022'} {(guide.sizes as SizeRow[]).length} {language === 'fr' ? 'tailles' : 'sizes'} {'\u2022'} {guide.unit}
                     </p>
                   </div>
+                  {/* Product count badge */}
+                  <button
+                    onClick={() => setExpandedGuideId(expandedGuideId === guide.id ? null : guide.id)}
+                    className={`relative group px-3 py-1.5 text-xs flex items-center gap-1.5 transition-all ${
+                      (guide.products?.length || 0) > 0
+                        ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                        : darkMode ? 'bg-white/5 text-white/40 hover:bg-white/10' : 'bg-black/5 text-black/40 hover:bg-black/10'
+                    }`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    <Package size={12} />
+                    {guide.products?.length || 0} {language === 'fr' ? 'PRODUITS' : 'PRODUCTS'}
+                  </button>
                   {!guide.isActive && (
                     <span className="px-2 py-1 text-xs bg-red-500/20 text-red-400" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                       {language === 'fr' ? 'INACTIF' : 'INACTIVE'}
@@ -414,6 +494,14 @@ export default function SizeGuidesAdminPage() {
                   )}
                 </div>
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => openAssignModal(guide.id)}
+                    className={`px-3 py-2 text-xs flex items-center gap-1.5 border transition-all ${darkMode ? 'border-white/10 hover:border-primary hover:text-primary' : 'border-gray-200 hover:border-primary hover:text-primary'}`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    <Package size={14} />
+                    {language === 'fr' ? 'ASSIGNER' : 'ASSIGN'}
+                  </button>
                   <button
                     onClick={() => startEdit(guide)}
                     className={`w-10 h-10 flex items-center justify-center ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
@@ -428,6 +516,22 @@ export default function SizeGuidesAdminPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Expanded product list */}
+              {expandedGuideId === guide.id && guide.products && guide.products.length > 0 && (
+                <div className={`mx-4 mb-4 pt-3 border-t ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                  <p className={`text-xs mb-2 ${darkMode ? 'text-white/40' : 'text-black/40'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                    {language === 'fr' ? 'PRODUITS UTILISANT CE GUIDE :' : 'PRODUCTS USING THIS GUIDE:'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {guide.products.map(p => (
+                      <span key={p.id} className={`px-2 py-1 text-xs ${darkMode ? 'bg-white/10 text-white/70' : 'bg-black/5 text-black/70'}`}>
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Preview table */}
               <div className={`overflow-x-auto border-t ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
@@ -450,7 +554,7 @@ export default function SizeGuidesAdminPage() {
                         {language === 'fr' ? 'LONGUEUR' : 'LENGTH'}
                       </th>
                       <th className="px-4 py-2 text-center text-xs" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-                        {language === 'fr' ? 'ÉPAULES' : 'SHOULDERS'}
+                        {language === 'fr' ? '\u00c9PAULES' : 'SHOULDERS'}
                       </th>
                     </tr>
                   </thead>
@@ -470,6 +574,78 @@ export default function SizeGuidesAdminPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Assign Products Modal */}
+      {assigningGuideId && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col ${darkMode ? 'bg-black border border-white/20' : 'bg-white border border-gray-200'}`}>
+            <div className={`flex items-center justify-between p-4 border-b ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
+              <h2 className="text-lg" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                {language === 'fr' ? 'ASSIGNER AUX PRODUITS' : 'ASSIGN TO PRODUCTS'}
+              </h2>
+              <button
+                onClick={() => setAssigningGuideId(null)}
+                className={`w-10 h-10 flex items-center justify-center ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {allProducts.length === 0 ? (
+                <p className={`text-center py-8 text-sm ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                  {language === 'fr' ? 'Chargement...' : 'Loading...'}
+                </p>
+              ) : (
+                allProducts.map(product => {
+                  const isSelected = selectedProductIds.includes(product.id);
+                  const isAssignedElsewhere = product.sizeGuideId && product.sizeGuideId !== assigningGuideId;
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => toggleProductSelection(product.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all border ${
+                        isSelected
+                          ? 'border-primary bg-primary/10'
+                          : darkMode ? 'border-white/10 hover:border-white/20' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 flex items-center justify-center border ${isSelected ? 'bg-primary border-primary' : darkMode ? 'border-white/30' : 'border-gray-300'}`}>
+                        {isSelected && <Check size={12} className="text-white" />}
+                      </div>
+                      <span className="flex-1 text-sm">{product.name}</span>
+                      {isAssignedElsewhere && (
+                        <span className={`text-xs px-2 py-0.5 ${darkMode ? 'bg-white/10 text-white/40' : 'bg-black/5 text-black/40'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                          {language === 'fr' ? 'AUTRE GUIDE' : 'OTHER GUIDE'}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            <div className={`flex gap-3 p-4 border-t ${darkMode ? 'border-white/10' : 'border-gray-200'}`}>
+              <button
+                onClick={() => setAssigningGuideId(null)}
+                className={`flex-1 py-3 border ${darkMode ? 'border-white/20 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+              >
+                {language === 'fr' ? 'ANNULER' : 'CANCEL'}
+              </button>
+              <button
+                onClick={handleAssignProducts}
+                disabled={assignSaving}
+                className="flex-1 py-3 bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+              >
+                {assignSaving
+                  ? (language === 'fr' ? 'SAUVEGARDE...' : 'SAVING...')
+                  : `${language === 'fr' ? 'ASSIGNER' : 'ASSIGN'} (${selectedProductIds.length})`
+                }
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

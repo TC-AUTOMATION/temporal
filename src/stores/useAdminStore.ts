@@ -53,6 +53,10 @@ export interface AdminProduct {
   isActive: boolean;
   isFeatured: boolean;
   isNew?: boolean;
+  sizeGuideId?: string | null;
+  careGuideId?: string | null;
+  sizeGuideName?: string;
+  careGuideName?: string;
   createdAt: string;
   updatedAt: string;
   totalStock: number;
@@ -148,7 +152,7 @@ export interface Ticket {
   customerName: string;
   customerEmail: string;
   subject: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  status: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed';
   priority: 'low' | 'medium' | 'high';
   messages: { id: string; content: string; isAdmin: boolean; createdAt: string }[];
   createdAt: string;
@@ -266,8 +270,8 @@ function apiProductToAdmin(p: ApiProduct): AdminProduct {
     materialsEn: (p as any).materialsEn || undefined,
     careInstructions: (p as any).careInstructions || undefined,
     careInstructionsEn: (p as any).careInstructionsEn || undefined,
-    price: p.price,
-    originalPrice: p.originalPrice || undefined,
+    price: Number(p.price),
+    originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
     category: p.category.slug,
     sizes: Array.from(sizeMap.values()),
     colors: Array.from(colorMap.values()),
@@ -277,6 +281,10 @@ function apiProductToAdmin(p: ApiProduct): AdminProduct {
     isActive: p.isActive,
     isFeatured: p.isFeatured,
     isNew: (p as any).isNew,
+    sizeGuideId: (p as any).sizeGuideId || null,
+    careGuideId: (p as any).careGuideId || null,
+    sizeGuideName: (p as any).sizeGuide ? ((p as any).sizeGuide.nameFr || (p as any).sizeGuide.nameEn) : undefined,
+    careGuideName: (p as any).careGuide ? ((p as any).careGuide.nameFr || (p as any).careGuide.nameEn) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     totalStock: p.variants.reduce((sum, v) => sum + v.stock, 0),
@@ -305,13 +313,13 @@ function apiOrderToAdmin(o: ApiOrder): Order {
       size: item.size || '',
       color: item.color || '',
       quantity: item.quantity,
-      price: item.unitPrice,
+      price: Number(item.unitPrice),
       image: item.product?.images?.[0],
     })),
-    subtotal: o.subtotal,
-    shipping: o.shippingCost,
-    discount: o.discount,
-    total: o.total,
+    subtotal: Number(o.subtotal),
+    shipping: Number(o.shippingCost),
+    discount: Number(o.discount),
+    total: Number(o.total),
     promoCode: o.promoCode?.code,
     status: o.status.toLowerCase() as Order['status'],
     paymentStatus: o.paymentStatus.toLowerCase() as Order['paymentStatus'],
@@ -330,9 +338,9 @@ function apiPromoToAdmin(p: ApiPromoCode): PromoCode {
     id: p.id,
     code: p.code,
     type: p.type.toLowerCase() as PromoCode['type'],
-    value: p.value,
-    minPurchase: p.minPurchase || undefined,
-    maxDiscount: p.maxDiscount || undefined,
+    value: Number(p.value),
+    minPurchase: p.minPurchase ? Number(p.minPurchase) : undefined,
+    maxDiscount: p.maxDiscount ? Number(p.maxDiscount) : undefined,
     maxUses: p.maxUses || undefined,
     usedCount: p.usedCount,
     validFrom: p.validFrom,
@@ -365,7 +373,7 @@ export const useAdminStore = create<AdminState>()(
           purchaseAmount: 150,
           description: 'Chaque commande de 150€ ou plus te donne automatiquement une participation au tirage au sort.',
           descriptionEn: 'Every order of 150€ or more automatically gives you one entry into the draw.',
-          prizeImage: '/clothes/bonnet-face-noir.png',
+          prizeImage: '/clothes/bonnet-face-noir.webp',
           isActive: true,
         },
         {
@@ -377,7 +385,7 @@ export const useAdminStore = create<AdminState>()(
           purchaseAmount: 200,
           description: 'Chaque commande de 200€ ou plus te donne automatiquement une participation au tirage au sort.',
           descriptionEn: 'Every order of 200€ or more automatically gives you one entry into the draw.',
-          prizeImage: '/clothes/veste-face-noire.png',
+          prizeImage: '/clothes/veste-face-noire.webp',
           isActive: true,
         },
       ],
@@ -766,6 +774,7 @@ export const useAdminStore = create<AdminState>()(
           const statusMap: Record<string, string> = {
             open: 'OPEN',
             in_progress: 'IN_PROGRESS',
+            waiting_customer: 'WAITING_CUSTOMER',
             resolved: 'RESOLVED',
             closed: 'CLOSED',
           };

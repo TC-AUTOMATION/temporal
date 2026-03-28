@@ -96,6 +96,20 @@ export default function ProfilePage() {
     isDefault: false,
   });
 
+  // Verify session with server on mount — syncs Zustand store with actual cookie state
+  useEffect(() => {
+    if (isAuthenticated) {
+      const { fetchCurrentUser } = useAuthStore.getState();
+      fetchCurrentUser().then((user) => {
+        if (!user) {
+          // Cookie expired or invalid — store was cleared by fetchCurrentUser
+          router.push('/login');
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (user) {
       setFormData({

@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // Images are pre-optimized as WebP - skip server-side optimization to avoid CPU overload
+  images: {
+    unoptimized: true,
+  },
+
   // Security headers
   async headers() {
     return [

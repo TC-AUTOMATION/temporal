@@ -32,6 +32,53 @@ export interface Product {
   modelInfoEn?: string;
 }
 
+// Cart sync utilities
+function getSessionId(): string {
+  if (typeof window === 'undefined') return '';
+  let sessionId = localStorage.getItem('temporal-cart-session-id');
+  if (!sessionId) {
+    sessionId = 'sess_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    localStorage.setItem('temporal-cart-session-id', sessionId);
+  }
+  return sessionId;
+}
+
+let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function debouncedSyncCart(cart: CartItem[], total: number) {
+  if (typeof window === 'undefined') return;
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    // Try to get userId from auth store in localStorage
+    let userId: string | null = null;
+    try {
+      const authRaw = localStorage.getItem('temporal-auth-store');
+      if (authRaw) {
+        const authData = JSON.parse(authRaw);
+        userId = authData?.state?.user?.id || null;
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    fetch('/api/cart/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        userId,
+        items: cart,
+        total,
+      }),
+    }).catch(() => {
+      // Silently fail - analytics should never block UX
+    });
+  }, 500);
+}
+
 interface StoreState {
   language: 'fr' | 'en';
   darkMode: boolean;
@@ -51,6 +98,12 @@ interface StoreState {
   cartTotal: () => number;
 }
 
+function triggerSync(get: () => StoreState) {
+  const state = get();
+  const total = state.cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  debouncedSyncCart(state.cart, total);
+}
+
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
@@ -62,7 +115,7 @@ export const useStore = create<StoreState>()(
       isSearchOpen: false,
       setLanguage: (lang) => set({ language: lang }),
       toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
-      addToCart: (item) =>
+      addToCart: (item) => {
         set((state) => {
           const existing = state.cart.find(
             (i) => i.id === item.id && i.size === item.size
@@ -77,18 +130,27 @@ export const useStore = create<StoreState>()(
             };
           }
           return { cart: [...state.cart, item] };
-        }),
-      removeFromCart: (id, size) =>
+        });
+        triggerSync(get);
+      },
+      removeFromCart: (id, size) => {
         set((state) => ({
           cart: state.cart.filter((i) => !(i.id === id && i.size === size)),
-        })),
-      updateQuantity: (id, size, quantity) =>
+        }));
+        triggerSync(get);
+      },
+      updateQuantity: (id, size, quantity) => {
         set((state) => ({
           cart: state.cart.map((i) =>
             i.id === id && i.size === size ? { ...i, quantity } : i
           ),
-        })),
-      clearCart: () => set({ cart: [] }),
+        }));
+        triggerSync(get);
+      },
+      clearCart: () => {
+        set({ cart: [] });
+        triggerSync(get);
+      },
       setCartOpen: (open) => set({ isCartOpen: open }),
       setSidebarOpen: (open) => set({ isSidebarOpen: open }),
       setSearchOpen: (open) => set({ isSearchOpen: open }),

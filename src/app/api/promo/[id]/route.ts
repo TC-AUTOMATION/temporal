@@ -72,10 +72,77 @@ export async function PUT(
       }
     }
 
-    // Update Stripe promotion code if exists
-    if (existing.stripePromoId && data.isActive !== undefined) {
+    // Sync changes to Stripe
+    const stripe = getStripe();
+    const needsStripeRecreate = data.type !== undefined || data.value !== undefined;
+
+    if (needsStripeRecreate && existing.stripePromoId) {
+      // Discount parameters changed - deactivate old promo and create new coupon+promo
       try {
-        const stripe = getStripe();
+        await stripe.promotionCodes.update(existing.stripePromoId, { active: false });
+
+        const newType = data.type || existing.type;
+        const newValue = data.value !== undefined ? data.value : Number(existing.value);
+        const newMinPurchase = data.minPurchase !== undefined ? data.minPurchase : (existing.minPurchase ? Number(existing.minPurchase) : undefined);
+        const newMaxUses = data.maxUses !== undefined ? data.maxUses : (existing.maxUses || undefined);
+        const newValidUntil = data.validUntil !== undefined ? data.validUntil : (existing.validUntil ? existing.validUntil.toISOString() : undefined);
+        const newCode = data.code || existing.code;
+        const newIsActive = data.isActive !== undefined ? data.isActive : existing.isActive;
+
+        const couponParams: Stripe.CouponCreateParams = {
+          name: newCode,
+          duration: 'forever',
+          metadata: { code: newCode, type: newType, source: 'temporal-admin' },
+        };
+
+        if (newType === 'PERCENTAGE') {
+          couponParams.percent_off = newValue;
+        } else if (newType === 'FIXED') {
+          couponParams.amount_off = Math.round(newValue * 100);
+          couponParams.currency = 'eur';
+        } else if (newType === 'FREE_SHIPPING') {
+          couponParams.amount_off = 590;
+          couponParams.currency = 'eur';
+        }
+
+        if (newValidUntil) {
+          couponParams.redeem_by = Math.floor(new Date(newValidUntil).getTime() / 1000);
+        }
+
+        const newCoupon = await stripe.coupons.create(couponParams);
+
+        const promoParams: Stripe.PromotionCodeCreateParams = {
+          promotion: { type: 'coupon', coupon: newCoupon.id },
+          code: newCode,
+          active: newIsActive,
+          metadata: { type: newType, source: 'temporal-admin' },
+        };
+
+        if (newMaxUses) promoParams.max_redemptions = newMaxUses;
+        if (newValidUntil) promoParams.expires_at = Math.floor(new Date(newValidUntil).getTime() / 1000);
+        if (newMinPurchase) {
+          promoParams.restrictions = {
+            minimum_amount: Math.round(newMinPurchase * 100),
+            minimum_amount_currency: 'eur',
+          };
+        }
+
+        const newPromo = await stripe.promotionCodes.create(promoParams);
+
+        // Update Stripe IDs in DB
+        await prisma.promoCode.update({
+          where: { id },
+          data: {
+            stripeCouponId: newCoupon.id,
+            stripePromoId: newPromo.id,
+          },
+        });
+      } catch (stripeError) {
+        console.error('Stripe promo recreate error:', stripeError);
+      }
+    } else if (existing.stripePromoId && data.isActive !== undefined) {
+      // Only active status changed - simple update
+      try {
         await stripe.promotionCodes.update(existing.stripePromoId, {
           active: data.isActive,
         });

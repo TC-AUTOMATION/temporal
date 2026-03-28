@@ -47,6 +47,8 @@ export async function GET(
             stock: true,
           },
         },
+        sizeGuide: true,
+        careGuide: true,
       },
     });
 
@@ -183,12 +185,16 @@ export async function PATCH(
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.isFeatured !== undefined && { isFeatured: data.isFeatured }),
         ...(data.isNew !== undefined && { isNew: data.isNew }),
+        ...(data.sizeGuideId !== undefined && { sizeGuideId: data.sizeGuideId || null }),
+        ...(data.careGuideId !== undefined && { careGuideId: data.careGuideId || null }),
         ...((data as any).stripeProductId && { stripeProductId: (data as any).stripeProductId }),
         ...(newStripePriceId && { stripePriceId: newStripePriceId }),
       },
       include: {
         category: true,
         variants: true,
+        sizeGuide: true,
+        careGuide: true,
       },
     });
 

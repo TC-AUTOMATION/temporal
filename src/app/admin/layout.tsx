@@ -21,9 +21,13 @@ import {
   Bell,
   Mail,
   Trophy,
+  Gauge,
   ScrollText,
   Ruler,
   WashingMachine,
+  Printer,
+  Eye,
+  TrendingUp,
 } from 'lucide-react';
 import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import TemporalStar from '@/components/ui/TemporalStar';
@@ -36,14 +40,18 @@ const navItems = [
   { href: '/admin', labelFr: 'TABLEAU DE BORD', labelEn: 'DASHBOARD', icon: LayoutDashboard, exact: true },
   { href: '/admin/products', labelFr: 'PRODUITS', labelEn: 'PRODUCTS', icon: Package },
   { href: '/admin/stickers', labelFr: 'COMMANDE STICKERS', labelEn: 'STICKERS ORDER', icon: Sticker },
-  { href: '/admin/orders', labelFr: 'COMMANDES', labelEn: 'ORDERS', icon: ShoppingCart },
+  { href: '/admin/orders', labelFr: 'COMMANDES', labelEn: 'ORDERS', icon: ShoppingCart, exact: true },
+  { href: '/admin/cart-spy', labelFr: 'PANIERS', labelEn: 'CART SPY', icon: Eye },
+  { href: '/admin/orders/print-station', labelFr: 'IMPRESSION', labelEn: 'PRINT STATION', icon: Printer },
   { href: '/admin/users', labelFr: 'UTILISATEURS', labelEn: 'USERS', icon: User },
   { href: '/admin/tickets', labelFr: 'TICKETS', labelEn: 'TICKETS', icon: MessageSquare },
   { href: '/admin/promos', labelFr: 'CODES PROMO', labelEn: 'PROMO CODES', icon: Tags },
   { href: '/admin/contests', labelFr: 'CONCOURS', labelEn: 'CONTESTS', icon: Trophy },
+  { href: '/admin/gauge', labelFr: 'JAUGE CONCOURS', labelEn: 'CONTEST GAUGE', icon: Gauge },
   { href: '/admin/marquee', labelFr: 'BANDEAU DÉFILANT', labelEn: 'MARQUEE BANNER', icon: ScrollText },
   { href: '/admin/size-guides', labelFr: 'GUIDES TAILLES', labelEn: 'SIZE GUIDES', icon: Ruler },
   { href: '/admin/care-guides', labelFr: 'GUIDES LAVAGE', labelEn: 'CARE GUIDES', icon: WashingMachine },
+  { href: '/admin/upsells', labelFr: 'UPSELLS', labelEn: 'UPSELLS', icon: TrendingUp },
   { href: '/admin/packs', labelFr: 'PACKS', labelEn: 'PACKS', icon: Gift },
   { href: '/admin/popups', labelFr: 'POPUPS', labelEn: 'POPUPS', icon: Bell },
   { href: '/admin/newsletter', labelFr: 'NEWSLETTER', labelEn: 'NEWSLETTER', icon: Mail },
@@ -54,20 +62,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [storeHydrated, setStoreHydrated] = useState(false);
   const { user, isAuthenticated, logout } = useAuthStore();
   const { orders } = useAdminStore();
   const { darkMode, toggleDarkMode, language, setLanguage } = useStore();
 
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
 
-  // Redirect if not admin
+  // Wait for Zustand persist rehydration before checking auth
   useEffect(() => {
-    if (!isAuthenticated || !user?.isAdmin) {
+    if (useAuthStore.persist.hasHydrated()) {
+      setStoreHydrated(true);
+      return;
+    }
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setStoreHydrated(true);
+    });
+    return () => { unsub(); };
+  }, []);
+
+  // Redirect if not admin — only after store has rehydrated
+  useEffect(() => {
+    if (storeHydrated && (!isAuthenticated || !user?.isAdmin)) {
       router.push('/login');
     }
-  }, [isAuthenticated, user, router]);
+  }, [storeHydrated, isAuthenticated, user, router]);
 
-  if (!isAuthenticated || !user?.isAdmin) {
+  if (!storeHydrated || !isAuthenticated || !user?.isAdmin) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white text-center">

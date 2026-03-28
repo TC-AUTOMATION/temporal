@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useAdminStore } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
 import {
@@ -19,8 +20,15 @@ import {
 import Link from 'next/link';
 
 export default function AdminDashboard() {
-  const { getDashboardStats, orders, products } = useAdminStore();
+  const { getDashboardStats, orders, products, fetchProducts, fetchOrders, fetchPromoCodes } = useAdminStore();
   const { darkMode, language } = useStore();
+
+  useEffect(() => {
+    fetchProducts();
+    fetchOrders();
+    fetchPromoCodes();
+  }, [fetchProducts, fetchOrders, fetchPromoCodes]);
+
   const stats = getDashboardStats();
 
   // Translations

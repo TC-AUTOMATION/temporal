@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAdminStore, PromoCode } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Copy, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Copy, Check, RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -59,11 +59,37 @@ export default function PromosPage() {
     noMinimum: language === 'fr' ? '0 = pas de minimum' : '0 = no minimum',
     noMaxUses: language === 'fr' ? '0 = illimité' : '0 = unlimited',
   };
-  const { promoCodes, addPromoCode, updatePromoCode, deletePromoCode } = useAdminStore();
+  const { promoCodes, fetchPromoCodes, addPromoCode, updatePromoCode, deletePromoCode } = useAdminStore();
+
+  useEffect(() => {
+    fetchPromoCodes();
+  }, [fetchPromoCodes]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  const syncToStripe = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const response = await fetch('/api/admin/stripe/sync-promos', { method: 'POST' });
+      const result = await response.json();
+      if (response.ok) {
+        setSyncResult(result.data.message);
+        fetchPromoCodes();
+      } else {
+        setSyncResult(result.error || 'Erreur de synchronisation');
+      }
+    } catch {
+      setSyncResult('Erreur de connexion');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncResult(null), 5000);
+    }
+  };
 
   const [formData, setFormData] = useState({
     code: '',
@@ -147,11 +173,28 @@ export default function PromosPage() {
             {promoCodes.filter((p) => p.isActive).length} {t.activeCodes} {promoCodes.length}
           </p>
         </div>
-        <Button onClick={openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t.newPromoCode}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={syncToStripe} disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            Sync Stripe
+          </Button>
+          <Button onClick={openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t.newPromoCode}
+          </Button>
+        </div>
       </div>
+
+      {/* Sync result */}
+      {syncResult && (
+        <div className={`p-3 rounded-lg text-sm ${
+          syncResult.includes('erreur') || syncResult.includes('Erreur')
+            ? 'bg-red-100 text-red-800'
+            : 'bg-green-100 text-green-800'
+        }`}>
+          {syncResult}
+        </div>
+      )}
 
       {/* Promo Codes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -293,12 +336,13 @@ export default function PromosPage() {
                 <select
                   value={formData.type}
                   onChange={(e) =>
-                    setFormData({ ...formData, type: e.target.value as 'percentage' | 'fixed' })
+                    setFormData({ ...formData, type: e.target.value as 'percentage' | 'fixed' | 'free_shipping' })
                   }
                   className="w-full mt-1 px-3 py-2 border rounded-md"
                 >
                   <option value="percentage">{t.percentage}</option>
                   <option value="fixed">{t.fixedAmount}</option>
+                  <option value="free_shipping">{language === 'fr' ? 'Livraison gratuite' : 'Free shipping'}</option>
                 </select>
               </div>
               <div>

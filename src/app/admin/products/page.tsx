@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useAdminStore, AdminProduct } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
+import Link from 'next/link';
 import {
   Plus,
   Search,
@@ -14,16 +15,518 @@ import {
   Star,
   X,
   Loader2,
+  Ruler,
+  WashingMachine,
+  ExternalLink,
+  GripVertical,
+  ArrowLeft,
+  ArrowRight,
+  Image as ImageIcon,
+  Crown,
+  Link as LinkIcon,
 } from 'lucide-react';
 
+// ==================== Image Browser Modal ====================
+function ImageBrowserModal({
+  isOpen,
+  onClose,
+  onSelect,
+  currentImages,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (images: string[]) => void;
+  currentImages: string[];
+}) {
+  const [availableImages, setAvailableImages] = useState<Record<string, string[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [activeFolder, setActiveFolder] = useState('clothes');
+  const [customUrl, setCustomUrl] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedImages([]);
+    setCustomUrl('');
+    const fetchImages = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/images');
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableImages(data.data || {});
+        }
+      } catch (err) {
+        console.error('Error fetching images:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchImages();
+  }, [isOpen]);
+
+  const toggleImage = (img: string) => {
+    setSelectedImages((prev) =>
+      prev.includes(img) ? prev.filter((i) => i !== img) : [...prev, img]
+    );
+  };
+
+  const handleConfirm = () => {
+    const all = [...selectedImages];
+    if (customUrl.trim()) {
+      all.push(customUrl.trim());
+    }
+    if (all.length > 0) {
+      onSelect(all);
+    }
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const folders = Object.keys(availableImages);
+  const images = availableImages[activeFolder] || [];
+  const filteredImages = images.filter((img) => !currentImages.includes(img));
+
+  return (
+    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4">
+      <div className="bg-black border border-white/20 w-full max-w-4xl max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <h3
+            className="text-lg"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+          >
+            CHOISIR DES IMAGES
+          </h3>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Folder tabs */}
+        <div className="flex border-b border-white/10">
+          {folders.map((folder) => (
+            <button
+              key={folder}
+              onClick={() => setActiveFolder(folder)}
+              className={`px-6 py-3 text-sm transition-colors ${
+                activeFolder === folder
+                  ? 'bg-primary/20 text-primary border-b-2 border-primary'
+                  : 'text-white/50 hover:text-white/80'
+              }`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            >
+              {folder.toUpperCase()} ({(availableImages[folder] || []).length})
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={32} className="animate-spin text-primary" />
+            </div>
+          ) : filteredImages.length === 0 ? (
+            <div className="text-center py-12 text-white/40">
+              <ImageIcon size={48} className="mx-auto mb-4 opacity-30" />
+              <p style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                TOUTES LES IMAGES SONT DEJA UTILISEES
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              {filteredImages.map((img) => {
+                const isSelected = selectedImages.includes(img);
+                return (
+                  <button
+                    key={img}
+                    onClick={() => toggleImage(img)}
+                    className={`aspect-square relative border-2 transition-all overflow-hidden group ${
+                      isSelected
+                        ? 'border-primary ring-2 ring-primary/30 scale-[0.97]'
+                        : 'border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <Image
+                      src={img}
+                      alt={img}
+                      fill
+                      className="object-cover"
+                    />
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                          {selectedImages.indexOf(img) + 1}
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-[10px] text-white/70 truncate">
+                        {img.split('/').pop()}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Custom URL input */}
+        <div className="px-4 pb-3 border-t border-white/10 pt-3">
+          <div className="flex gap-2 items-center">
+            <LinkIcon size={16} className="text-white/40 flex-shrink-0" />
+            <input
+              value={customUrl}
+              onChange={(e) => setCustomUrl(e.target.value)}
+              placeholder="Ou coller une URL personnalisee..."
+              className="flex-1 px-3 py-2 bg-white/5 border border-white/10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between p-4 border-t border-white/10">
+          <span className="text-sm text-white/50">
+            {selectedImages.length} image{selectedImages.length !== 1 ? 's' : ''} selectionnee{selectedImages.length !== 1 ? 's' : ''}
+            {customUrl.trim() ? ' + 1 URL' : ''}
+          </span>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-white/20 text-white/70 hover:border-white/40 transition-colors"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            >
+              ANNULER
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selectedImages.length === 0 && !customUrl.trim()}
+              className={`px-6 py-2 transition-colors ${
+                selectedImages.length > 0 || customUrl.trim()
+                  ? 'bg-primary text-white hover:bg-primary/90'
+                  : 'bg-primary/30 text-white/50 cursor-not-allowed'
+              }`}
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            >
+              AJOUTER ({selectedImages.length + (customUrl.trim() ? 1 : 0)})
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== Image Manager Grid ====================
+function ImageManagerGrid({
+  images,
+  onImagesChange,
+}: {
+  images: string[];
+  onImagesChange: (images: string[]) => void;
+}) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [imageBrowserOpen, setImageBrowserOpen] = useState(false);
+
+  const moveImage = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (toIndex < 0 || toIndex >= images.length) return;
+      const newImages = [...images];
+      const [moved] = newImages.splice(fromIndex, 1);
+      newImages.splice(toIndex, 0, moved);
+      onImagesChange(newImages);
+    },
+    [images, onImagesChange]
+  );
+
+  const removeImage = useCallback(
+    (index: number) => {
+      onImagesChange(images.filter((_, i) => i !== index));
+    },
+    [images, onImagesChange]
+  );
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      moveImage(draggedIndex, index);
+      setDraggedIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const handleAddImages = (newImages: string[]) => {
+    onImagesChange([...images, ...newImages]);
+  };
+
+  const validImages = images.filter((img) => img.trim() !== '');
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <label
+          className="text-xs text-white/50"
+          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+        >
+          IMAGES ({validImages.length})
+        </label>
+        <button
+          type="button"
+          onClick={() => setImageBrowserOpen(true)}
+          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1.5 border border-primary/30 hover:border-primary/60"
+          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+        >
+          <Plus size={14} />
+          AJOUTER
+        </button>
+      </div>
+
+      {/* Image info banner */}
+      {validImages.length > 0 && (
+        <div className="p-2.5 border border-primary/20 bg-primary/5">
+          <p className="text-[11px] text-primary/80" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+            IMAGE 1 = IMAGE PRINCIPALE &bull; GLISSE-DEPOSE OU FLECHES POUR REORDONNER
+          </p>
+        </div>
+      )}
+
+      {/* Images Grid */}
+      {validImages.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {validImages.map((img, index) => (
+            <div
+              key={`${img}-${index}`}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              className={`group/imgcard relative border-2 transition-all cursor-grab active:cursor-grabbing ${
+                draggedIndex === index
+                  ? 'border-primary scale-[1.03] shadow-lg shadow-primary/30 z-10'
+                  : 'border-white/10 hover:border-white/30'
+              }`}
+            >
+              {/* Position badge */}
+              <div
+                className={`absolute top-1.5 left-1.5 z-10 w-7 h-7 flex items-center justify-center text-sm font-bold ${
+                  index === 0
+                    ? 'bg-primary text-white'
+                    : 'bg-black/70 text-white/80 border border-white/20'
+                }`}
+                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              >
+                {index + 1}
+              </div>
+
+              {/* Principal badge for first image */}
+              {index === 0 && (
+                <div className="absolute top-1.5 right-1.5 z-10">
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-primary text-white text-[10px]"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    <Crown size={10} />
+                    PRINCIPAL
+                  </div>
+                </div>
+              )}
+
+              {/* Drag handle */}
+              {index !== 0 && (
+                <div className="absolute top-1.5 right-1.5 z-10 p-0.5 text-white/30 group-hover/imgcard:text-white/60 transition-colors">
+                  <GripVertical size={16} />
+                </div>
+              )}
+
+              {/* Image thumbnail */}
+              <div className="aspect-square relative bg-white/5 overflow-hidden">
+                <Image
+                  src={img}
+                  alt={`Image ${index + 1}`}
+                  fill
+                  className={`object-cover transition-opacity ${
+                    draggedIndex === index ? 'opacity-80' : 'opacity-100'
+                  }`}
+                />
+              </div>
+
+              {/* Controls bar */}
+              <div className="flex items-center justify-between bg-white/5 border-t border-white/10">
+                {/* Move arrows */}
+                <div className="flex">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveImage(index, index - 1);
+                    }}
+                    disabled={index === 0}
+                    className={`w-8 h-8 flex items-center justify-center transition-colors ${
+                      index === 0
+                        ? 'text-white/15 cursor-not-allowed'
+                        : 'text-white/50 hover:text-white hover:bg-primary/30'
+                    }`}
+                    title="Deplacer a gauche"
+                  >
+                    <ArrowLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveImage(index, index + 1);
+                    }}
+                    disabled={index === validImages.length - 1}
+                    className={`w-8 h-8 flex items-center justify-center transition-colors ${
+                      index === validImages.length - 1
+                        ? 'text-white/15 cursor-not-allowed'
+                        : 'text-white/50 hover:text-white hover:bg-primary/30'
+                    }`}
+                    title="Deplacer a droite"
+                  >
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+
+                {/* Delete button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeImage(index);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  title="Supprimer"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              {/* File name tooltip */}
+              <div className="absolute bottom-9 left-0 right-0 px-1.5 opacity-0 group-hover/imgcard:opacity-100 transition-opacity pointer-events-none">
+                <div className="bg-black/80 border border-white/10 px-2 py-1">
+                  <p className="text-[9px] text-white/60 truncate">{img.split('/').pop()}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add more button (inline) */}
+          <button
+            type="button"
+            onClick={() => setImageBrowserOpen(true)}
+            className="aspect-square border-2 border-dashed border-white/15 hover:border-primary/50 flex flex-col items-center justify-center gap-2 transition-all hover:bg-primary/5 group/addbtn"
+          >
+            <Plus size={24} className="text-white/20 group-hover/addbtn:text-primary/60 transition-colors" />
+            <span
+              className="text-[10px] text-white/20 group-hover/addbtn:text-primary/60 transition-colors"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            >
+              AJOUTER
+            </span>
+          </button>
+        </div>
+      ) : (
+        /* Empty state */
+        <button
+          type="button"
+          onClick={() => setImageBrowserOpen(true)}
+          className="w-full py-12 border-2 border-dashed border-white/15 hover:border-primary/50 flex flex-col items-center justify-center gap-3 transition-all hover:bg-primary/5 group/empty"
+        >
+          <ImageIcon size={36} className="text-white/15 group-hover/empty:text-primary/40 transition-colors" />
+          <div className="text-center">
+            <p
+              className="text-sm text-white/30 group-hover/empty:text-primary/60 transition-colors"
+              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+            >
+              AUCUNE IMAGE
+            </p>
+            <p className="text-xs text-white/20 mt-1">
+              Cliquez pour parcourir les images disponibles
+            </p>
+          </div>
+        </button>
+      )}
+
+      {/* Preview section */}
+      {validImages.length > 0 && (
+        <div className="mt-4 p-3 border border-white/10 bg-white/[0.02]">
+          <p
+            className="text-[10px] text-white/30 mb-2"
+            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+          >
+            APERCU PAGE PRODUIT
+          </p>
+          <div className="flex gap-2">
+            {/* Main image preview */}
+            <div className="w-24 h-24 relative border border-primary/30 flex-shrink-0 overflow-hidden">
+              <Image
+                src={validImages[0]}
+                alt="Image principale"
+                fill
+                className="object-cover"
+              />
+            </div>
+            {/* Thumbnail strip */}
+            <div className="flex gap-1.5 overflow-x-auto">
+              {validImages.slice(1).map((img, i) => (
+                <div
+                  key={`preview-${i}`}
+                  className="w-12 h-12 relative border border-white/10 flex-shrink-0 overflow-hidden"
+                >
+                  <Image src={img} alt={`Miniature ${i + 2}`} fill className="object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Browser Modal */}
+      <ImageBrowserModal
+        isOpen={imageBrowserOpen}
+        onClose={() => setImageBrowserOpen(false)}
+        onSelect={handleAddImages}
+        currentImages={validImages}
+      />
+    </div>
+  );
+}
+
+// ==================== Main Products Page ====================
 export default function ProductsPage() {
   const { products, addProduct, updateProduct, deleteProduct, categories, fetchProducts, fetchCategories, isLoading } = useAdminStore();
   const { darkMode, language } = useStore();
 
-  // Fetch products and categories on mount
+  const [sizeGuides, setSizeGuides] = useState<{ id: string; nameFr: string; nameEn: string }[]>([]);
+  const [careGuides, setCareGuides] = useState<{ id: string; nameFr: string; nameEn: string }[]>([]);
+
+  // Fetch products, categories, and guides on mount
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    // Fetch size guides
+    fetch('/api/admin/size-guides', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => { if (data.success) setSizeGuides(data.data); })
+      .catch(console.error);
+    // Fetch care guides
+    fetch('/api/admin/care-guides', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => { if (data.success) setCareGuides(data.data); })
+      .catch(console.error);
   }, [fetchProducts, fetchCategories]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -60,11 +563,13 @@ export default function ProductsPage() {
       { name: 'XL', stock: 0, available: true },
     ],
     colors: [{ name: 'Noir', hex: '#000000', available: true }],
-    images: [''],
+    images: [] as string[],
     modelImages: [] as string[],
     modelInfo: '',
     modelInfoFr: '',
     modelInfoEn: '',
+    sizeGuideId: '' as string,
+    careGuideId: '' as string,
   });
 
   const filteredProducts = products.filter((p) => {
@@ -105,11 +610,13 @@ export default function ProductsPage() {
         { name: 'XL', stock: 0, available: true },
       ],
       colors: [{ name: 'Noir', hex: '#000000', available: true }],
-      images: [''],
+      images: [],
       modelImages: [],
       modelInfo: '',
       modelInfoFr: '',
       modelInfoEn: '',
+      sizeGuideId: '',
+      careGuideId: '',
     });
     setIsModalOpen(true);
   };
@@ -140,20 +647,26 @@ export default function ProductsPage() {
       isNew: (product as any).isNew !== false,
       sizes: product.sizes,
       colors: product.colors,
-      images: product.images.length > 0 ? product.images : [''],
+      images: product.images.filter((img) => img.trim() !== ''),
       modelImages: product.modelImages,
       modelInfo: product.modelInfo || '',
       modelInfoFr: product.modelInfoFr || '',
       modelInfoEn: product.modelInfoEn || '',
+      sizeGuideId: product.sizeGuideId || '',
+      careGuideId: product.careGuideId || '',
     });
     setIsModalOpen(true);
   };
 
   const handleSave = () => {
+    const cleanedFormData = {
+      ...formData,
+      images: formData.images.filter((img) => img.trim() !== ''),
+    };
     if (editingProduct) {
-      updateProduct(editingProduct.id, formData);
+      updateProduct(editingProduct.id, cleanedFormData);
     } else {
-      addProduct(formData);
+      addProduct(cleanedFormData);
     }
     setIsModalOpen(false);
   };
@@ -318,6 +831,14 @@ export default function ProductsPage() {
                   >
                     STOCK: {product.totalStock}
                   </span>
+                  {product.images.length > 1 && (
+                    <span
+                      className="px-3 py-1 text-xs bg-white/20 text-white backdrop-blur-sm"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      {product.images.length} IMG
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -602,6 +1123,97 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* Linked Guides */}
+              <div className="p-4 border border-primary/30 rounded-lg space-y-4">
+                <p className="text-xs text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                  {language === 'fr' ? 'GUIDES LIÉS' : 'LINKED GUIDES'}
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      <Ruler size={12} className="inline mr-1" />
+                      {language === 'fr' ? 'GUIDE DES TAILLES' : 'SIZE GUIDE'}
+                    </label>
+                    <select
+                      value={formData.sizeGuideId}
+                      onChange={(e) => setFormData({ ...formData, sizeGuideId: e.target.value })}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white focus:outline-none focus:border-primary"
+                    >
+                      <option value="" className="bg-black">{language === 'fr' ? '-- Aucun --' : '-- None --'}</option>
+                      {sizeGuides.map((g) => (
+                        <option key={g.id} value={g.id} className="bg-black">
+                          {language === 'fr' ? g.nameFr : g.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-3 mt-2">
+                      {formData.sizeGuideId && (
+                        <Link
+                          href="/admin/size-guides"
+                          className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                        >
+                          <ExternalLink size={10} />
+                          {language === 'fr' ? 'MODIFIER' : 'EDIT'}
+                        </Link>
+                      )}
+                      <Link
+                        href="/admin/size-guides"
+                        className="text-xs text-white/40 hover:text-white/60 flex items-center gap-1"
+                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                      >
+                        <Plus size={10} />
+                        {language === 'fr' ? 'CRÉER' : 'CREATE NEW'}
+                      </Link>
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs text-white/50 mb-2 block"
+                      style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                    >
+                      <WashingMachine size={12} className="inline mr-1" />
+                      {language === 'fr' ? 'GUIDE DE LAVAGE' : 'CARE GUIDE'}
+                    </label>
+                    <select
+                      value={formData.careGuideId}
+                      onChange={(e) => setFormData({ ...formData, careGuideId: e.target.value })}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white focus:outline-none focus:border-primary"
+                    >
+                      <option value="" className="bg-black">{language === 'fr' ? '-- Aucun --' : '-- None --'}</option>
+                      {careGuides.map((g) => (
+                        <option key={g.id} value={g.id} className="bg-black">
+                          {language === 'fr' ? g.nameFr : g.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-3 mt-2">
+                      {formData.careGuideId && (
+                        <Link
+                          href="/admin/care-guides"
+                          className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                        >
+                          <ExternalLink size={10} />
+                          {language === 'fr' ? 'MODIFIER' : 'EDIT'}
+                        </Link>
+                      )}
+                      <Link
+                        href="/admin/care-guides"
+                        className="text-xs text-white/40 hover:text-white/60 flex items-center gap-1"
+                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                      >
+                        <Plus size={10} />
+                        {language === 'fr' ? 'CRÉER' : 'CREATE NEW'}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label
@@ -652,21 +1264,11 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              {/* Images */}
-              <div>
-                <label
-                  className="text-xs text-white/50 mb-2 block"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
-                >
-                  MAIN IMAGE URL
-                </label>
-                <input
-                  value={formData.images[0] || ''}
-                  onChange={(e) => setFormData({ ...formData, images: [e.target.value] })}
-                  placeholder="https://..."
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-primary"
-                />
-              </div>
+              {/* Visual Image Manager */}
+              <ImageManagerGrid
+                images={formData.images}
+                onImagesChange={(images) => setFormData({ ...formData, images })}
+              />
 
               {/* Sizes & Stock */}
               <div>

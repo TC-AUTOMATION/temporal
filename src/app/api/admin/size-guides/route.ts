@@ -22,6 +22,11 @@ export async function GET() {
 
     const guides = await prisma.sizeGuide.findMany({
       orderBy: { sortOrder: 'asc' },
+      include: {
+        products: {
+          select: { id: true, name: true },
+        },
+      },
     });
 
     return successResponse(guides);

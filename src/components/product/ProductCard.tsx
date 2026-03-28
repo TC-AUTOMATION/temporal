@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Heart, ShoppingBag, ChevronDown } from 'lucide-react';
 import { Product, useStore } from '@/stores/useStore';
@@ -204,12 +203,11 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
                 {/* Mobile/Tablet: Auto-switching images */}
                 {isMobile ? (
                   product.images.map((img, idx) => (
-                    <Image
+                    <img
                       key={idx}
                       src={img}
                       alt={`${product.name} - ${idx + 1}`}
-                      fill
-                      className={`object-cover transition-opacity duration-500 ${
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
                         currentImageIndex === idx ? 'opacity-100' : 'opacity-0'
                       }`}
                     />
@@ -217,18 +215,16 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
                 ) : (
                   /* Desktop: Hover to switch */
                   <>
-                    <Image
+                    <img
                       src={product.images[0]}
                       alt={product.name}
-                      fill
-                      className={`object-cover transition-opacity duration-500 ${isHovered && product.images[1] ? 'opacity-0' : 'opacity-100'}`}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isHovered && product.images[1] ? 'opacity-0' : 'opacity-100'}`}
                     />
                     {product.images[1] && (
-                      <Image
+                      <img
                         src={product.images[1]}
                         alt={`${getProductName(product, language)} - view 2`}
-                        fill
-                        className={`object-cover transition-opacity duration-500 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
                       />
                     )}
                   </>

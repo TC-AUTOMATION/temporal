@@ -21,6 +21,7 @@ import {
   Hash,
   HandMetal,
   AlertCircle,
+  Save,
 } from 'lucide-react';
 
 export default function OrdersPage() {
@@ -29,6 +30,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [trackingInput, setTrackingInput] = useState('');
 
   // Translations
   const t = {
@@ -78,6 +80,7 @@ export default function OrdersPage() {
     free: language === 'fr' ? 'Gratuit' : 'Free',
     discount: language === 'fr' ? 'Réduction' : 'Discount',
     close: language === 'fr' ? 'FERMER' : 'CLOSE',
+    save: language === 'fr' ? 'SAUVEGARDER' : 'SAVE',
   };
 
   const statusOptions = [
@@ -101,6 +104,11 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Sync tracking input when selected order changes
+  useEffect(() => {
+    setTrackingInput(selectedOrder?.trackingNumber || '');
+  }, [selectedOrder?.id]);
 
   const filteredOrders = orders
     .filter((o) => {
@@ -425,12 +433,23 @@ export default function OrdersPage() {
                 <label className="text-xs text-white/50 mb-2 block" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
                   {t.trackingNumber}
                 </label>
-                <input
-                  value={selectedOrder.trackingNumber || ''}
-                  onChange={(e) => handleTrackingUpdate(selectedOrder.id, e.target.value)}
-                  placeholder={t.enterTracking}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-primary transition-colors"
-                />
+                <div className="flex gap-2">
+                  <input
+                    value={trackingInput}
+                    onChange={(e) => setTrackingInput(e.target.value)}
+                    placeholder={t.enterTracking}
+                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-primary transition-colors"
+                  />
+                  <button
+                    onClick={() => handleTrackingUpdate(selectedOrder.id, trackingInput)}
+                    disabled={trackingInput === (selectedOrder.trackingNumber || '')}
+                    className="px-4 py-3 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-xl text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    <Save size={14} />
+                    {t.save}
+                  </button>
+                </div>
               </div>
 
               {/* Customer Info */}

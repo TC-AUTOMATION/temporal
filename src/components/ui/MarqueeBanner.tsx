@@ -2,16 +2,40 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/stores/useStore';
-import { useAdminStore } from '@/stores/useAdminStore';
+
+interface MarqueeMessage {
+  id: string;
+  textFr: string;
+  textEn: string;
+  isActive: boolean;
+  sortOrder: number;
+}
 
 export default function MarqueeBanner() {
   const { language, darkMode } = useStore();
-  const { marqueeItems } = useAdminStore();
   const marqueeRef = useRef<HTMLDivElement>(null);
   const [animationDuration, setAnimationDuration] = useState('20s');
+  const [activeItems, setActiveItems] = useState<MarqueeMessage[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  // Filter only active items
-  const activeItems = marqueeItems.filter(item => item.isActive);
+  // Fetch marquee messages from public API
+  useEffect(() => {
+    async function fetchMessages() {
+      try {
+        const res = await fetch('/api/marquee');
+        if (!res.ok) throw new Error('Failed to fetch marquee messages');
+        const json = await res.json();
+        if (json.success && json.data?.messages) {
+          setActiveItems(json.data.messages);
+        }
+      } catch (error) {
+        console.error('MarqueeBanner: failed to load messages', error);
+      } finally {
+        setLoaded(true);
+      }
+    }
+    fetchMessages();
+  }, []);
 
   // Adjust speed based on device
   useEffect(() => {
@@ -68,6 +92,11 @@ export default function MarqueeBanner() {
     }
     return items;
   };
+
+  // Show nothing while loading or if no messages
+  if (!loaded || activeItems.length === 0) {
+    return null;
+  }
 
   return (
     <div

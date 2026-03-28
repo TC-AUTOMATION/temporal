@@ -82,58 +82,74 @@ export async function POST(request: NextRequest) {
       return errorResponse('Ce code promo existe déjà');
     }
 
-    // Create Stripe coupon
+    // Create Stripe coupon + promotion code with ALL parameters
     const stripe = getStripe();
     let stripeCouponId: string | null = null;
     let stripePromoId: string | null = null;
 
     try {
-      // Create Stripe Coupon based on type
       const couponParams: Stripe.CouponCreateParams = {
         name: data.code,
-        metadata: { code: data.code },
+        duration: 'forever',
+        metadata: {
+          code: data.code,
+          type: data.type,
+          source: 'temporal-admin',
+        },
       };
 
       if (data.type === 'PERCENTAGE') {
         couponParams.percent_off = Number(data.value);
       } else if (data.type === 'FIXED') {
-        couponParams.amount_off = Math.round(Number(data.value) * 100); // Convert to cents
+        couponParams.amount_off = Math.round(Number(data.value) * 100);
+        couponParams.currency = 'eur';
+      } else if (data.type === 'FREE_SHIPPING') {
+        // Free shipping = fixed discount of shipping cost (5.90€)
+        couponParams.amount_off = 590;
         couponParams.currency = 'eur';
       }
-      // FREE_SHIPPING is handled locally, not on Stripe
 
-      if (data.type !== 'FREE_SHIPPING') {
-        if (data.maxUses) {
-          couponParams.max_redemptions = data.maxUses;
-        }
-        if (data.validUntil) {
-          couponParams.redeem_by = Math.floor(new Date(data.validUntil).getTime() / 1000);
-        }
-
-        const stripeCoupon = await stripe.coupons.create(couponParams);
-        stripeCouponId = stripeCoupon.id;
-
-        // Create a Promotion Code (this is what customers use)
-        // Note: Stripe v20+ uses 'promotion' object with 'type' and 'coupon' nested
-        const promoCodeParams: Stripe.PromotionCodeCreateParams = {
-          promotion: {
-            type: 'coupon',
-            coupon: stripeCoupon.id,
-          },
-          code: data.code,
-          active: data.isActive ?? true,
-        };
-
-        if (data.minPurchase) {
-          promoCodeParams.restrictions = {
-            minimum_amount: Math.round(Number(data.minPurchase) * 100),
-            minimum_amount_currency: 'eur',
-          };
-        }
-
-        const stripePromo = await stripe.promotionCodes.create(promoCodeParams);
-        stripePromoId = stripePromo.id;
+      if (data.validUntil) {
+        couponParams.redeem_by = Math.floor(new Date(data.validUntil).getTime() / 1000);
       }
+
+      const stripeCoupon = await stripe.coupons.create(couponParams);
+      stripeCouponId = stripeCoupon.id;
+
+      // Create Promotion Code with all parameters
+      const promoCodeParams: Stripe.PromotionCodeCreateParams = {
+        promotion: {
+          type: 'coupon',
+          coupon: stripeCoupon.id,
+        },
+        code: data.code,
+        active: data.isActive ?? true,
+        metadata: {
+          type: data.type,
+          source: 'temporal-admin',
+        },
+      };
+
+      // Max redemptions on promotion code level
+      if (data.maxUses) {
+        promoCodeParams.max_redemptions = data.maxUses;
+      }
+
+      // Expiry on promotion code level
+      if (data.validUntil) {
+        promoCodeParams.expires_at = Math.floor(new Date(data.validUntil).getTime() / 1000);
+      }
+
+      // Minimum purchase restriction
+      if (data.minPurchase) {
+        promoCodeParams.restrictions = {
+          minimum_amount: Math.round(Number(data.minPurchase) * 100),
+          minimum_amount_currency: 'eur',
+        };
+      }
+
+      const stripePromo = await stripe.promotionCodes.create(promoCodeParams);
+      stripePromoId = stripePromo.id;
     } catch (stripeError) {
       console.error('Stripe coupon creation error:', stripeError);
       // Continue without Stripe sync - local promo still works

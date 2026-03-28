@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -13,8 +13,10 @@ import Starfield from '@/components/ui/Starfield';
 type LoginMode = 'password' | 'otp';
 type Step = 'login' | 'code' | 'success';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/profile';
   const { language, darkMode } = useStore();
   const {
     isAuthenticated,
@@ -36,12 +38,20 @@ export default function LoginPage() {
   const [code, setCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated — verify session with server first
+  // to avoid redirect loops when Zustand says authenticated but cookie is expired
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/profile');
+      const { fetchCurrentUser } = useAuthStore.getState();
+      fetchCurrentUser().then((user) => {
+        if (user) {
+          router.push(redirectTo);
+        }
+        // If fetchCurrentUser fails, it clears the store automatically,
+        // so the login form will appear
+      });
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, redirectTo]);
 
   // Update step based on pendingEmail (for OTP mode)
   useEffect(() => {
@@ -57,7 +67,7 @@ export default function LoginPage() {
     if (success) {
       setStep('success');
       setTimeout(() => {
-        router.push('/profile');
+        router.push(redirectTo);
       }, 1500);
     }
   };
@@ -78,7 +88,7 @@ export default function LoginPage() {
     if (success) {
       setStep('success');
       setTimeout(() => {
-        router.push('/profile');
+        router.push(redirectTo);
       }, 1500);
     }
   };
@@ -416,5 +426,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

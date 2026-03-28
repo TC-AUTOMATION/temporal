@@ -63,6 +63,7 @@ export default function ProductPage() {
   const [showMaterials, setShowMaterials] = useState(false);
   const [showCare, setShowCare] = useState(false);
   const [sizeGuideData, setSizeGuideData] = useState<any>(null);
+  const [careGuideData, setCareGuideData] = useState<any>(null);
 
   // Fetch product from API (with cache-busting for Safari)
   useEffect(() => {
@@ -146,32 +147,47 @@ export default function ProductPage() {
     setRelatedProducts(sorted.slice(0, 4));
   }, [product, allProducts]);
 
-  // Fetch size guide data for this product's category
+  // Use linked size guide from product, or fallback to category match
   useEffect(() => {
-    const fetchSizeGuide = async () => {
-      try {
-        const res = await fetch('/api/size-guides', {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' },
-        });
-        const data = await res.json();
-        if (data.success && data.data) {
-          const categorySlug = product?.category?.slug?.toLowerCase() || '';
-          const name = product?.name?.toLowerCase() || '';
-          const matched = data.data.find((g: any) =>
-            g.categorySlug === categorySlug ||
-            (name.includes('veste') && g.categorySlug === 'vestes') ||
-            (name.includes('t-shirt') && g.categorySlug === 'tshirts') ||
-            (name.includes('jogging') && g.categorySlug === 'pantalons') ||
-            (name.includes('bonnet') && g.categorySlug === 'accessoires')
-          );
-          if (matched) setSizeGuideData(matched);
+    if (!product) return;
+
+    // If product has a directly linked size guide, use it
+    if (product.sizeGuide) {
+      setSizeGuideData(product.sizeGuide);
+    } else {
+      // Fallback: fetch all size guides and match by category
+      const fetchSizeGuide = async () => {
+        try {
+          const res = await fetch('/api/size-guides', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' },
+          });
+          const data = await res.json();
+          if (data.success && data.data) {
+            const categorySlug = product?.category?.slug?.toLowerCase() || '';
+            const name = product?.name?.toLowerCase() || '';
+            const matched = data.data.find((g: any) =>
+              g.categorySlug === categorySlug ||
+              (name.includes('veste') && g.categorySlug === 'vestes') ||
+              (name.includes('t-shirt') && g.categorySlug === 'tshirts') ||
+              (name.includes('jogging') && g.categorySlug === 'pantalons') ||
+              (name.includes('bonnet') && g.categorySlug === 'accessoires')
+            );
+            if (matched) setSizeGuideData(matched);
+          }
+        } catch (err) {
+          console.error(err);
         }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    if (product) fetchSizeGuide();
+      };
+      fetchSizeGuide();
+    }
+
+    // Use linked care guide from product
+    if (product.careGuide) {
+      setCareGuideData(product.careGuide);
+    } else {
+      setCareGuideData(null);
+    }
   }, [product]);
 
   // Check if product should show size guide (not for stickers/accessories)
@@ -292,12 +308,10 @@ export default function ProductPage() {
               {/* Main image */}
               <div className={`aspect-square relative overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
                 {product.images[currentImage] ? (
-                  <Image
+                  <img
                     src={product.images[currentImage]}
                     alt={product.name}
-                    fill
-                    className="object-cover"
-                    priority
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -352,7 +366,7 @@ export default function ProductPage() {
                           : darkMode ? 'opacity-50 hover:opacity-100' : 'opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <Image src={img} alt={`${product.name} - ${i + 1}`} fill className="object-cover" />
+                      <img src={img} alt={`${product.name} - ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -666,20 +680,41 @@ export default function ProductPage() {
                   </button>
                   <div
                     className={`overflow-hidden transition-all duration-300 ${
-                      showCare ? 'max-h-40' : 'max-h-0'
+                      showCare ? 'max-h-96' : 'max-h-0'
                     }`}
                   >
                     <div className="px-4 pb-4 pl-[44px]">
-                      <p className={`text-sm leading-relaxed ${darkMode ? 'text-white/70' : 'text-black/70'}`}>
-                        {language === 'en' && product.careInstructionsEn ? product.careInstructionsEn :
-                         product.careInstructions ? product.careInstructions :
-                         isSticker(product.name) ? t.careSticker :
-                         product.name.toLowerCase().includes('veste') ? t.careJacket :
-                         product.name.toLowerCase().includes('t-shirt') ? t.careTshirt :
-                         product.name.toLowerCase().includes('jogging') ? t.careJogging :
-                         product.name.toLowerCase().includes('bonnet') ? t.careBonnet :
-                         t.careJacket}
-                      </p>
+                      {careGuideData ? (
+                        <div className="space-y-3">
+                          <p className={`text-sm leading-relaxed ${darkMode ? 'text-white/70' : 'text-black/70'}`}>
+                            {language === 'en' ? careGuideData.instructionsEn : careGuideData.instructionsFr}
+                          </p>
+                          {careGuideData.iconSymbols && (careGuideData.iconSymbols as any[]).length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-2">
+                              {(careGuideData.iconSymbols as any[]).map((sym: any, i: number) => (
+                                <span
+                                  key={i}
+                                  className={`px-2 py-1 text-xs ${darkMode ? 'bg-white/10 text-white/60' : 'bg-black/5 text-black/60'}`}
+                                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                                >
+                                  {language === 'en' ? sym.labelEn : sym.labelFr}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className={`text-sm leading-relaxed ${darkMode ? 'text-white/70' : 'text-black/70'}`}>
+                          {language === 'en' && product.careInstructionsEn ? product.careInstructionsEn :
+                           product.careInstructions ? product.careInstructions :
+                           isSticker(product.name) ? t.careSticker :
+                           product.name.toLowerCase().includes('veste') ? t.careJacket :
+                           product.name.toLowerCase().includes('t-shirt') ? t.careTshirt :
+                           product.name.toLowerCase().includes('jogging') ? t.careJogging :
+                           product.name.toLowerCase().includes('bonnet') ? t.careBonnet :
+                           t.careJacket}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

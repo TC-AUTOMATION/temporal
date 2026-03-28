@@ -11,7 +11,8 @@ import CartDrawer from '@/components/cart/CartDrawer';
 import SearchOverlay from '@/components/layout/SearchOverlay';
 import Footer from '@/components/layout/Footer';
 import ProductCard from '@/components/product/ProductCard';
-import { Shirt, Tag, Grid3X3, Loader2 } from 'lucide-react';
+import PackCard from '@/components/product/PackCard';
+import { Shirt, Tag, Grid3X3, Loader2, Package } from 'lucide-react';
 import Link from 'next/link';
 
 // Custom Jacket icon
@@ -50,6 +51,7 @@ const getCategoryLabel = (id: string, language: string) => {
   const t = translations[language as keyof typeof translations];
   const labels: Record<string, string> = {
     all: t.viewAll,
+    packs: 'Packs',
     ensembles: language === 'fr' ? 'Ensembles' : 'Sets',
     vestes: language === 'fr' ? 'Vestes' : 'Jackets',
     tshirts: 'T-Shirts',
@@ -62,6 +64,7 @@ const getCategoryLabel = (id: string, language: string) => {
 
 const categories = [
   { id: 'all', Icon: Grid3X3 },
+  { id: 'packs', Icon: Package },
   { id: 'ensembles', Icon: SetIcon },
   { id: 'vestes', Icon: JacketIcon },
   { id: 'tshirts', Icon: Shirt },
@@ -84,6 +87,14 @@ const categoryHeaders: Record<string, {
     titleEn: 'COLLECTION',
     subtitleFr: 'Toutes nos pièces. Un seul objectif : te démarquer.',
     subtitleEn: 'All our pieces. One goal: stand out.',
+  },
+  packs: {
+    titleFr: 'PACKS',
+    titleEn: 'PACKS',
+    subtitleFr: 'Nos lots exclusifs. Plusieurs pièces, un prix canon.',
+    subtitleEn: 'Our exclusive bundles. Multiple pieces, one amazing price.',
+    emptyFr: 'Aucun pack disponible pour le moment. Reviens bientôt.',
+    emptyEn: 'No packs available right now. Check back soon.',
   },
   ensembles: {
     titleFr: 'ENSEMBLES',
@@ -155,6 +166,7 @@ function ShopContent() {
   const urlCategory = searchParams.get('category') || 'all';
   const [activeCategory, setActiveCategory] = useState(urlCategory);
   const [products, setProducts] = useState<any[]>([]);
+  const [packs, setPacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,34 +175,40 @@ function ShopContent() {
     setActiveCategory(urlCategory);
   }, [urlCategory]);
 
-  // Fetch products from API
+  // Fetch products or packs from API
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams();
-        if (activeCategory !== 'all') {
-          params.append('category', activeCategory);
+        if (activeCategory === 'packs') {
+          const response = await fetch('/api/packs');
+          if (!response.ok) throw new Error('Failed to fetch packs');
+          const data = await response.json();
+          setPacks(data.data?.packs || []);
+          setProducts([]);
+        } else {
+          const params = new URLSearchParams();
+          if (activeCategory !== 'all') {
+            params.append('category', activeCategory);
+          }
+          const response = await fetch(`/api/products?${params.toString()}`);
+          if (!response.ok) throw new Error('Failed to fetch products');
+          const data = await response.json();
+          setProducts(data.data?.products || data.products || []);
+          setPacks([]);
         }
-
-        const response = await fetch(`/api/products?${params.toString()}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch products');
-        }
-
-        const data = await response.json();
-        setProducts(data.data?.products || data.products || []);
       } catch (err) {
-        console.error('Error fetching products:', err);
-        setError('Failed to load products');
+        console.error('Error fetching data:', err);
+        setError('Failed to load');
         setProducts([]);
+        setPacks([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchData();
   }, [activeCategory]);
 
   const filteredProducts = products;
@@ -266,13 +284,13 @@ function ShopContent() {
                 </div>
 
                 {/* Product count */}
-                {filteredProducts.length > 0 && (
+                {(filteredProducts.length > 0 || packs.length > 0) && (
                   <div className="hidden md:flex items-baseline gap-2">
                     <span
                       className="text-4xl text-primary"
                       style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                     >
-                      {filteredProducts.length}
+                      {activeCategory === 'packs' ? packs.length : filteredProducts.length}
                     </span>
                     <span
                       className={`text-sm ${darkMode ? 'text-white/40' : 'text-black/40'}`}
@@ -349,6 +367,12 @@ function ShopContent() {
                 >
                   {t.retry}
                 </button>
+              </div>
+            ) : activeCategory === 'packs' && packs.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {packs.map((pack: any) => (
+                  <PackCard key={pack.id} pack={pack} />
+                ))}
               </div>
             ) : filteredProducts.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">

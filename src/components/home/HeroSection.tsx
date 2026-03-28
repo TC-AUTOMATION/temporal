@@ -195,10 +195,10 @@ export function ContestSection() {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const vh = window.innerHeight;
-    // Start animation as soon as section ENTERS viewport from below
-    // Complete when section top reaches 20% from viewport top
-    const scrolled = vh - rect.top;
-    const scrollRange = vh * 0.8;
+    // Start when section top reaches 60% from viewport top (halfway visible)
+    // Uses the full 150vh wrapper scroll distance for a slow, luxurious pace
+    const scrollRange = el.offsetHeight - vh;
+    const scrolled = -rect.top + vh * 0.4; // offset so it starts when 40% visible
     const p = clamp(scrolled / scrollRange, 0, 1);
     if (Math.abs(p - progressRef.current) > 0.002) {
       progressRef.current = p;
@@ -236,25 +236,27 @@ export function ContestSection() {
   const p = progressRef.current;
   const bebas: React.CSSProperties = { fontFamily: '"Bebas Neue", sans-serif' };
 
-  // --- Phases ---
-  // Overlay images SLIDE apart from center
-  const slideP = clamp((p - 0.08) / 0.40, 0, 1);         // slide: 8→48%
+  // --- Phases (spread over full 0→1 range for slow, luxurious pace) ---
+  // Phase 1: Images stay centered (0→0.25 = no movement, just visible)
+
+  // Phase 2: Overlay images SLIDE apart from center (25→65%)
+  const slideP = clamp((p - 0.25) / 0.40, 0, 1);
   const slideEp = easeOut(slideP);
-  const img1SlideX = lerp(0, -35, slideEp);               // left image slides left (vw)
-  const img2SlideX = lerp(0, 35, slideEp);                // right image slides right (vw)
-  const imgOverlayScale = lerp(1, 0.85, slideEp);         // slight shrink as they slide
+  const img1SlideX = lerp(0, -35, slideEp);
+  const img2SlideX = lerp(0, 35, slideEp);
+  const imgOverlayScale = lerp(1, 0.85, slideEp);
 
-  // Background colors appear while images slide
-  const bgOpacity = easeOut(clamp((p - 0.12) / 0.25, 0, 1));          // colors: 12→37%
+  // Phase 2b: Background colors appear while images slide (30→60%)
+  const bgOpacity = easeOut(clamp((p - 0.30) / 0.30, 0, 1));
 
-  // Overlay fades out (cross-fade with final layout)
-  const overlayOpacity = 1 - easeOut(clamp((p - 0.35) / 0.20, 0, 1)); // out: 35→55%
-  const layoutOpacity = easeOut(clamp((p - 0.38) / 0.17, 0, 1));      // in: 38→55%
+  // Phase 3: Overlay fades out, final layout fades in (55→75%)
+  const overlayOpacity = 1 - easeOut(clamp((p - 0.55) / 0.20, 0, 1));
+  const layoutOpacity = easeOut(clamp((p - 0.58) / 0.17, 0, 1));
 
-  // Text arrives
-  const textOpacity = clamp((p - 0.52) / 0.23, 0, 1);                 // text: 52→75%
+  // Phase 4: Text arrives (75→100%)
+  const textOpacity = clamp((p - 0.75) / 0.25, 0, 1);
   const textY = lerp(25, 0, easeOut(textOpacity));
-  const sepOpacity = clamp((p - 0.48) / 0.17, 0, 1);
+  const sepOpacity = clamp((p - 0.72) / 0.18, 0, 1);
 
   // Helper to render a contest text block
   const renderText = (c: ContestData, variant: 'light' | 'dark') => {

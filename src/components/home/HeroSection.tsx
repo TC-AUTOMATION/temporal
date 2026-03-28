@@ -161,15 +161,16 @@ function easeOut(t: number) {
 }
 
 /*
- * ContestSection - Apple-style scroll animation in 4 phases:
+ * ContestSection — scroll-driven reveal
  *
- * Phase 1 (0.00→0.25): Photos BIG and CENTERED on dark background
- * Phase 2 (0.25→0.50): Colored backgrounds (violet / white) fade in
- * Phase 3 (0.45→0.75): Photos slide to their sides and shrink
- * Phase 4 (0.70→1.00): Texts fade in
+ * Two hero images are rendered as a SEPARATE overlay, properly centered
+ * with a gap between them. As the user scrolls:
+ *   0-15%  : photos visible, big, centered, dark bg
+ *   15-35% : colors fade in
+ *   30-55% : overlay photos fade out, final layout appears
+ *   50-75% : text fades in
  *
- * Uses a tall wrapper (200vh) + sticky content so the section stays
- * in view while the user scrolls and the animation plays out.
+ * Wrapper is 150vh + sticky so the animation has room to breathe.
  */
 export function ContestSection() {
   const { language, darkMode } = useStore();
@@ -193,12 +194,8 @@ export function ContestSection() {
     const el = wrapperRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const wrapperH = el.offsetHeight;
-    const vh = window.innerHeight;
-    // How far through the wrapper: 0 = wrapper top at viewport top, 1 = wrapper bottom at viewport bottom
-    const scrolled = -rect.top;
-    const scrollRange = wrapperH - vh;
-    const p = clamp(scrolled / Math.max(scrollRange, 1), 0, 1);
+    const scrollRange = el.offsetHeight - window.innerHeight;
+    const p = clamp(-rect.top / Math.max(scrollRange, 1), 0, 1);
     if (Math.abs(p - progressRef.current) > 0.002) {
       progressRef.current = p;
       rerender((n) => n + 1);
@@ -225,10 +222,7 @@ export function ContestSection() {
       { rootMargin: '100px' }
     );
     obs.observe(el);
-    return () => {
-      obs.disconnect();
-      window.removeEventListener('scroll', onScroll);
-    };
+    return () => { obs.disconnect(); window.removeEventListener('scroll', onScroll); };
   }, [contests, onScroll, update]);
 
   const c1 = contests[0];
@@ -238,300 +232,143 @@ export function ContestSection() {
   const p = progressRef.current;
   const bebas: React.CSSProperties = { fontFamily: '"Bebas Neue", sans-serif' };
 
-  // ===== PHASE 1: Photos visible, big, centered (p: 0.00 → 0.25) =====
-  // Photos are always visible from the start
+  // --- Phases ---
+  const bgOpacity = easeOut(clamp((p - 0.15) / 0.20, 0, 1));          // colors: 15→35%
+  const overlayOpacity = 1 - easeOut(clamp((p - 0.25) / 0.25, 0, 1)); // overlay out: 25→50%
+  const layoutOpacity = easeOut(clamp((p - 0.30) / 0.20, 0, 1));      // layout in: 30→50%
+  const textOpacity = clamp((p - 0.50) / 0.25, 0, 1);                 // text: 50→75%
+  const textY = lerp(25, 0, easeOut(textOpacity));
+  const sepOpacity = clamp((p - 0.45) / 0.20, 0, 1);
 
-  // ===== PHASE 2: Colored backgrounds fade in (p: 0.25 → 0.50) =====
-  const bgP = clamp((p - 0.25) / 0.25, 0, 1);
-  const bgOpacity = easeOut(bgP);
-
-  // ===== PHASE 3: Photos slide to sides (p: 0.45 → 0.75) =====
-  const imgP = clamp((p - 0.45) / 0.30, 0, 1);
-  const imgEp = easeOut(imgP);
-  // Desktop: images translate from center to their edges
-  const img1X = lerp(38, 0, imgEp);    // left image: from +38vw (toward center) to 0
-  const img2X = lerp(-38, 0, imgEp);   // right image: from -38vw (toward center) to 0
-  const imgScale = lerp(2.2, 1, imgEp); // big → normal
-  // Mobile
-  const imgMobileX = lerp(25, 0, imgEp);
-  const imgMobileScale = lerp(1.6, 1, imgEp);
-
-  // ===== PHASE 4: Text fades in (p: 0.70 → 1.00) =====
-  const textP = clamp((p - 0.70) / 0.30, 0, 1);
-  const textEp = easeOut(textP);
-  const textOpacity = textP;
-  const textY = lerp(30, 0, textEp);
-
-  // Separator appears with text
-  const sepOpacity = clamp((p - 0.65) / 0.25, 0, 1);
-
-  // Images stay above everything during animation
-  const imgZ = imgP < 0.9 ? 30 : 1;
+  // Helper to render a contest text block
+  const renderText = (c: ContestData, variant: 'light' | 'dark') => {
+    const isLight = variant === 'light';
+    return (
+      <div style={{ opacity: textOpacity, transform: `translateY(${textY}px)`, willChange: 'opacity, transform' }}>
+        <div className="flex items-center gap-4 md:gap-6">
+          <span className={`${isLight ? 'text-white/30' : 'text-primary/30'} text-6xl md:text-8xl lg:text-9xl font-bold leading-none`} style={bebas}>{c.number}</span>
+          <div className="flex-1">
+            <p className={`text-xs md:text-sm tracking-[0.2em] uppercase ${isLight ? 'text-white/80' : 'text-primary'}`} style={bebas}>{isLight ? t.winA : t.winAFemale}</p>
+            <h3 className={`text-xl md:text-3xl lg:text-4xl uppercase leading-tight font-bold ${isLight ? 'text-white' : 'text-foreground'}`} style={bebas}>
+              {language === 'fr' ? c.prizeName : (c.prizeNameEn || c.prizeName)}
+            </h3>
+            <p className={`text-sm md:text-base ${isLight ? 'text-white/70' : darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>{t.value} {c.prizeValue}€</p>
+          </div>
+          <div className="text-right hidden md:block">
+            <p className={`text-2xl md:text-3xl font-bold ${isLight ? 'text-white' : 'text-primary'}`} style={bebas}>{c.purchaseAmount}€ {t.purchaseSuffix}</p>
+            <p className={`text-xs md:text-sm ${isLight ? 'text-white/80' : darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>{t.oneDrawEntry}</p>
+          </div>
+        </div>
+        <div className="mt-2 md:hidden">
+          <p className={`text-lg font-bold ${isLight ? 'text-white' : 'text-primary'}`} style={bebas}>{c.purchaseAmount}€ {t.purchaseSuffix}</p>
+          <p className={`text-xs ${isLight ? 'text-white/80' : darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>{t.oneDrawEntry}</p>
+        </div>
+        <p className={`text-[10px] md:text-xs mt-3 md:mt-4 ${isLight ? 'text-white/60' : darkMode ? 'text-white/50' : 'text-black/50'}`}>
+          {language === 'fr' ? c.description : (c.descriptionEn || c.description)}
+        </p>
+        <Link href="/concours#conditions" className={`inline-block mt-1.5 md:mt-2 text-[10px] md:text-xs transition-colors underline underline-offset-2 ${isLight ? 'text-white/50 hover:text-white' : darkMode ? 'text-white/40 hover:text-white' : 'text-black/40 hover:text-black'}`}>
+          {t.concoursSeeConditionsLink}
+        </Link>
+      </div>
+    );
+  };
 
   return (
-    <div
-      id="contests"
-      ref={wrapperRef}
-      className="relative z-30 -mt-20 scroll-mt-20"
-      style={{ height: '200vh' }}
-    >
-      {/* Sticky content: stays in viewport while user scrolls the 200vh wrapper */}
+    <div id="contests" ref={wrapperRef} className="relative z-30 -mt-20 scroll-mt-20" style={{ height: '150vh' }}>
       <div className="sticky top-0 w-full overflow-hidden">
-        {/* The actual section content */}
-        <div className="relative w-full">
+        <div className="relative w-full" style={{ minHeight: '280px' }}>
 
-          {/* ===== Background layers ===== */}
-          {/* Dark base - always behind everything, fades out as colors appear */}
-          <div
-            className="absolute inset-0 bg-[#0a0a0a] z-0"
-            style={{ opacity: lerp(1, 0, bgOpacity) }}
-          />
+          {/* === Dark base background === */}
+          <div className="absolute inset-0 bg-[#0a0a0a] z-0" style={{ opacity: 1 - bgOpacity }} />
 
-          {/* ===== DESKTOP LAYOUT ===== */}
-          <div className="hidden md:block">
-            <div className="relative w-full flex" style={{ minHeight: '280px' }}>
+          {/* === HERO OVERLAY: two photos centered with gap === */}
+          {overlayOpacity > 0.01 && c1?.prizeImage && c2?.prizeImage && (
+            <div
+              className="absolute inset-0 z-40 flex items-center justify-center gap-6 md:gap-10 pointer-events-none"
+              style={{ opacity: overlayOpacity }}
+            >
+              <img
+                src={c1.prizeImage}
+                alt=""
+                className="w-[140px] h-[200px] md:w-[220px] md:h-[310px] object-cover rounded-xl shadow-2xl"
+              />
+              <img
+                src={c2.prizeImage}
+                alt=""
+                className="w-[140px] h-[200px] md:w-[220px] md:h-[310px] object-cover rounded-xl shadow-2xl"
+              />
+            </div>
+          )}
 
-              {/* === Contest 1 half === */}
+          {/* === FINAL LAYOUT (fades in as overlay fades out) === */}
+          <div style={{ opacity: layoutOpacity }}>
+            {/* Desktop */}
+            <div className="hidden md:flex w-full" style={{ minHeight: '280px' }}>
               {c1 && (
                 <div className={`relative ${c2 ? 'w-1/2' : 'w-full'}`}>
-                  {/* Colored bg fades in (Phase 2) */}
                   <div className="absolute inset-0 bg-primary" style={{ opacity: bgOpacity }} />
-
                   <div className="relative flex items-stretch min-h-[280px]">
-                    {/* Image */}
-                    <div
-                      className="relative w-40 lg:w-48 flex-shrink-0 self-stretch"
-                      style={{ overflow: 'visible', zIndex: imgZ }}
-                    >
-                      {/* Image bg tint */}
-                      <div className="absolute inset-0 bg-white/10" style={{ opacity: bgOpacity }} />
-                      {c1.prizeImage && (
-                        <img
-                          src={c1.prizeImage}
-                          alt={language === 'fr' ? c1.prizeName : (c1.prizeNameEn || c1.prizeName)}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          style={{
-                            willChange: 'transform',
-                            transformOrigin: 'center center',
-                            transform: `translateX(${img1X}vw) scale(${imgScale})`,
-                          }}
-                        />
-                      )}
+                    <div className="relative w-40 lg:w-48 flex-shrink-0 self-stretch bg-white/10 overflow-hidden">
+                      {c1.prizeImage && <img src={c1.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     </div>
-
-                    {/* Text (Phase 4) */}
-                    <div
-                      className="p-8 lg:p-10 pr-16 flex flex-col justify-center flex-1"
-                      style={{ opacity: textOpacity, transform: `translateY(${textY}px)` }}
-                    >
-                      <div className="flex items-center gap-6">
-                        <span className="text-white/30 text-8xl lg:text-9xl font-bold leading-none" style={bebas}>
-                          {c1.number}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-white/80 text-sm tracking-[0.2em] uppercase" style={bebas}>{t.winA}</p>
-                          <h3 className="text-white text-3xl lg:text-4xl uppercase leading-tight font-bold" style={bebas}>
-                            {language === 'fr' ? c1.prizeName : (c1.prizeNameEn || c1.prizeName)}
-                          </h3>
-                          <p className="text-white/70 text-base" style={bebas}>{t.value} {c1.prizeValue}€</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-white text-3xl font-bold" style={bebas}>
-                            {c1.purchaseAmount}€ {t.purchaseSuffix}
-                          </p>
-                          <p className="text-white/80 text-sm" style={bebas}>{t.oneDrawEntry}</p>
-                        </div>
-                      </div>
-                      <p className="text-white/60 text-xs mt-4">
-                        {language === 'fr' ? c1.description : (c1.descriptionEn || c1.description)}
-                      </p>
-                      <Link href="/concours#conditions" className="inline-block mt-2 text-white/50 hover:text-white text-xs transition-colors underline underline-offset-2">
-                        {t.concoursSeeConditionsLink}
-                      </Link>
+                    <div className="p-6 md:p-8 lg:p-10 md:pr-16 flex flex-col justify-center flex-1">
+                      {renderText(c1, 'light')}
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* Diagonal separator */}
               {c1 && c2 && (
-                <div
-                  className="absolute left-1/2 top-0 bottom-0 w-[60px] -translate-x-1/2 z-10 pointer-events-none"
-                  style={{ opacity: sepOpacity }}
-                >
+                <div className="absolute left-1/2 top-0 bottom-0 w-[60px] -translate-x-1/2 z-10 pointer-events-none" style={{ opacity: sepOpacity }}>
                   <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
                     <polygon points="0,0 70,0 30,100 0,100" className="fill-primary" />
                     <polygon points="70,0 100,0 100,100 30,100" className={darkMode ? 'fill-[#0a0a0a]' : 'fill-white'} />
                   </svg>
                 </div>
               )}
-
-              {/* === Contest 2 half === */}
               {c2 && (
                 <div className={`relative ${c1 ? 'w-1/2' : 'w-full'}`}>
-                  {/* Colored bg fades in (Phase 2) */}
-                  <div
-                    className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`}
-                    style={{ opacity: bgOpacity }}
-                  />
-
+                  <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} style={{ opacity: bgOpacity }} />
                   <div className="relative flex items-stretch min-h-[280px]">
-                    {/* Text (Phase 4) */}
-                    <div
-                      className="p-8 lg:p-10 pl-16 flex flex-col justify-center flex-1"
-                      style={{ opacity: textOpacity, transform: `translateY(${textY}px)` }}
-                    >
-                      <div className="flex items-center gap-6">
-                        <span className="text-primary/30 text-8xl lg:text-9xl font-bold leading-none" style={bebas}>
-                          {c2.number}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-primary text-sm tracking-[0.2em] uppercase" style={bebas}>{t.winAFemale}</p>
-                          <h3 className="text-foreground text-3xl lg:text-4xl uppercase leading-tight font-bold" style={bebas}>
-                            {language === 'fr' ? c2.prizeName : (c2.prizeNameEn || c2.prizeName)}
-                          </h3>
-                          <p className={`text-base ${darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>
-                            {t.value} {c2.prizeValue}€
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-primary text-3xl font-bold" style={bebas}>
-                            {c2.purchaseAmount}€ {t.purchaseSuffix}
-                          </p>
-                          <p className={`text-sm ${darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>
-                            {t.oneDrawEntry}
-                          </p>
-                        </div>
-                      </div>
-                      <p className={`text-xs mt-4 ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
-                        {language === 'fr' ? c2.description : (c2.descriptionEn || c2.description)}
-                      </p>
-                      <Link
-                        href="/concours#conditions"
-                        className={`inline-block mt-2 text-xs transition-colors underline underline-offset-2 ${darkMode ? 'text-white/40 hover:text-white' : 'text-black/40 hover:text-black'}`}
-                      >
-                        {t.concoursSeeConditionsLink}
-                      </Link>
+                    <div className="p-6 md:p-8 lg:p-10 md:pl-16 flex flex-col justify-center flex-1">
+                      {renderText(c2, 'dark')}
                     </div>
-
-                    {/* Image */}
-                    <div
-                      className={`relative w-40 lg:w-48 flex-shrink-0 self-stretch`}
-                      style={{ overflow: 'visible', zIndex: imgZ }}
-                    >
-                      <div className={`absolute inset-0 ${darkMode ? 'bg-white/5' : 'bg-black/5'}`} style={{ opacity: bgOpacity }} />
-                      {c2.prizeImage && (
-                        <img
-                          src={c2.prizeImage}
-                          alt={language === 'fr' ? c2.prizeName : (c2.prizeNameEn || c2.prizeName)}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          style={{
-                            willChange: 'transform',
-                            transformOrigin: 'center center',
-                            transform: `translateX(${img2X}vw) scale(${imgScale})`,
-                          }}
-                        />
-                      )}
+                    <div className={`relative w-40 lg:w-48 flex-shrink-0 self-stretch overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                      {c2.prizeImage && <img src={c2.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     </div>
                   </div>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* ===== MOBILE LAYOUT ===== */}
-          <div className="block md:hidden">
-            {/* Contest 1 mobile */}
-            {c1 && (
-              <div className="relative">
-                <div className="absolute inset-0 bg-primary" style={{ opacity: bgOpacity }} />
-                <div className="relative flex items-stretch min-h-[200px]">
-                  <div className="relative w-28 flex-shrink-0 self-stretch" style={{ overflow: 'visible', zIndex: imgZ }}>
-                    <div className="absolute inset-0 bg-white/10" style={{ opacity: bgOpacity }} />
-                    {c1.prizeImage && (
-                      <img
-                        src={c1.prizeImage}
-                        alt={language === 'fr' ? c1.prizeName : (c1.prizeNameEn || c1.prizeName)}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{
-                          willChange: 'transform',
-                          transformOrigin: 'center center',
-                          transform: `translateX(${imgMobileX}vw) scale(${imgMobileScale})`,
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="p-5 flex flex-col justify-center flex-1" style={{ opacity: textOpacity, transform: `translateY(${textY}px)` }}>
-                    <div className="flex items-center gap-4">
-                      <span className="text-white/30 text-6xl font-bold leading-none" style={bebas}>{c1.number}</span>
-                      <div className="flex-1">
-                        <p className="text-white/80 text-xs tracking-[0.2em] uppercase" style={bebas}>{t.winA}</p>
-                        <h3 className="text-white text-xl uppercase leading-tight font-bold" style={bebas}>
-                          {language === 'fr' ? c1.prizeName : (c1.prizeNameEn || c1.prizeName)}
-                        </h3>
-                        <p className="text-white/70 text-sm" style={bebas}>{t.value} {c1.prizeValue}€</p>
-                      </div>
+            {/* Mobile */}
+            <div className="flex flex-col md:hidden">
+              {c1 && (
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary" style={{ opacity: bgOpacity }} />
+                  <div className="relative flex items-stretch min-h-[200px]">
+                    <div className="relative w-28 flex-shrink-0 self-stretch bg-white/10 overflow-hidden">
+                      {c1.prizeImage && <img src={c1.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     </div>
-                    <div className="mt-2">
-                      <p className="text-white text-lg font-bold" style={bebas}>{c1.purchaseAmount}€ {t.purchaseSuffix}</p>
-                      <p className="text-white/80 text-xs" style={bebas}>{t.oneDrawEntry}</p>
+                    <div className="p-5 flex flex-col justify-center flex-1">
+                      {renderText(c1, 'light')}
                     </div>
-                    <p className="text-white/60 text-[10px] mt-3">
-                      {language === 'fr' ? c1.description : (c1.descriptionEn || c1.description)}
-                    </p>
-                    <Link href="/concours#conditions" className="inline-block mt-1.5 text-white/50 hover:text-white text-[10px] transition-colors underline underline-offset-2">
-                      {t.concoursSeeConditionsLink}
-                    </Link>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Contest 2 mobile */}
-            {c2 && (
-              <div className="relative border-t border-white/10">
-                <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} style={{ opacity: bgOpacity }} />
-                <div className="relative flex items-stretch min-h-[200px]">
-                  <div className={`relative w-28 flex-shrink-0 self-stretch`} style={{ overflow: 'visible', zIndex: imgZ }}>
-                    <div className={`absolute inset-0 ${darkMode ? 'bg-white/5' : 'bg-black/5'}`} style={{ opacity: bgOpacity }} />
-                    {c2.prizeImage && (
-                      <img
-                        src={c2.prizeImage}
-                        alt={language === 'fr' ? c2.prizeName : (c2.prizeNameEn || c2.prizeName)}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{
-                          willChange: 'transform',
-                          transformOrigin: 'center center',
-                          transform: `translateX(${imgMobileX}vw) scale(${imgMobileScale})`,
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="p-5 flex flex-col justify-center flex-1" style={{ opacity: textOpacity, transform: `translateY(${textY}px)` }}>
-                    <div className="flex items-center gap-4">
-                      <span className="text-primary/30 text-6xl font-bold leading-none" style={bebas}>{c2.number}</span>
-                      <div className="flex-1">
-                        <p className="text-primary text-xs tracking-[0.2em] uppercase" style={bebas}>{t.winAFemale}</p>
-                        <h3 className="text-foreground text-xl uppercase leading-tight font-bold" style={bebas}>
-                          {language === 'fr' ? c2.prizeName : (c2.prizeNameEn || c2.prizeName)}
-                        </h3>
-                        <p className={`text-sm ${darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>{t.value} {c2.prizeValue}€</p>
-                      </div>
+              )}
+              {c2 && (
+                <div className="relative border-t border-white/10">
+                  <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} style={{ opacity: bgOpacity }} />
+                  <div className="relative flex items-stretch min-h-[200px]">
+                    <div className={`relative w-28 flex-shrink-0 self-stretch overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                      {c2.prizeImage && <img src={c2.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     </div>
-                    <div className="mt-2">
-                      <p className="text-primary text-lg font-bold" style={bebas}>{c2.purchaseAmount}€ {t.purchaseSuffix}</p>
-                      <p className={`text-xs ${darkMode ? 'text-white/70' : 'text-black/60'}`} style={bebas}>{t.oneDrawEntry}</p>
+                    <div className="p-5 flex flex-col justify-center flex-1">
+                      {renderText(c2, 'dark')}
                     </div>
-                    <p className={`text-[10px] mt-3 ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
-                      {language === 'fr' ? c2.description : (c2.descriptionEn || c2.description)}
-                    </p>
-                    <Link href="/concours#conditions" className={`inline-block mt-1.5 text-[10px] transition-colors underline underline-offset-2 ${darkMode ? 'text-white/40 hover:text-white' : 'text-black/40 hover:text-black'}`}>
-                      {t.concoursSeeConditionsLink}
-                    </Link>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
         </div>

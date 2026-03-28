@@ -27,12 +27,13 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  addresses     Address[]
-  orders        Order[]
-  sessions      Session[]
-  tickets       Ticket[]
-  ticketReplies TicketReply[]
-  wishlist      Wishlist[]
+  addresses      Address[]
+  orders         Order[]
+  sessions       Session[]
+  tickets        Ticket[]
+  ticketReplies  TicketReply[]
+  wishlist       Wishlist[]
+  cartSnapshots  CartSnapshot[]
 
   @@map("users")
 }
@@ -124,11 +125,15 @@ model Product {
   sortOrder     Int      @default(0)
   stripeProductId String?  // Stripe product ID for sync
   stripePriceId   String?  // Stripe price ID for checkout
+  sizeGuideId     String?
+  careGuideId     String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Relations
   category   Category         @relation(fields: [categoryId], references: [id])
+  sizeGuide  SizeGuide?       @relation(fields: [sizeGuideId], references: [id], onDelete: SetNull)
+  careGuide  CareGuide?       @relation(fields: [careGuideId], references: [id], onDelete: SetNull)
   variants   ProductVariant[]
   orderItems OrderItem[]
   packItems  PackItem[]
@@ -137,6 +142,8 @@ model Product {
 
   @@index([categoryId])
   @@index([slug])
+  @@index([sizeGuideId])
+  @@index([careGuideId])
   @@map("products")
 }
 
@@ -651,6 +658,8 @@ model SizeGuide {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  products Product[]
+
   @@unique([categorySlug])
   @@index([isActive, sortOrder])
   @@map("size_guides")
@@ -670,6 +679,8 @@ model CareGuide {
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  products Product[]
 
   @@unique([categorySlug])
   @@index([isActive, sortOrder])
@@ -697,4 +708,23 @@ model Shipment {
   @@index([orderId])
   @@index([status])
   @@map("shipments")
+}
+
+// ==================== CART SNAPSHOTS ====================
+
+model CartSnapshot {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String?
+  items     Json     // Array of cart items with product details
+  total     Decimal  @default(0) @db.Decimal(10, 2)
+  itemCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([updatedAt])
+  @@map("cart_snapshots")
 }

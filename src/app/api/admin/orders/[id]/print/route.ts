@@ -29,8 +29,8 @@ export async function POST(
 
     const updated = await prisma.order.update({
       where: { id },
-      data: { printedAt: new Date() },
-      select: { id: true, orderNumber: true, printedAt: true },
+      data: { adminNotes: `Printed at ${new Date().toISOString()}` },
+      select: { id: true, orderNumber: true, adminNotes: true },
     });
 
     return successResponse(updated);

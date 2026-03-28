@@ -18,11 +18,14 @@ export async function GET() {
     if (!user.isAdmin) return forbiddenResponse();
 
     const [pendingOrders, recentlyPrinted] = await Promise.all([
-      // Unprinted paid orders
+      // Unprinted paid orders (adminNotes doesn't start with "Printed at")
       prisma.order.findMany({
         where: {
           paymentStatus: 'PAID',
-          printedAt: null,
+          OR: [
+            { adminNotes: null },
+            { NOT: { adminNotes: { startsWith: 'Printed at' } } },
+          ],
           status: { notIn: ['CANCELLED', 'REFUNDED'] },
         },
         include: {
@@ -38,7 +41,8 @@ export async function GET() {
       // Recently printed orders (last 24h) for reprint
       prisma.order.findMany({
         where: {
-          printedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          adminNotes: { startsWith: 'Printed at' },
+          updatedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
         include: {
           items: {
@@ -48,7 +52,7 @@ export async function GET() {
           },
           promoCode: { select: { code: true } },
         },
-        orderBy: { printedAt: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         take: 20,
       }),
     ]);

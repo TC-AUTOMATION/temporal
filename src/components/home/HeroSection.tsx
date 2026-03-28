@@ -194,8 +194,12 @@ export function ContestSection() {
     const el = wrapperRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const scrollRange = el.offsetHeight - window.innerHeight;
-    const p = clamp(-rect.top / Math.max(scrollRange, 1), 0, 1);
+    const vh = window.innerHeight;
+    // Start animation as soon as section ENTERS viewport from below
+    // Complete when section top reaches 20% from viewport top
+    const scrolled = vh - rect.top;
+    const scrollRange = vh * 0.8;
+    const p = clamp(scrolled / scrollRange, 0, 1);
     if (Math.abs(p - progressRef.current) > 0.002) {
       progressRef.current = p;
       rerender((n) => n + 1);
@@ -278,24 +282,24 @@ export function ContestSection() {
       <div className="sticky top-0 w-full overflow-hidden">
         <div className="relative w-full" style={{ minHeight: '280px' }}>
 
-          {/* === Dark base background === */}
-          <div className="absolute inset-0 bg-[#0a0a0a] z-0" style={{ opacity: 1 - bgOpacity }} />
+          {/* === Base background (matches page, no dark strip) === */}
+          <div className="absolute inset-0 bg-background z-0" style={{ opacity: 1 - bgOpacity }} />
 
-          {/* === HERO OVERLAY: two photos centered with gap === */}
+          {/* === HERO OVERLAY: two photos touching, filling the section === */}
           {overlayOpacity > 0.01 && c1?.prizeImage && c2?.prizeImage && (
             <div
-              className="absolute inset-0 z-40 flex items-center justify-center gap-6 md:gap-10 pointer-events-none"
+              className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none"
               style={{ opacity: overlayOpacity }}
             >
               <img
                 src={c1.prizeImage}
                 alt=""
-                className="w-[140px] h-[200px] md:w-[220px] md:h-[310px] object-cover rounded-xl shadow-2xl"
+                className="h-full w-auto max-w-[50%] object-cover"
               />
               <img
                 src={c2.prizeImage}
                 alt=""
-                className="w-[140px] h-[200px] md:w-[220px] md:h-[310px] object-cover rounded-xl shadow-2xl"
+                className="h-full w-auto max-w-[50%] object-cover"
               />
             </div>
           )}

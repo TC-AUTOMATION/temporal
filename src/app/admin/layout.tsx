@@ -36,27 +36,70 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useAdminStore } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
 
-const navItems = [
-  { href: '/admin', labelFr: 'TABLEAU DE BORD', labelEn: 'DASHBOARD', icon: LayoutDashboard, exact: true },
-  { href: '/admin/products', labelFr: 'PRODUITS', labelEn: 'PRODUCTS', icon: Package },
-  { href: '/admin/stickers', labelFr: 'COMMANDE STICKERS', labelEn: 'STICKERS ORDER', icon: Sticker },
-  { href: '/admin/orders', labelFr: 'COMMANDES', labelEn: 'ORDERS', icon: ShoppingCart, exact: true },
-  { href: '/admin/cart-spy', labelFr: 'PANIERS', labelEn: 'CART SPY', icon: Eye },
-  { href: '/admin/orders/print-station', labelFr: 'IMPRESSION', labelEn: 'PRINT STATION', icon: Printer },
-  { href: '/admin/users', labelFr: 'UTILISATEURS', labelEn: 'USERS', icon: User },
-  { href: '/admin/tickets', labelFr: 'TICKETS', labelEn: 'TICKETS', icon: MessageSquare },
-  { href: '/admin/promos', labelFr: 'CODES PROMO', labelEn: 'PROMO CODES', icon: Tags },
-  { href: '/admin/contests', labelFr: 'CONCOURS', labelEn: 'CONTESTS', icon: Trophy },
-  { href: '/admin/gauge', labelFr: 'JAUGE CONCOURS', labelEn: 'CONTEST GAUGE', icon: Gauge },
-  { href: '/admin/marquee', labelFr: 'BANDEAU DÉFILANT', labelEn: 'MARQUEE BANNER', icon: ScrollText },
-  { href: '/admin/size-guides', labelFr: 'GUIDES TAILLES', labelEn: 'SIZE GUIDES', icon: Ruler },
-  { href: '/admin/care-guides', labelFr: 'GUIDES LAVAGE', labelEn: 'CARE GUIDES', icon: WashingMachine },
-  { href: '/admin/upsells', labelFr: 'UPSELLS', labelEn: 'UPSELLS', icon: TrendingUp },
-  { href: '/admin/packs', labelFr: 'PACKS', labelEn: 'PACKS', icon: Gift },
-  { href: '/admin/popups', labelFr: 'POPUPS', labelEn: 'POPUPS', icon: Bell },
-  { href: '/admin/newsletter', labelFr: 'NEWSLETTER', labelEn: 'NEWSLETTER', icon: Mail },
-  { href: '/admin/settings', labelFr: 'PARAMÈTRES', labelEn: 'SETTINGS', icon: Settings },
+interface NavItem {
+  href: string;
+  labelFr: string;
+  labelEn: string;
+  icon: React.ComponentType<{ size?: number }>;
+  exact?: boolean;
+}
+
+interface NavGroup {
+  labelFr: string;
+  labelEn: string;
+  items: NavItem[];
+}
+
+const navTop: NavItem = { href: '/admin', labelFr: 'TABLEAU DE BORD', labelEn: 'DASHBOARD', icon: LayoutDashboard, exact: true };
+
+const navGroups: NavGroup[] = [
+  {
+    labelFr: 'BOUTIQUE',
+    labelEn: 'SHOP',
+    items: [
+      { href: '/admin/products', labelFr: 'PRODUITS', labelEn: 'PRODUCTS', icon: Package },
+      { href: '/admin/stickers', labelFr: 'STICKERS', labelEn: 'STICKERS', icon: Sticker },
+      { href: '/admin/packs', labelFr: 'PACKS', labelEn: 'PACKS', icon: Gift },
+      { href: '/admin/upsells', labelFr: 'UPSELLS', labelEn: 'UPSELLS', icon: TrendingUp },
+      { href: '/admin/size-guides', labelFr: 'TAILLES', labelEn: 'SIZES', icon: Ruler },
+      { href: '/admin/care-guides', labelFr: 'LAVAGE', labelEn: 'CARE', icon: WashingMachine },
+    ],
+  },
+  {
+    labelFr: 'VENTES',
+    labelEn: 'SALES',
+    items: [
+      { href: '/admin/orders', labelFr: 'COMMANDES', labelEn: 'ORDERS', icon: ShoppingCart, exact: true },
+      { href: '/admin/orders/print-station', labelFr: 'IMPRESSION', labelEn: 'PRINT', icon: Printer },
+      { href: '/admin/cart-spy', labelFr: 'PANIERS', labelEn: 'CARTS', icon: Eye },
+      { href: '/admin/promos', labelFr: 'PROMOS', labelEn: 'PROMOS', icon: Tags },
+    ],
+  },
+  {
+    labelFr: 'MARKETING',
+    labelEn: 'MARKETING',
+    items: [
+      { href: '/admin/contests', labelFr: 'CONCOURS', labelEn: 'CONTESTS', icon: Trophy },
+      { href: '/admin/gauge', labelFr: 'JAUGE', labelEn: 'GAUGE', icon: Gauge },
+      { href: '/admin/marquee', labelFr: 'BANDEAU', labelEn: 'MARQUEE', icon: ScrollText },
+      { href: '/admin/popups', labelFr: 'POPUPS', labelEn: 'POPUPS', icon: Bell },
+      { href: '/admin/newsletter', labelFr: 'NEWSLETTER', labelEn: 'NEWSLETTER', icon: Mail },
+    ],
+  },
+  {
+    labelFr: 'SUPPORT',
+    labelEn: 'SUPPORT',
+    items: [
+      { href: '/admin/users', labelFr: 'UTILISATEURS', labelEn: 'USERS', icon: User },
+      { href: '/admin/tickets', labelFr: 'TICKETS', labelEn: 'TICKETS', icon: MessageSquare },
+    ],
+  },
 ];
+
+const navBottom: NavItem = { href: '/admin/settings', labelFr: 'PARAMÈTRES', labelEn: 'SETTINGS', icon: Settings };
+
+// Flat list for header title lookup
+const allNavItems = [navTop, ...navGroups.flatMap((g) => g.items), navBottom];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -68,6 +111,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { darkMode, toggleDarkMode, language, setLanguage } = useStore();
 
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
+
+  // Track which nav groups are open (all open by default)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    BOUTIQUE: true, VENTES: true, MARKETING: false, SUPPORT: false,
+  });
+  const toggleGroup = (key: string) => setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // Wait for Zustand persist rehydration before checking auth
   useEffect(() => {
@@ -104,9 +153,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/');
   };
 
-  const currentPage = navItems.find((item) =>
+  const currentPage = allNavItems.find((item) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href) && item.href !== '/admin'
-  ) || navItems[0];
+  ) || allNavItems[0];
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-[#0a0a0a] text-white' : 'bg-gray-50 text-gray-900'}`}>
@@ -145,44 +194,90 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Navigation */}
-        <nav className="p-3 space-y-1">
-          {sidebarOpen && (
-            <p className={`text-[10px] uppercase tracking-widest px-4 py-2 ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
-              {language === 'fr' ? 'Menu' : 'Menu'}
-            </p>
-          )}
-          {navItems.map((item) => {
-            const isActive = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href) && item.href !== '/admin';
-            const Icon = item.icon;
-
+        <nav className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 160px)' }}>
+          {/* Dashboard - always visible */}
+          {(() => {
+            const isActive = pathname === navTop.href;
+            const Icon = navTop.icon;
             return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                      : darkMode
-                        ? 'text-white/50 hover:bg-white/5 hover:text-white'
-                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-                  } ${!sidebarOpen && 'justify-center px-3'}`}
-                >
+              <Link href={navTop.href}>
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : darkMode ? 'text-white/50 hover:bg-white/5 hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'} ${!sidebarOpen && 'justify-center px-3'}`}>
                   <Icon size={20} />
-                  {sidebarOpen && (
-                    <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em', fontSize: '0.9rem' }}>
-                      {language === 'fr' ? item.labelFr : item.labelEn}
-                    </span>
-                  )}
-                  {item.href === '/admin/orders' && pendingOrdersCount > 0 && sidebarOpen && (
-                    <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                      {pendingOrdersCount}
-                    </span>
-                  )}
+                  {sidebarOpen && <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em', fontSize: '0.9rem' }}>{language === 'fr' ? navTop.labelFr : navTop.labelEn}</span>}
                 </div>
               </Link>
             );
+          })()}
+
+          {/* Grouped nav items */}
+          {navGroups.map((group) => {
+            const groupKey = group.labelEn;
+            const isOpen = openGroups[groupKey] !== false;
+            const hasActiveChild = group.items.some((item) =>
+              item.exact ? pathname === item.href : pathname.startsWith(item.href) && item.href !== '/admin'
+            );
+
+            return (
+              <div key={groupKey}>
+                {sidebarOpen ? (
+                  <button
+                    onClick={() => toggleGroup(groupKey)}
+                    className={`w-full flex items-center justify-between px-4 py-2 mt-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-white/5' : 'hover:bg-gray-100'}`}
+                  >
+                    <span className={`text-[10px] uppercase tracking-widest ${hasActiveChild ? 'text-primary' : darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                      {language === 'fr' ? group.labelFr : group.labelEn}
+                    </span>
+                    <ChevronLeft
+                      size={12}
+                      className={`transition-transform duration-200 ${darkMode ? 'text-white/20' : 'text-gray-400'} ${isOpen ? '-rotate-90' : 'rotate-0'}`}
+                    />
+                  </button>
+                ) : (
+                  <div className={`h-[1px] mx-3 my-2 ${darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />
+                )}
+
+                <div className={`space-y-0.5 overflow-hidden transition-all duration-200 ${isOpen || !sidebarOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  {group.items.map((item) => {
+                    const isActive = item.exact
+                      ? pathname === item.href
+                      : pathname.startsWith(item.href) && item.href !== '/admin';
+                    const Icon = item.icon;
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : darkMode ? 'text-white/50 hover:bg-white/5 hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'} ${!sidebarOpen ? 'justify-center px-3' : 'ml-2'}`}>
+                          <Icon size={18} />
+                          {sidebarOpen && (
+                            <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em', fontSize: '0.85rem' }}>
+                              {language === 'fr' ? item.labelFr : item.labelEn}
+                            </span>
+                          )}
+                          {item.href === '/admin/orders' && pendingOrdersCount > 0 && sidebarOpen && (
+                            <span className="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingOrdersCount}</span>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            );
           })}
+
+          {/* Settings - always visible at bottom of nav */}
+          {(() => {
+            const isActive = pathname.startsWith(navBottom.href);
+            const Icon = navBottom.icon;
+            return (
+              <div className="mt-2">
+                <Link href={navBottom.href}>
+                  <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : darkMode ? 'text-white/50 hover:bg-white/5 hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'} ${!sidebarOpen && 'justify-center px-3'}`}>
+                    <Icon size={18} />
+                    {sidebarOpen && <span style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em', fontSize: '0.85rem' }}>{language === 'fr' ? navBottom.labelFr : navBottom.labelEn}</span>}
+                  </div>
+                </Link>
+              </div>
+            );
+          })()}
         </nav>
 
         {/* Bottom section */}

@@ -237,12 +237,24 @@ export function ContestSection() {
   const bebas: React.CSSProperties = { fontFamily: '"Bebas Neue", sans-serif' };
 
   // --- Phases ---
-  const bgOpacity = easeOut(clamp((p - 0.15) / 0.20, 0, 1));          // colors: 15→35%
-  const overlayOpacity = 1 - easeOut(clamp((p - 0.25) / 0.25, 0, 1)); // overlay out: 25→50%
-  const layoutOpacity = easeOut(clamp((p - 0.30) / 0.20, 0, 1));      // layout in: 30→50%
-  const textOpacity = clamp((p - 0.50) / 0.25, 0, 1);                 // text: 50→75%
+  // Overlay images SLIDE apart from center
+  const slideP = clamp((p - 0.08) / 0.40, 0, 1);         // slide: 8→48%
+  const slideEp = easeOut(slideP);
+  const img1SlideX = lerp(0, -35, slideEp);               // left image slides left (vw)
+  const img2SlideX = lerp(0, 35, slideEp);                // right image slides right (vw)
+  const imgOverlayScale = lerp(1, 0.85, slideEp);         // slight shrink as they slide
+
+  // Background colors appear while images slide
+  const bgOpacity = easeOut(clamp((p - 0.12) / 0.25, 0, 1));          // colors: 12→37%
+
+  // Overlay fades out (cross-fade with final layout)
+  const overlayOpacity = 1 - easeOut(clamp((p - 0.35) / 0.20, 0, 1)); // out: 35→55%
+  const layoutOpacity = easeOut(clamp((p - 0.38) / 0.17, 0, 1));      // in: 38→55%
+
+  // Text arrives
+  const textOpacity = clamp((p - 0.52) / 0.23, 0, 1);                 // text: 52→75%
   const textY = lerp(25, 0, easeOut(textOpacity));
-  const sepOpacity = clamp((p - 0.45) / 0.20, 0, 1);
+  const sepOpacity = clamp((p - 0.48) / 0.17, 0, 1);
 
   // Helper to render a contest text block
   const renderText = (c: ContestData, variant: 'light' | 'dark') => {
@@ -285,7 +297,7 @@ export function ContestSection() {
           {/* === Base background (matches page, no dark strip) === */}
           <div className="absolute inset-0 bg-background z-0" style={{ opacity: 1 - bgOpacity }} />
 
-          {/* === HERO OVERLAY: two photos touching, filling the section === */}
+          {/* === HERO OVERLAY: two photos that SLIDE apart === */}
           {overlayOpacity > 0.01 && c1?.prizeImage && c2?.prizeImage && (
             <div
               className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none"
@@ -295,11 +307,19 @@ export function ContestSection() {
                 src={c1.prizeImage}
                 alt=""
                 className="h-full w-auto max-w-[50%] object-cover"
+                style={{
+                  willChange: 'transform',
+                  transform: `translateX(${img1SlideX}vw) scale(${imgOverlayScale})`,
+                }}
               />
               <img
                 src={c2.prizeImage}
                 alt=""
                 className="h-full w-auto max-w-[50%] object-cover"
+                style={{
+                  willChange: 'transform',
+                  transform: `translateX(${img2SlideX}vw) scale(${imgOverlayScale})`,
+                }}
               />
             </div>
           )}

@@ -339,9 +339,51 @@ export default function AdminContestsPage() {
       const json = await res.json();
       if (json.success) {
         setEntries((prev) => prev.filter((e) => e.id !== entryId));
+        // Refresh contests list to update entry counts
+        fetchContests();
       }
     } catch {
       /* ignore */
+    }
+  };
+
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
+
+  const handleCleanupDuplicates = async () => {
+    if (cleanupRunning) return;
+    const msg = language === 'fr'
+      ? 'Nettoyer les participations en double ?\n\nUne commande qui se trouve dans plusieurs concours sera conservée uniquement dans le palier le plus haut (≥ 150 € → veste, sinon bonnet).\n\nLes entrées manuelles et les gagnants ne sont pas touchés.'
+      : 'Clean up duplicate entries?\n\nAn order that appears in multiple contests will only be kept in the highest tier (≥ 150€ → jacket, otherwise beanie).\n\nManual entries and winners are not affected.';
+    if (!confirm(msg)) return;
+    setCleanupRunning(true);
+    setCleanupResult(null);
+    try {
+      const res = await fetch('/api/admin/contests/cleanup-duplicates', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || `Erreur ${res.status}`);
+      }
+      setCleanupResult(
+        language === 'fr'
+          ? `${json.data.deletedCount} doublon(s) supprimé(s) sur ${json.data.ordersWithDuplicates} commande(s) concernée(s).`
+          : `${json.data.deletedCount} duplicate(s) removed across ${json.data.ordersWithDuplicates} order(s).`
+      );
+      // Reload entries for current contest if open
+      if (entriesContest) {
+        const reload = await fetch(`/api/admin/contests/${entriesContest.id}/entries`);
+        const reloadJson = await reload.json();
+        if (reloadJson.success) setEntries(reloadJson.data.entries || []);
+      }
+      // Refresh contests list
+      fetchContests();
+    } catch (err) {
+      setCleanupResult(err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setCleanupRunning(false);
     }
   };
 
@@ -842,6 +884,22 @@ export default function AdminContestsPage() {
             </div>
           )}
 
+          <button
+            onClick={handleCleanupDuplicates}
+            disabled={cleanupRunning}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              darkMode
+                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
+            } disabled:opacity-50`}
+            title={language === 'fr'
+              ? 'Supprimer les doublons : 70-149.99€ → bonnet uniquement, ≥150€ → veste uniquement'
+              : '70-149.99€ → beanie only, ≥150€ → jacket only'}
+          >
+            {cleanupRunning ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+            {language === 'fr' ? 'Nettoyer doublons' : 'Clean duplicates'}
+          </button>
+
           <Link
             href="/admin/jauge"
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
@@ -871,6 +929,17 @@ export default function AdminContestsPage() {
           <AlertCircle size={20} />
           <span className="text-sm">{error}</span>
           <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Cleanup Result Banner */}
+      {cleanupResult && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300">
+          <CheckCircle size={20} />
+          <span className="text-sm">{cleanupResult}</span>
+          <button onClick={() => setCleanupResult(null)} className="ml-auto text-amber-300 hover:text-amber-200">
             ✕
           </button>
         </div>
@@ -1305,11 +1374,11 @@ export default function AdminContestsPage() {
                               })}
                             </p>
                           </div>
-                          {entry.isManual && !isWinner && (
+                          {!isWinner && (
                             <button
                               onClick={() => handleDeleteManualEntry(entry.id)}
                               className={`p-1.5 rounded ${darkMode ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
-                              title={language === 'fr' ? 'Supprimer' : 'Delete'}
+                              title={language === 'fr' ? 'Retirer ce participant' : 'Remove this entry'}
                             >
                               <X size={14} />
                             </button>

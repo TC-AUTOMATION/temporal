@@ -25,6 +25,7 @@ interface PackData {
   description?: string | null;
   price: number;
   image?: string | null;
+  images?: string[];
   items: PackItem[];
   originalPrice: number;
   discount: number;
@@ -34,6 +35,9 @@ interface PackData {
 export default function PackCard({ pack }: { pack: PackData }) {
   const { darkMode, language } = useStore();
 
+  // Prefer pack-specific images (from admin upload). Fallback to legacy single image,
+  // then to product images only if the pack has no dedicated images.
+  const packImages = pack.images && pack.images.length > 0 ? pack.images : [];
   const productImages = pack.items
     .flatMap((item) => item.product.images.slice(0, 1))
     .slice(0, 4);
@@ -76,9 +80,25 @@ export default function PackCard({ pack }: { pack: PackData }) {
           </div>
         </div>
 
-        {/* Product images grid */}
+        {/* Pack images (priority) or product images (fallback) */}
         <div className="aspect-square relative overflow-hidden">
-          {productImages.length >= 2 ? (
+          {packImages.length > 0 ? (
+            <Image
+              src={packImages[0]}
+              alt={pack.name}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
+          ) : pack.image ? (
+            <Image
+              src={pack.image}
+              alt={pack.name}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
+          ) : productImages.length >= 2 ? (
             <div className="grid grid-cols-2 h-full">
               {productImages.slice(0, 4).map((img, i) => (
                 <div key={i} className="relative overflow-hidden">
@@ -92,14 +112,6 @@ export default function PackCard({ pack }: { pack: PackData }) {
                 </div>
               ))}
             </div>
-          ) : pack.image ? (
-            <Image
-              src={pack.image}
-              alt={pack.name}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
           ) : (
             <div className={`flex items-center justify-center h-full ${darkMode ? 'bg-white/5' : 'bg-gray-100'}`}>
               <Package size={48} className={darkMode ? 'text-white/20' : 'text-gray-300'} />

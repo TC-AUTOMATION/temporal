@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff, X, Check, Search, Loader2 } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, X, Check, Search, Loader2, Upload, ChevronUp, ChevronDown } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 
 // Types matching the backend API response
@@ -26,6 +26,7 @@ interface APIPack {
   description: string | null;
   price: number;
   image: string | null;
+  images: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -68,9 +69,11 @@ export default function PacksPage() {
     slug: '',
     description: '',
     price: 0,
+    images: [] as string[],
     items: [] as FormItem[],
     isActive: true,
   });
+  const [uploading, setUploading] = useState(false);
 
   // Translations
   const t = {
@@ -171,6 +174,7 @@ export default function PacksPage() {
       slug: '',
       description: '',
       price: 0,
+      images: [],
       items: [],
       isActive: true,
     });
@@ -185,11 +189,19 @@ export default function PacksPage() {
 
   const openEditModal = (pack: APIPack) => {
     setEditingPack(pack);
+    // Hydrate images: prefer images array, fallback to legacy single image
+    const hydratedImages =
+      pack.images && pack.images.length > 0
+        ? pack.images
+        : pack.image
+          ? [pack.image]
+          : [];
     setFormData({
       name: pack.name,
       slug: pack.slug,
       description: pack.description || '',
       price: pack.price,
+      images: hydratedImages,
       items: pack.items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -197,6 +209,44 @@ export default function PacksPage() {
       isActive: pack.isActive,
     });
     setIsModalOpen(true);
+  };
+
+  const handleUploadImages = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      for (let i = 0; i < files.length; i++) fd.append('files', files[i]);
+      const res = await fetch('/api/admin/images/upload', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Upload failed');
+      }
+      const json = await res.json();
+      const uploaded: string[] = json?.data?.uploaded || [];
+      if (uploaded.length === 0) throw new Error('No images uploaded');
+      setFormData((prev) => ({ ...prev, images: [...prev.images, ...uploaded].slice(0, 10) }));
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImageAt = (idx: number) => {
+    setFormData((prev) => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+  };
+
+  const moveImage = (idx: number, dir: -1 | 1) => {
+    setFormData((prev) => {
+      const next = [...prev.images];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return { ...prev, images: next };
+    });
   };
 
   const handleSave = async () => {
@@ -212,6 +262,7 @@ export default function PacksPage() {
         slug,
         description: formData.description || undefined,
         price: formData.price,
+        images: formData.images,
         isActive: formData.isActive,
         items: formData.items.map((item) => ({
           productId: item.productId,
@@ -609,6 +660,88 @@ export default function PacksPage() {
                       : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
                   }`}
                 />
+              </div>
+
+              {/* Images (multi-upload) */}
+              <div>
+                <label className={`block text-sm mb-2 ${darkMode ? 'text-white/70' : 'text-gray-600'}`}>
+                  {language === 'fr' ? 'Images' : 'Images'} ({formData.images.length}/10)
+                </label>
+                <label
+                  className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                    darkMode
+                      ? 'border-white/20 hover:border-primary/60 bg-white/5'
+                      : 'border-gray-300 hover:border-primary/60 bg-gray-50'
+                  }`}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-sm">{language === 'fr' ? 'Téléchargement...' : 'Uploading...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      <span className="text-sm">
+                        {language === 'fr' ? 'Cliquez pour ajouter des images' : 'Click to add images'}
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleUploadImages(e.target.files);
+                      e.currentTarget.value = '';
+                    }}
+                    disabled={uploading || formData.images.length >= 10}
+                  />
+                </label>
+
+                {formData.images.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mt-3">
+                    {formData.images.map((img, idx) => (
+                      <div key={`${img}-${idx}`} className="relative group">
+                        <img src={img} alt="" className="w-full aspect-square object-cover rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => removeImageAt(idx)}
+                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove"
+                        >
+                          <X size={12} />
+                        </button>
+                        <div className="absolute bottom-1 left-1 right-1 flex justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => moveImage(idx, -1)}
+                            disabled={idx === 0}
+                            className="w-6 h-6 rounded bg-black/70 text-white flex items-center justify-center disabled:opacity-30"
+                            aria-label="Move up"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveImage(idx, 1)}
+                            disabled={idx === formData.images.length - 1}
+                            className="w-6 h-6 rounded bg-black/70 text-white flex items-center justify-center disabled:opacity-30"
+                            aria-label="Move down"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </div>
+                        {idx === 0 && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] bg-primary text-white" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                            {language === 'fr' ? 'PRINCIPALE' : 'MAIN'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Product Selection */}

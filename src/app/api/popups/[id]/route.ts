@@ -23,6 +23,8 @@ const updatePopupSchema = z.object({
   contentFr: z.string().max(2000).optional().nullable(),
   contentEn: z.string().max(2000).optional().nullable(),
   linkUrl: z.string().url().optional().nullable().or(z.literal('')),
+  image: z.string().optional().nullable(),
+  images: z.array(z.string()).max(5).optional(),
   showDelay: z.number().int().min(0).max(60000).optional(),
   showOnce: z.boolean().optional(),
 });
@@ -105,6 +107,7 @@ export async function PUT(
       data: {
         ...data,
         linkUrl: data.linkUrl === '' ? null : data.linkUrl,
+        image: data.image === '' ? null : data.image,
       },
     });
 

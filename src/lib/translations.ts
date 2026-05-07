@@ -28,6 +28,7 @@ export const translations = {
 
     // ==================== NAVIGATION ====================
     ensembles: "Ensembles",
+    packs: "Packs",
     vestes: "Vestes",
     tshirts: "T-shirts",
     pantalons: "Pantalons",
@@ -472,7 +473,7 @@ export const translations = {
     // ==================== CONCOURS PAGE ====================
     concoursTitle: "NOS CONCOURS",
     concoursSubtitle: "Tentez votre chance \u00e0 chaque commande",
-    concoursActiveContests: "CONCOURS EN COURS",
+    concoursActiveContests: "NOS CONCOURS",
     concoursWinLabel: "TENTEZ DE GAGNER",
     concoursSeeConditions: "VOIR LES CONDITIONS",
     concoursParticipations: "participations",
@@ -551,6 +552,7 @@ export const translations = {
 
     // ==================== NAVIGATION ====================
     ensembles: "Sets",
+    packs: "Packs",
     vestes: "Jackets",
     tshirts: "T-shirts",
     pantalons: "Pants",
@@ -995,7 +997,7 @@ export const translations = {
     // ==================== CONCOURS PAGE ====================
     concoursTitle: "OUR CONTESTS",
     concoursSubtitle: "Try your luck with every order",
-    concoursActiveContests: "ACTIVE CONTESTS",
+    concoursActiveContests: "OUR CONTESTS",
     concoursWinLabel: "TRY TO WIN",
     concoursSeeConditions: "SEE CONDITIONS",
     concoursParticipations: "entries",

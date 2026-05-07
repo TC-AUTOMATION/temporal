@@ -16,6 +16,7 @@ const packSchema = z.object({
   description: z.string().optional(),
   price: z.number().min(0, 'Price must be positive'),
   image: z.string().optional(),
+  images: z.array(z.string()).max(10).optional().default([]),
   isActive: z.boolean().optional(),
   items: z.array(z.object({
     productId: z.string(),
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
         description: data.description,
         price: data.price,
         image: data.image,
+        images: data.images ?? [],
         isActive: data.isActive ?? true,
         items: {
           create: data.items.map((item) => ({

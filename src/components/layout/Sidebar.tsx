@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, ChevronRight, Sparkles, Instagram, User, Shirt, Watch, X, Tag, Shield, LogOut, Globe, Camera, Info } from 'lucide-react';
+import { Search, ChevronRight, Sparkles, Instagram, User, Shirt, Watch, X, Tag, Shield, LogOut, Globe, Camera, Info, Package } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/lib/translations';
@@ -32,14 +32,6 @@ const BeanieIcon = ({ size = 24, className = '' }: { size?: number; className?: 
   </svg>
 );
 
-// Custom Set/Ensemble icon (shirt + pants combined)
-const SetIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 2L9 4H6v4l2 1v4h8V9l2-1V4h-3l-3-2z" />
-    <path d="M8 13h8l1 4-1 5h-3l-.5-4h-1l-.5 4H8l-1-5 1-4z" />
-  </svg>
-);
-
 export default function Sidebar() {
   const { language, setLanguage, darkMode, isSidebarOpen, setSidebarOpen, setSearchOpen } = useStore();
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -63,7 +55,7 @@ export default function Sidebar() {
   };
 
   const menuItems = [
-    { label: t.ensembles, href: '/shop?category=ensembles', icon: SetIcon },
+    { label: t.packs, href: '/shop?category=packs', icon: Package },
     { label: t.vestes, href: '/shop?category=vestes', icon: JacketIcon },
     { label: t.tshirts, href: '/shop?category=tshirts', icon: Shirt },
     { label: t.pantalons, href: '/shop?category=pantalons', icon: PantsIcon },
@@ -264,6 +256,29 @@ export default function Sidebar() {
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
                 {t.quiSommesNous.toUpperCase()}
+              </span>
+            </div>
+            <ChevronRight size={16} className={`group-hover:text-primary group-hover:translate-x-1 transition-all ${darkMode ? 'text-white/50' : 'text-muted-foreground'}`} />
+          </Link>
+
+          <Link
+            href="/concours"
+            onClick={() => setSidebarOpen(false)}
+            className={`flex items-center justify-between px-3 py-2.5 transition-all group ${
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 flex items-center justify-center ${
+                darkMode ? 'bg-primary/20' : 'bg-primary/10'
+              }`}>
+                <Sparkles size={14} className="text-primary" />
+              </div>
+              <span
+                className={`group-hover:text-primary transition-colors text-sm ${darkMode ? 'text-white/70' : 'text-muted-foreground'}`}
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+              >
+                {t.concoursTitle}
               </span>
             </div>
             <ChevronRight size={16} className={`group-hover:text-primary group-hover:translate-x-1 transition-all ${darkMode ? 'text-white/50' : 'text-muted-foreground'}`} />

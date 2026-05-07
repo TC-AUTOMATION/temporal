@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@/stores/useStore';
 import {
   MessageSquare,
@@ -16,6 +16,12 @@ import {
   Loader2,
   AlertCircle,
   Eye,
+  Check,
+  Gift,
+  AlertTriangle,
+  Upload,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 
 interface Popup {
@@ -31,6 +37,8 @@ interface Popup {
   contentFr: string | null;
   contentEn: string | null;
   linkUrl: string | null;
+  image: string | null;
+  images: string[];
   showDelay: number;
   showOnce: boolean;
   createdAt: string;
@@ -76,6 +84,8 @@ const defaultPopup: Omit<Popup, 'id' | 'createdAt' | 'updatedAt'> = {
   contentFr: '',
   contentEn: '',
   linkUrl: '',
+  image: '',
+  images: [],
   showDelay: 5000,
   showOnce: true,
 };
@@ -86,13 +96,54 @@ export default function AdminPopupsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingPopup, setEditingPopup] = useState<Partial<Popup> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [previewPopup, setPreviewPopup] = useState<Popup | null>(null);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<NodeJS.Timeout>(null);
+  const successTimeoutRef = useRef<NodeJS.Timeout>(null);
 
   useEffect(() => {
     fetchPopups();
   }, []);
+
+  // Auto-clear error after 4s
+  useEffect(() => {
+    if (error) {
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = setTimeout(() => setError(''), 4000);
+    }
+    return () => { if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current); };
+  }, [error]);
+
+  // Auto-clear success after 3s
+  useEffect(() => {
+    if (successMessage) {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = setTimeout(() => setSuccessMessage(''), 3000);
+    }
+    return () => { if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current); };
+  }, [successMessage]);
+
+  // Close modals on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (previewPopup) closePreview();
+        else if (isEditing) closeEditModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditing, previewPopup]);
+
+  const showSuccess = (msg: string) => {
+    setSuccessMessage(msg);
+  };
 
   const fetchPopups = async () => {
     try {
@@ -104,15 +155,52 @@ export default function AdminPopupsPage() {
       } else {
         setError(data.error || 'Erreur lors du chargement');
       }
-    } catch (err) {
+    } catch {
       setError('Erreur de connexion');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const openEditModal = (popupData: Partial<Popup>) => {
+    // Hydrate images: prefer images array, fallback to legacy image field
+    const hydratedImages =
+      popupData.images && popupData.images.length > 0
+        ? popupData.images
+        : popupData.image
+          ? [popupData.image]
+          : [];
+    setEditingPopup({ ...popupData, images: hydratedImages });
+    setIsEditing(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setIsModalVisible(true));
+    });
+  };
+
+  const closeEditModal = useCallback(() => {
+    setIsModalVisible(false);
+    setTimeout(() => {
+      setIsEditing(false);
+      setEditingPopup(null);
+    }, 300);
+  }, []);
+
+  const openPreview = (popup: Popup) => {
+    setPreviewPopup(popup);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setIsPreviewVisible(true));
+    });
+  };
+
+  const closePreview = useCallback(() => {
+    setIsPreviewVisible(false);
+    setTimeout(() => {
+      setPreviewPopup(null);
+    }, 300);
+  }, []);
+
   const handleCreateNew = (type: 'NEWSLETTER' | 'DELIVERY_ISSUE' | 'NEW_DROP') => {
-    setEditingPopup({
+    openEditModal({
       ...defaultPopup,
       type,
       titleFr: type === 'NEWSLETTER' ? 'Rejoignez notre newsletter' :
@@ -134,12 +222,10 @@ export default function AdminPopupsPage() {
                     type === 'DELIVERY_ISSUE' ? 'Got it' :
                     'Shop Now',
     });
-    setIsEditing(true);
   };
 
   const handleEdit = (popup: Popup) => {
-    setEditingPopup({ ...popup });
-    setIsEditing(true);
+    openEditModal({ ...popup });
   };
 
   const handleSave = async () => {
@@ -165,8 +251,8 @@ export default function AdminPopupsPage() {
         throw new Error(data.error || 'Erreur lors de la sauvegarde');
       }
 
-      setIsEditing(false);
-      setEditingPopup(null);
+      closeEditModal();
+      showSuccess(isUpdate ? 'Popup modifié avec succès' : 'Popup créé avec succès');
       fetchPopups();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
@@ -176,23 +262,40 @@ export default function AdminPopupsPage() {
   };
 
   const handleToggleActive = async (popup: Popup) => {
+    setTogglingId(popup.id);
+    // Optimistic update
+    const newActive = !popup.isActive;
+    setPopups(prev => prev.map(p => {
+      if (p.id === popup.id) return { ...p, isActive: newActive };
+      if (newActive && p.type === popup.type && p.id !== popup.id) return { ...p, isActive: false };
+      return p;
+    }));
+
     try {
       const response = await fetch(`/api/popups/${popup.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !popup.isActive }),
+        body: JSON.stringify({ isActive: newActive }),
       });
 
       if (response.ok) {
-        fetchPopups();
+        showSuccess(newActive ? 'Popup activé' : 'Popup désactivé');
+      } else {
+        fetchPopups(); // Revert on error
+        setError('Erreur lors de la modification');
       }
-    } catch (err) {
+    } catch {
+      fetchPopups(); // Revert on error
       setError('Erreur lors de la modification');
+    } finally {
+      setTogglingId(null);
     }
   };
 
   const handleDelete = async (popup: Popup) => {
     if (!confirm(`Supprimer ce popup "${popup.titleFr}" ?`)) return;
+
+    setDeletingId(popup.id);
 
     try {
       const response = await fetch(`/api/popups/${popup.id}`, {
@@ -200,15 +303,17 @@ export default function AdminPopupsPage() {
       });
 
       if (response.ok) {
-        fetchPopups();
+        // Optimistic removal with animation delay
+        setPopups(prev => prev.filter(p => p.id !== popup.id));
+        showSuccess('Popup supprimé');
+      } else {
+        setError('Erreur lors de la suppression');
       }
-    } catch (err) {
+    } catch {
       setError('Erreur lors de la suppression');
+    } finally {
+      setDeletingId(null);
     }
-  };
-
-  const getPopupTypeInfo = (type: string) => {
-    return POPUP_TYPES.find(t => t.type === type) || POPUP_TYPES[0];
   };
 
   if (isLoading) {
@@ -236,13 +341,28 @@ export default function AdminPopupsPage() {
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 flex items-center gap-2">
-          <AlertCircle size={18} />
-          {error}
-        </div>
-      )}
+      {/* Success Toast */}
+      <div
+        className={`fixed top-6 right-6 z-[60] flex items-center gap-3 px-5 py-3 bg-green-500 text-white shadow-lg transition-all duration-300 ${
+          successMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+        }`}
+      >
+        <Check size={18} />
+        <span className="text-sm font-medium">{successMessage}</span>
+      </div>
+
+      {/* Error Toast */}
+      <div
+        className={`fixed top-6 right-6 z-[60] flex items-center gap-3 px-5 py-3 bg-red-500/90 text-white shadow-lg transition-all duration-300 ${
+          error ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+        }`}
+      >
+        <AlertCircle size={18} />
+        <span className="text-sm font-medium">{error}</span>
+        <button onClick={() => setError('')} className="ml-2 hover:opacity-70">
+          <X size={14} />
+        </button>
+      </div>
 
       {/* Popup Types Grid */}
       <div className="grid md:grid-cols-3 gap-6">
@@ -303,17 +423,19 @@ export default function AdminPopupsPage() {
                   {existingPopups.map((popup) => (
                     <div
                       key={popup.id}
-                      className={`p-3 flex items-center justify-between ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}
+                      className={`p-3 flex items-center justify-between transition-all duration-200 ${
+                        deletingId === popup.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                      } ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}
                     >
                       <div className="flex-1 min-w-0">
                         <p className="truncate text-sm">{popup.titleFr}</p>
-                        <p className={`text-xs ${popup.isActive ? 'text-green-500' : (darkMode ? 'text-white/40' : 'text-black/40')}`}>
+                        <p className={`text-xs transition-colors ${popup.isActive ? 'text-green-500' : (darkMode ? 'text-white/40' : 'text-black/40')}`}>
                           {popup.isActive ? 'Actif' : 'Inactif'}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => setPreviewPopup(popup)}
+                          onClick={() => openPreview(popup)}
                           className={`p-2 transition-colors ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
                           title="Aperçu"
                         >
@@ -328,10 +450,13 @@ export default function AdminPopupsPage() {
                         </button>
                         <button
                           onClick={() => handleToggleActive(popup)}
-                          className={`p-2 transition-colors ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+                          disabled={togglingId === popup.id}
+                          className={`p-2 transition-colors disabled:opacity-50 ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
                           title={popup.isActive ? 'Désactiver' : 'Activer'}
                         >
-                          {popup.isActive ? (
+                          {togglingId === popup.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : popup.isActive ? (
                             <ToggleRight size={16} className="text-green-500" />
                           ) : (
                             <ToggleLeft size={16} />
@@ -339,10 +464,15 @@ export default function AdminPopupsPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(popup)}
-                          className="p-2 text-red-500 hover:bg-red-500/10 transition-colors"
+                          disabled={deletingId === popup.id}
+                          className="p-2 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                           title="Supprimer"
                         >
-                          <Trash2 size={16} />
+                          {deletingId === popup.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -370,9 +500,19 @@ export default function AdminPopupsPage() {
 
       {/* Edit Modal */}
       {isEditing && editingPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-black border border-white/10' : 'bg-white border border-black/10'}`}>
-            <div className={`sticky top-0 p-6 border-b flex items-center justify-between ${darkMode ? 'bg-black border-white/10' : 'bg-white border-black/10'}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
+              isModalVisible ? 'opacity-100' : 'opacity-0'
+            }`}
+            onClick={closeEditModal}
+          />
+          {/* Modal */}
+          <div className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-300 ${
+            isModalVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+          } ${darkMode ? 'bg-black border border-white/10' : 'bg-white border border-black/10'}`}>
+            <div className={`sticky top-0 z-10 p-6 border-b flex items-center justify-between ${darkMode ? 'bg-black border-white/10' : 'bg-white border-black/10'}`}>
               <h2
                 className="text-xl"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
@@ -380,7 +520,7 @@ export default function AdminPopupsPage() {
                 {editingPopup.id ? 'MODIFIER LE POPUP' : 'CRÉER UN POPUP'}
               </h2>
               <button
-                onClick={() => { setIsEditing(false); setEditingPopup(null); }}
+                onClick={closeEditModal}
                 className={`p-2 transition-colors ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
               >
                 <X size={20} />
@@ -560,34 +700,154 @@ export default function AdminPopupsPage() {
                 />
               </div>
 
+              {/* Images (multi-upload, carrousel) */}
+              <div>
+                <label className={`block mb-2 text-sm ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
+                  Images (optionnel — {(editingPopup.images || []).length}/5, défilent automatiquement si plusieurs)
+                </label>
+                <label
+                  className={`flex items-center justify-center gap-2 w-full px-4 py-3 cursor-pointer border-2 border-dashed transition-colors ${
+                    darkMode
+                      ? 'border-white/20 hover:border-primary/60 text-white'
+                      : 'border-black/20 hover:border-primary/60 text-black'
+                  }`}
+                >
+                  <Upload size={16} />
+                  <span className="text-sm">Cliquez pour ajouter des images</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files || files.length === 0) return;
+                      const fd = new FormData();
+                      for (let i = 0; i < files.length; i++) fd.append('files', files[i]);
+                      try {
+                        const res = await fetch('/api/admin/images/upload', {
+                          method: 'POST',
+                          credentials: 'include',
+                          body: fd,
+                        });
+                        const json = await res.json();
+                        const uploaded: string[] = json?.data?.uploaded || [];
+                        if (uploaded.length === 0) throw new Error('No images uploaded');
+                        setEditingPopup({
+                          ...editingPopup,
+                          images: [...(editingPopup.images || []), ...uploaded].slice(0, 5),
+                        });
+                      } catch {
+                        setError("Échec de l'upload");
+                      }
+                      e.currentTarget.value = '';
+                    }}
+                    disabled={(editingPopup.images || []).length >= 5}
+                  />
+                </label>
+                {(editingPopup.images || []).length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    {(editingPopup.images || []).map((img, idx) => (
+                      <div key={`${img}-${idx}`} className="relative group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img}
+                          alt=""
+                          className="w-full aspect-video object-cover border border-white/10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (editingPopup.images || []).filter((_, i) => i !== idx);
+                            setEditingPopup({ ...editingPopup, images: next });
+                          }}
+                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove"
+                        >
+                          <X size={12} />
+                        </button>
+                        <div className="absolute bottom-1 left-1 right-1 flex justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...(editingPopup.images || [])];
+                              if (idx === 0) return;
+                              [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+                              setEditingPopup({ ...editingPopup, images: next });
+                            }}
+                            disabled={idx === 0}
+                            className="w-6 h-6 rounded bg-black/70 text-white flex items-center justify-center disabled:opacity-30"
+                            aria-label="Move up"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...(editingPopup.images || [])];
+                              if (idx === next.length - 1) return;
+                              [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                              setEditingPopup({ ...editingPopup, images: next });
+                            }}
+                            disabled={idx === (editingPopup.images || []).length - 1}
+                            className="w-6 h-6 rounded bg-black/70 text-white flex items-center justify-center disabled:opacity-30"
+                            aria-label="Move down"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </div>
+                        {idx === 0 && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 text-[10px] bg-primary text-white" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                            PRINCIPALE
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Settings */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className={`block mb-2 text-sm ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
-                    Délai d'affichage (ms)
+                    Délai d'affichage
                   </label>
-                  <input
-                    type="number"
-                    value={editingPopup.showDelay || 5000}
-                    onChange={(e) => setEditingPopup({ ...editingPopup, showDelay: parseInt(e.target.value) || 5000 })}
-                    min={0}
-                    max={60000}
-                    className={`w-full px-4 py-3 bg-transparent border focus:outline-none focus:border-primary ${
-                      darkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'
-                    }`}
-                  />
-                  <p className={`text-xs mt-1 ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
-                    5000 = 5 secondes
-                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="range"
+                      value={editingPopup.showDelay || 5000}
+                      onChange={(e) => setEditingPopup({ ...editingPopup, showDelay: parseInt(e.target.value) })}
+                      min={0}
+                      max={60000}
+                      step={1000}
+                      className="w-full accent-primary cursor-pointer"
+                    />
+                    <div className="flex justify-between items-center">
+                      <span className={`text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                        Immédiat
+                      </span>
+                      <span className={`text-sm font-medium px-3 py-1 ${darkMode ? 'bg-white/10' : 'bg-black/5'}`}>
+                        {((editingPopup.showDelay || 5000) / 1000).toFixed(0)}s
+                      </span>
+                      <span className={`text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+                        60s
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editingPopup.showOnce ?? true}
-                      onChange={(e) => setEditingPopup({ ...editingPopup, showOnce: e.target.checked })}
-                      className="w-4 h-4"
-                    />
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <div
+                      onClick={() => setEditingPopup({ ...editingPopup, showOnce: !(editingPopup.showOnce ?? true) })}
+                      className={`w-10 h-6 rounded-full transition-colors duration-200 relative cursor-pointer ${
+                        (editingPopup.showOnce ?? true) ? 'bg-primary' : (darkMode ? 'bg-white/20' : 'bg-black/20')
+                      }`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                        (editingPopup.showOnce ?? true) ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
+                    </div>
                     <span className="text-sm">Afficher une seule fois par session</span>
                   </label>
                 </div>
@@ -616,7 +876,7 @@ export default function AdminPopupsPage() {
               {/* Actions */}
               <div className="flex gap-4">
                 <button
-                  onClick={() => { setIsEditing(false); setEditingPopup(null); }}
+                  onClick={closeEditModal}
                   className={`flex-1 py-3 border transition-colors ${
                     darkMode
                       ? 'border-white/20 hover:border-white/40'
@@ -647,49 +907,129 @@ export default function AdminPopupsPage() {
         </div>
       )}
 
-      {/* Preview Modal */}
+      {/* Preview Modal - matches DynamicPopup appearance */}
       {previewPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className={`w-full max-w-md ${darkMode ? 'bg-black border border-white/10' : 'bg-white border border-black/10'}`}>
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3
-                  className="text-xl"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
-                >
-                  APERÇU
-                </h3>
-                <button
-                  onClick={() => setPreviewPopup(null)}
-                  className={`p-2 transition-colors ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
-                >
-                  <X size={20} />
-                </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${
+              isPreviewVisible ? 'opacity-100' : 'opacity-0'
+            }`}
+            onClick={closePreview}
+          />
+          {/* Preview card */}
+          <div className={`relative w-full max-w-md transition-all duration-300 ${
+            isPreviewVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}>
+            {/* "APERÇU" badge */}
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-1 bg-primary text-white text-xs font-bold tracking-wider">
+              APERÇU
+            </div>
+
+            <div className={`relative overflow-hidden ${darkMode ? 'bg-black border border-white/20' : 'bg-white border border-black/10'}`}>
+              {/* Background decoration like DynamicPopup */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div
+                  className="absolute -top-1/2 -right-1/4 w-[80%] h-[200%] opacity-20 blur-3xl"
+                  style={{
+                    background: previewPopup.type === 'DELIVERY_ISSUE'
+                      ? 'radial-gradient(ellipse at center, rgba(249, 115, 22, 0.6) 0%, transparent 70%)'
+                      : previewPopup.type === 'NEW_DROP'
+                        ? 'radial-gradient(ellipse at center, rgba(34, 197, 94, 0.6) 0%, transparent 70%)'
+                        : 'radial-gradient(ellipse at center, rgba(91, 45, 142, 0.6) 0%, transparent 70%)',
+                  }}
+                />
               </div>
 
-              <div className={`p-6 text-center ${darkMode ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/10'}`}>
-                <h4 className="text-2xl mb-2" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+              {/* Close button */}
+              <button
+                onClick={closePreview}
+                className={`absolute top-4 right-4 w-8 h-8 flex items-center justify-center z-10 transition-all hover:scale-110 ${
+                  darkMode ? 'bg-white/10 hover:bg-white/20' : 'bg-black/5 hover:bg-black/10'
+                }`}
+              >
+                <X size={16} />
+              </button>
+
+              {/* Content */}
+              <div className="relative p-8 text-center">
+                {/* Icon */}
+                <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                  previewPopup.type === 'DELIVERY_ISSUE' ? 'bg-orange-500/20' :
+                  previewPopup.type === 'NEW_DROP' ? 'bg-green-500/20' : 'bg-primary/20'
+                }`}>
+                  {previewPopup.type === 'NEWSLETTER' ? (
+                    <Gift size={32} className="text-primary" />
+                  ) : previewPopup.type === 'DELIVERY_ISSUE' ? (
+                    <AlertTriangle size={32} className="text-orange-500" />
+                  ) : (
+                    <Sparkles size={32} className="text-green-500" />
+                  )}
+                </div>
+
+                {/* Title */}
+                <h4
+                  className="text-2xl md:text-3xl mb-2"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                >
                   {previewPopup.titleFr}
                 </h4>
+
+                {/* Subtitle */}
                 {previewPopup.subtitleFr && (
-                  <p className={darkMode ? 'text-white/70' : 'text-black/70'}>
+                  <p className={`mb-4 ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
                     {previewPopup.subtitleFr}
                   </p>
                 )}
+
+                {/* Content */}
                 {previewPopup.contentFr && (
-                  <p className={`mt-4 text-sm ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
+                  <p className={`mb-6 text-sm ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
                     {previewPopup.contentFr}
                   </p>
                 )}
+
+                {/* Newsletter form preview */}
+                {previewPopup.type === 'NEWSLETTER' && (
+                  <div className="space-y-4 mt-4">
+                    <div className={`w-full px-4 py-3 border-2 text-left ${
+                      darkMode ? 'bg-white/5 border-white/20 text-white/40' : 'bg-black/5 border-black/10 text-black/40'
+                    }`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                      votre@email.com
+                    </div>
+                  </div>
+                )}
+
+                {/* Button */}
                 {previewPopup.buttonTextFr && (
                   <button
-                    className="mt-6 px-6 py-3 bg-primary text-white"
-                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                    className={`mt-4 w-full py-3 text-white font-bold ${
+                      previewPopup.type === 'NEW_DROP' ? 'bg-green-500' :
+                      previewPopup.type === 'DELIVERY_ISSUE' ? 'bg-orange-500' :
+                      'bg-primary'
+                    }`}
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.15em' }}
                   >
                     {previewPopup.buttonTextFr}
                   </button>
                 )}
               </div>
+
+              {/* Bottom accent */}
+              <div className={`h-1 ${
+                previewPopup.type === 'NEW_DROP'
+                  ? 'bg-gradient-to-r from-green-500 via-green-500/50 to-transparent'
+                  : previewPopup.type === 'DELIVERY_ISSUE'
+                    ? 'bg-gradient-to-r from-orange-500 via-orange-500/50 to-transparent'
+                    : 'bg-gradient-to-r from-primary via-primary/50 to-transparent'
+              }`} />
+            </div>
+
+            {/* Info below preview */}
+            <div className={`mt-3 flex items-center justify-center gap-4 text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
+              <span>Délai : {((previewPopup.showDelay || 5000) / 1000).toFixed(0)}s</span>
+              <span>|</span>
+              <span>{previewPopup.showOnce ? 'Affiché 1 fois/session' : 'Affiché à chaque visite'}</span>
             </div>
           </div>
         </div>

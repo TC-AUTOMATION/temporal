@@ -17,6 +17,7 @@ const updatePackSchema = z.object({
   description: z.string().optional().nullable(),
   price: z.number().min(0).optional(),
   image: z.string().optional().nullable(),
+  images: z.array(z.string()).max(10).optional(),
   isActive: z.boolean().optional(),
   items: z.array(z.object({
     productId: z.string(),
@@ -140,6 +141,7 @@ export async function PUT(
         ...(data.description !== undefined && { description: data.description }),
         ...(data.price !== undefined && { price: data.price }),
         ...(data.image !== undefined && { image: data.image }),
+        ...(data.images !== undefined && { images: data.images }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.items && {
           items: {

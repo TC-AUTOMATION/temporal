@@ -20,6 +20,8 @@ interface Popup {
   contentFr: string | null;
   contentEn: string | null;
   linkUrl: string | null;
+  image: string | null;
+  images: string[] | null;
   showDelay: number;
   showOnce: boolean;
 }
@@ -34,6 +36,7 @@ export default function DynamicPopup() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [currentImageIdx, setCurrentImageIdx] = useState(0);
 
   useEffect(() => {
     fetchActivePopup();
@@ -110,6 +113,24 @@ export default function DynamicPopup() {
       setIsSubmitting(false);
     }
   };
+
+  // Build gallery: prefer images array, fallback to legacy single image
+  const gallery: string[] = popup
+    ? popup.images && popup.images.length > 0
+      ? popup.images
+      : popup.image
+        ? [popup.image]
+        : []
+    : [];
+
+  // Auto-rotate gallery if more than one image
+  useEffect(() => {
+    if (!isVisible || gallery.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentImageIdx((prev) => (prev + 1) % gallery.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isVisible, gallery.length]);
 
   if (!isVisible || !popup) return null;
 
@@ -195,6 +216,52 @@ export default function DynamicPopup() {
             <div className="flex justify-center mb-6">
               <TemporalLogoStatic size={50} />
             </div>
+
+            {/* Image / Carousel (optional) */}
+            {gallery.length > 0 && (
+              <div className="mb-6 -mx-8 -mt-4 relative">
+                {gallery.length === 1 ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={gallery[0]}
+                    alt={title}
+                    className="w-full h-48 md:h-56 object-cover"
+                  />
+                ) : (
+                  <>
+                    <div className="relative w-full h-48 md:h-56 overflow-hidden">
+                      {gallery.map((src, idx) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={`${src}-${idx}`}
+                          src={src}
+                          alt={title}
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                            idx === currentImageIdx ? 'opacity-100' : 'opacity-0'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    {/* Dots */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {gallery.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCurrentImageIdx(idx)}
+                          aria-label={`Image ${idx + 1}`}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            idx === currentImageIdx
+                              ? 'bg-white scale-125'
+                              : 'bg-white/50 hover:bg-white/80'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Newsletter Success State */}
             {popup.type === 'NEWSLETTER' && isSuccess ? (

@@ -28,6 +28,8 @@ import {
   Printer,
   Eye,
   TrendingUp,
+  Truck,
+  BarChart3,
 } from 'lucide-react';
 import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import TemporalStar from '@/components/ui/TemporalStar';
@@ -63,6 +65,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/upsells', labelFr: 'UPSELLS', labelEn: 'UPSELLS', icon: TrendingUp },
       { href: '/admin/size-guides', labelFr: 'TAILLES', labelEn: 'SIZES', icon: Ruler },
       { href: '/admin/care-guides', labelFr: 'LAVAGE', labelEn: 'CARE', icon: WashingMachine },
+      { href: '/admin/stock', labelFr: 'STOCK', labelEn: 'STOCK', icon: BarChart3 },
     ],
   },
   {
@@ -70,6 +73,7 @@ const navGroups: NavGroup[] = [
     labelEn: 'SALES',
     items: [
       { href: '/admin/orders', labelFr: 'COMMANDES', labelEn: 'ORDERS', icon: ShoppingCart, exact: true },
+      { href: '/admin/livraisons', labelFr: 'LIVRAISONS', labelEn: 'DELIVERIES', icon: Truck },
       { href: '/admin/orders/print-station', labelFr: 'IMPRESSION', labelEn: 'PRINT', icon: Printer },
       { href: '/admin/cart-spy', labelFr: 'PANIERS', labelEn: 'CARTS', icon: Eye },
       { href: '/admin/promos', labelFr: 'PROMOS', labelEn: 'PROMOS', icon: Tags },
@@ -80,7 +84,7 @@ const navGroups: NavGroup[] = [
     labelEn: 'MARKETING',
     items: [
       { href: '/admin/contests', labelFr: 'CONCOURS', labelEn: 'CONTESTS', icon: Trophy },
-      { href: '/admin/gauge', labelFr: 'JAUGE', labelEn: 'GAUGE', icon: Gauge },
+      { href: '/admin/jauge', labelFr: 'JAUGE', labelEn: 'GAUGE', icon: Gauge },
       { href: '/admin/marquee', labelFr: 'BANDEAU', labelEn: 'MARQUEE', icon: ScrollText },
       { href: '/admin/popups', labelFr: 'POPUPS', labelEn: 'POPUPS', icon: Bell },
       { href: '/admin/newsletter', labelFr: 'NEWSLETTER', labelEn: 'NEWSLETTER', icon: Mail },

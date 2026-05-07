@@ -156,13 +156,38 @@ model ProductVariant {
   size      String  // e.g., "S", "M", "L", "XL"
   stock     Int     @default(0)
   isActive  Boolean @default(true)
+  // Marque cette variante comme un "ensemble" (bundle). Ses composants
+  // (veste + jogging par ex.) sont décrits dans bundleComponents ; leur stock
+  // sera décrémenté en plus de la variante ensemble à chaque vente.
+  isBundle  Boolean @default(false)
 
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
 
+  bundleComponents    ProductBundleComponent[] @relation("BundleVariant")
+  componentOfBundles  ProductBundleComponent[] @relation("ComponentVariant")
+
   @@unique([productId, color, size])
   @@index([productId])
   @@map("product_variants")
+}
+
+/// Lie une variante "ensemble" à ses variantes composantes (veste + jogging).
+/// Quand un OrderItem avec bundleVariantId est vendu, on décrémente aussi
+/// chaque composantVariantId par (orderItem.quantity * quantity).
+model ProductBundleComponent {
+  id                  String @id @default(cuid())
+  bundleVariantId     String
+  componentVariantId  String
+  quantity            Int    @default(1)
+
+  bundleVariant    ProductVariant @relation("BundleVariant", fields: [bundleVariantId], references: [id], onDelete: Cascade)
+  componentVariant ProductVariant @relation("ComponentVariant", fields: [componentVariantId], references: [id], onDelete: Cascade)
+
+  @@unique([bundleVariantId, componentVariantId])
+  @@index([bundleVariantId])
+  @@index([componentVariantId])
+  @@map("product_bundle_components")
 }
 
 // ==================== UPSELLS ====================
@@ -181,6 +206,9 @@ model Upsell {
   discountType    String?  // "percentage" | "fixed" | "free"
   discountValue   Decimal? @db.Decimal(10, 2)
   freeThreshold   Decimal? @db.Decimal(10, 2) // cart total at which it becomes FREE
+  // Produits requis dans le panier pour que l'upsell devienne gratuit (liste d'IDs).
+  // Vide = aucune contrainte produit (seul freeThreshold s'applique).
+  freeRequiredProductIds String[] @default([])
   message         String?
   messageEn       String?
   image           String?
@@ -214,7 +242,8 @@ enum PaymentStatus {
 }
 
 enum DeliveryMethod {
-  DELIVERY      // Standard delivery
+  DELIVERY      // Standard home delivery
+  RELAY         // Relay point pickup
   HAND_DELIVERY // Hand-to-hand (friends only)
 }
 
@@ -230,11 +259,24 @@ model Order {
   customerFirstName String
   customerLastName  String
 
-  // Shipping address (copied)
+  // Shipping address (what the carrier sees — may be a relay point)
   shippingStreet     String?
   shippingCity       String?
   shippingPostalCode String?
   shippingCountry    String?
+
+  // Billing address (the real customer home — always the person, never a relay)
+  // Used on the invoice's "FACTURÉ À" block.
+  billingStreet      String?
+  billingCity        String?
+  billingPostalCode  String?
+  billingCountry     String?
+
+  // Relay point info (for RELAY delivery)
+  relayCarrier       String?  // mondial_relay, colissimo, chronopost, ups
+  relayPointCode     String?  // Boxtal parcelshop code
+  relayPointName     String?  // Relay point name
+  relayPointAddress  String?  // Relay point address
 
   // Amounts
   subtotal        Decimal        @db.Decimal(10, 2)
@@ -272,6 +314,7 @@ model Order {
   user       User?       @relation(fields: [userId], references: [id])
   address    Address?    @relation(fields: [addressId], references: [id])
   items      OrderItem[]
+  shipment   Shipment?
 
   @@index([userId])
   @@index([orderNumber])
@@ -344,7 +387,8 @@ model Pack {
   slug        String   @unique
   description String?
   price       Decimal  @db.Decimal(10, 2) // Pack price (discounted)
-  image       String?
+  image       String?  // Legacy: kept for backward compatibility, prefer `images`
+  images      String[] @default([]) // Gallery of pack images
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -531,6 +575,12 @@ model Popup {
   contentFr    String?
   contentEn    String?
 
+  // Optional image (URL ou chemin /uploads/...) affichée dans la popup
+  // Legacy: kept for backward compatibility, prefer `images`
+  image        String?
+  // Gallery of popup images (carousel)
+  images       String[] @default([])
+
   // Optional link (e.g., for "Shop Now" button)
   linkUrl      String?
 
@@ -594,9 +644,16 @@ model Contest {
 model ContestEntry {
   id        String   @id @default(cuid())
   contestId String
-  userId    String
-  orderId   String
-  orderTotal Decimal @db.Decimal(10, 2) // Stored for reference
+  // userId et orderId sont optionnels pour permettre l'ajout manuel
+  // (personnes ayant acheté hors site, saisies par l'admin).
+  userId    String?
+  orderId   String?
+  orderTotal Decimal? @db.Decimal(10, 2) // Stored for reference
+  // Champs pour les participations ajoutées manuellement par l'admin
+  manualName     String?
+  manualEmail    String?
+  manualNote     String?
+  addedByAdminId String?
   createdAt DateTime @default(now())
 
   contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
@@ -704,6 +761,8 @@ model Shipment {
   deliveredAt     DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([status])

@@ -22,6 +22,8 @@ const popupSchema = z.object({
   contentFr: z.string().max(2000).optional(),
   contentEn: z.string().max(2000).optional(),
   linkUrl: z.string().url().optional().or(z.literal('')),
+  image: z.string().optional().nullable(),
+  images: z.array(z.string()).max(5).optional().default([]),
   showDelay: z.number().int().min(0).max(60000).default(5000),
   showOnce: z.boolean().default(true),
 });
@@ -117,6 +119,8 @@ export async function POST(request: NextRequest) {
         contentFr: data.contentFr || null,
         contentEn: data.contentEn || null,
         linkUrl: data.linkUrl || null,
+        image: data.image || null,
+        images: data.images ?? [],
         showDelay: data.showDelay,
         showOnce: data.showOnce,
       },

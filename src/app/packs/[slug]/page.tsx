@@ -50,6 +50,7 @@ interface Pack {
   description: string | null;
   price: number;
   image: string | null;
+  images: string[];
   items: PackItem[];
   originalPrice: number;
   discount: number;
@@ -104,6 +105,8 @@ export default function PackDetailPage({ params }: { params: Promise<{ slug: str
         return !!selectedSizes[item.product.id];
       })
     : false;
+
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
 
   const handleAddToCart = () => {
     if (!pack || !allSizesSelected) return;
@@ -207,26 +210,62 @@ export default function PackDetailPage({ params }: { params: Promise<{ slug: str
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Left: Images */}
             <div className="space-y-4">
-              {/* Pack image grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {pack.items.map((item) => (
-                  <div key={item.id} className="relative aspect-square rounded-xl overflow-hidden">
+              {pack.images && pack.images.length > 0 ? (
+                <>
+                  {/* Main image */}
+                  <div className="relative aspect-square rounded-xl overflow-hidden">
                     <Image
-                      src={item.product.images[0] || ''}
-                      alt={item.product.name}
+                      src={pack.images[activeImageIdx] || pack.images[0]}
+                      alt={pack.name}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 1024px) 50vw, 25vw"
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      priority
                     />
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
-                      <p className="text-white text-sm" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
-                        {item.product.name}
-                        {item.quantity > 1 && ` x${item.quantity}`}
-                      </p>
-                    </div>
                   </div>
-                ))}
-              </div>
+                  {/* Thumbnails */}
+                  {pack.images.length > 1 && (
+                    <div className="grid grid-cols-5 gap-2">
+                      {pack.images.map((img, idx) => (
+                        <button
+                          key={`${img}-${idx}`}
+                          onClick={() => setActiveImageIdx(idx)}
+                          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                            idx === activeImageIdx
+                              ? 'border-primary'
+                              : darkMode
+                                ? 'border-white/10 hover:border-white/30'
+                                : 'border-gray-200 hover:border-gray-400'
+                          }`}
+                        >
+                          <Image src={img} alt="" fill className="object-cover" sizes="80px" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Fallback: per-item product images */
+                <div className="grid grid-cols-2 gap-3">
+                  {pack.items.map((item) => (
+                    <div key={item.id} className="relative aspect-square rounded-xl overflow-hidden">
+                      <Image
+                        src={item.product.images[0] || ''}
+                        alt={item.product.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 1024px) 50vw, 25vw"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
+                        <p className="text-white text-sm" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                          {item.product.name}
+                          {item.quantity > 1 && ` x${item.quantity}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Right: Pack details + size selection */}

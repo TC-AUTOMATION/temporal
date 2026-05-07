@@ -49,8 +49,17 @@ export async function GET() {
           ? Math.round((discount / originalPrice) * 100)
           : 0;
 
+      // Fallback: if no gallery images, build one from legacy single image
+      const galleryImages =
+        pack.images && pack.images.length > 0
+          ? pack.images
+          : pack.image
+            ? [pack.image]
+            : [];
+
       return {
         ...pack,
+        images: galleryImages,
         price: packPrice,
         originalPrice,
         discount,

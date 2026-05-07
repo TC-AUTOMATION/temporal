@@ -21,7 +21,7 @@ export interface Order {
   customerLastName: string;
   status: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED';
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
-  deliveryMethod: 'DELIVERY' | 'HAND_DELIVERY';
+  deliveryMethod: 'DELIVERY' | 'RELAY' | 'HAND_DELIVERY';
   subtotal: number;
   shippingCost: number;
   discount: number;
@@ -258,7 +258,7 @@ export const useAuthStore = create<AuthState>()(
 
       getUserOrders: async () => {
         try {
-          const result = await ordersApi.list();
+          const result = await ordersApi.list({ mine: true });
           return result.orders.map((order: ApiOrder) => ({
             id: order.id,
             orderNumber: order.orderNumber,

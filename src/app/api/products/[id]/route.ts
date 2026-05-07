@@ -61,12 +61,7 @@ export async function GET(
       return notFoundResponse('Product not found');
     }
 
-    const response = successResponse({ product });
-    // Anti-cache headers for Safari compatibility
-    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('Expires', '0');
-    return response;
+    return successResponse({ product });
   } catch (error) {
     console.error('GET /api/products/[id] error:', error);
     return serverErrorResponse();
@@ -164,7 +159,7 @@ export async function PATCH(
       (data as any).stripeProductId = stripeProduct.id;
     }
 
-    const product = await prisma.product.update({
+    await prisma.product.update({
       where: { id },
       data: {
         ...(data.sku && { sku: data.sku }),
@@ -181,7 +176,7 @@ export async function PATCH(
         ...(data.price !== undefined && { price: data.price }),
         ...(data.originalPrice !== undefined && { originalPrice: data.originalPrice }),
         ...(data.categoryId && { categoryId: data.categoryId }),
-        ...(data.images && { images: data.images }),
+        ...(data.images !== undefined && { images: data.images }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.isFeatured !== undefined && { isFeatured: data.isFeatured }),
         ...(data.isNew !== undefined && { isNew: data.isNew }),
@@ -190,6 +185,44 @@ export async function PATCH(
         ...((data as any).stripeProductId && { stripeProductId: (data as any).stripeProductId }),
         ...(newStripePriceId && { stripePriceId: newStripePriceId }),
       },
+    });
+
+    // Update variants if provided
+    if (data.variants) {
+      // Disconnect order items from existing variants before deleting
+      const existingVariants = await prisma.productVariant.findMany({
+        where: { productId: id },
+        select: { id: true },
+      });
+      const variantIds = existingVariants.map(v => v.id);
+
+      if (variantIds.length > 0) {
+        await prisma.orderItem.updateMany({
+          where: { variantId: { in: variantIds } },
+          data: { variantId: null },
+        });
+      }
+
+      await prisma.productVariant.deleteMany({ where: { productId: id } });
+
+      if (data.variants.length > 0) {
+        await prisma.productVariant.createMany({
+          data: data.variants.map((v: { sku: string; color: string; colorHex?: string | null; size: string; stock: number; isActive?: boolean }) => ({
+            productId: id,
+            sku: v.sku,
+            color: v.color,
+            colorHex: v.colorHex || null,
+            size: v.size,
+            stock: v.stock,
+            isActive: v.isActive ?? true,
+          })),
+        });
+      }
+    }
+
+    // Re-fetch with all relations
+    const product = await prisma.product.findUnique({
+      where: { id },
       include: {
         category: true,
         variants: true,

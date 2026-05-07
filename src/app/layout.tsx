@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import CookieConsentProvider from "@/components/providers/CookieConsentProvider";
+import VisitorTracker from "@/components/providers/VisitorTracker";
 import Script from "next/script";
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://temporal-clothes.com";
@@ -382,6 +383,7 @@ export default function RootLayout({
       <body className="antialiased bg-background text-foreground overflow-x-hidden" itemScope itemType="https://schema.org/WebPage">
         {children}
         <CookieConsentProvider />
+        <VisitorTracker />
       </body>
     </html>
   );

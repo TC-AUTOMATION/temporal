@@ -28,8 +28,6 @@ export default function ProductGrid({ category }: ProductGridProps) {
         if (category) {
           params.append('category', category);
         }
-        // Fetch featured products for home page
-        params.append('featured', 'true');
 
         const response = await fetch(`/api/products?${params.toString()}`);
         if (!response.ok) {
@@ -125,10 +123,10 @@ export default function ProductGrid({ category }: ProductGridProps) {
   }, []);
 
   return (
-    <section id="collection" ref={gridRef} className="pt-12 md:pt-20 pb-20 bg-background relative overflow-hidden">
+    <section id="collection" ref={gridRef} className="pt-6 md:pt-10 pb-20 bg-background relative overflow-hidden">
 
       {/* Section header */}
-      <div className={`text-center mb-10 md:mb-20 px-4 relative z-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+      <div className={`text-center mb-6 md:mb-10 px-4 relative z-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
         {/* Badge */}
         <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 px-4 md:px-6 py-2 mb-6 md:mb-8">
           <span
@@ -244,3 +242,4 @@ export default function ProductGrid({ category }: ProductGridProps) {
     </section>
   );
 }
+

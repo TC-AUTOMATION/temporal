@@ -9,6 +9,29 @@ import {
   serverErrorResponse,
 } from '@/lib/api/response';
 
+function slugify(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function uniqueSlug(base: string, currentId?: string): Promise<string> {
+  const seed = base || 'guide';
+  let slug = seed;
+  let i = 2;
+  // Loop until we find a free slug; bounded to avoid infinite loops
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const existing = await prisma.sizeGuide.findUnique({ where: { categorySlug: slug } });
+    if (!existing || existing.id === currentId) return slug;
+    slug = `${seed}-${i++}`;
+  }
+  return `${seed}-${Date.now()}`;
+}
+
 /**
  * GET /api/admin/size-guides
  * Get all size guides (admin)
@@ -50,18 +73,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { categorySlug, nameFr, nameEn, tipsFr, tipsEn, sizes, unit, sortOrder, isActive } = body;
 
-    if (!categorySlug || !nameFr || !nameEn || !sizes) {
-      return errorResponse('Champs requis manquants');
+    if (!nameFr || !nameEn) {
+      return errorResponse('Nom FR et Nom EN requis');
     }
+
+    const slug = await uniqueSlug(categorySlug?.trim() || slugify(nameFr));
 
     const guide = await prisma.sizeGuide.create({
       data: {
-        categorySlug,
+        categorySlug: slug,
         nameFr,
         nameEn,
         tipsFr: tipsFr || '',
         tipsEn: tipsEn || '',
-        sizes,
+        sizes: sizes || [],
         unit: unit || 'cm',
         sortOrder: sortOrder || 0,
         isActive: isActive !== false,
@@ -96,13 +121,28 @@ export async function PUT(request: NextRequest) {
       return errorResponse('ID requis');
     }
 
+    if (data.nameFr !== undefined && !data.nameFr) {
+      return errorResponse('Nom FR requis');
+    }
+    if (data.nameEn !== undefined && !data.nameEn) {
+      return errorResponse('Nom EN requis');
+    }
+
+    // Keep categorySlug consistent if renamed
+    if (data.categorySlug !== undefined && data.categorySlug) {
+      data.categorySlug = await uniqueSlug(slugify(data.categorySlug), id);
+    }
+
     const guide = await prisma.sizeGuide.update({
       where: { id },
       data,
     });
 
     return successResponse(guide);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return errorResponse('Un guide des tailles existe déjà pour cette catégorie');
+    }
     console.error('PUT /api/admin/size-guides error:', error);
     return serverErrorResponse();
   }

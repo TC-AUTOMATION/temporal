@@ -531,7 +531,10 @@ export default function ProductPage() {
                   )}
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {product.variants && (Array.from(new Set(product.variants.map((v: any) => v.size))).filter(Boolean) as string[]).map((size: string) => {
+                  {product.variants && (Array.from(new Set(product.variants.map((v: any) => v.size))).filter(Boolean) as string[]).sort((a: string, b: string) => {
+                    const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+                    return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b));
+                  }).map((size: string) => {
                     const variant = product.variants.find((v: any) => v.size === size);
                     const isAvailable = variant && variant.stock > 0;
                     return (

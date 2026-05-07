@@ -60,6 +60,17 @@ export function proxy(request: NextRequest) {
   }
 
   // ===========================================
+  // 🚫 Anti-cache headers for API routes (Safari fix)
+  // Safari aggressively caches fetch/XHR GET responses, causing
+  // stale data after saves — admin changes appear to "not work".
+  // ===========================================
+  if (pathname.startsWith('/api/')) {
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+  }
+
+  // ===========================================
   // 🔒 Protection des routes admin
   // ===========================================
   if (pathname.startsWith('/admin')) {

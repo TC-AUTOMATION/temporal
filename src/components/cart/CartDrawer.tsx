@@ -30,6 +30,7 @@ interface UpsellData {
       nameEn: string | null;
       slug: string;
     };
+    variants?: { id: string; size: string; stock: number }[];
   };
 }
 
@@ -48,6 +49,10 @@ export default function CartDrawer() {
   const t = translations[language];
   const [isVisible, setIsVisible] = useState(false);
   const [upsells, setUpsells] = useState<UpsellData[]>([]);
+  const [upsellSizePicker, setUpsellSizePicker] = useState<string | null>(null); // upsell id with open size picker
+  const [upsellSelectedSizes, setUpsellSelectedSizes] = useState<Record<string, string>>({}); // upsellId -> size
+
+  const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Unique'];
 
   useEffect(() => {
     if (isCartOpen) {
@@ -69,9 +74,28 @@ export default function CartDrawer() {
       );
       if (res.ok) {
         const data = await res.json();
+        const matching: UpsellData[] = data.data?.upsells || [];
+        const allUpsellProductIds: string[] = data.data?.allUpsellProductIds || [];
+        const matchingProductIds = new Set(matching.map((u) => u.product.id));
+
+        // Auto-remove upsell items from cart if their conditions are no
+        // longer met (e.g. user removed items and dropped below the cart
+        // total threshold that qualified the upsell in the first place).
+        const itemsToRemove = cart.filter(
+          (item) =>
+            allUpsellProductIds.includes(item.id) &&
+            !matchingProductIds.has(item.id)
+        );
+        if (itemsToRemove.length > 0) {
+          itemsToRemove.forEach((item) => removeFromCart(item.id, item.size));
+          // Skip rendering upsell suggestions this round; the cart change
+          // will trigger another fetchUpsells via the dependency effect.
+          return;
+        }
+
         // Filter out upsells for products already in cart
         const cartProductIds = cart.map((item) => item.id);
-        const filtered = (data.data?.upsells || []).filter(
+        const filtered = matching.filter(
           (u: UpsellData) => !cartProductIds.includes(u.product.id)
         );
         setUpsells(filtered);
@@ -79,7 +103,7 @@ export default function CartDrawer() {
     } catch (err) {
       console.error('Error fetching upsells:', err);
     }
-  }, [cart, cartTotal]);
+  }, [cart, cartTotal, removeFromCart]);
 
   useEffect(() => {
     if (isCartOpen && cart.length > 0) {
@@ -360,7 +384,7 @@ export default function CartDrawer() {
                   const upsellMessage = language === 'fr'
                     ? upsell.message
                     : (upsell.messageEn || upsell.message);
-                  const upsellImage = upsell.image || upsell.product.images[0];
+                  const upsellImage = upsell.image === '__product__' ? upsell.product.images[0] : (upsell.image || null);
 
                   return (
                     <div
@@ -397,8 +421,12 @@ export default function CartDrawer() {
                             className="object-cover w-full h-full"
                           />
                         ) : (
-                          <div className={`w-full h-full flex items-center justify-center ${darkMode ? 'bg-white/10' : 'bg-black/10'}`}>
-                            <Gift size={16} className="text-primary/50" />
+                          <div className={`w-full h-full flex items-center justify-center ${
+                            upsell.isFreeGift
+                              ? 'bg-green-500/20'
+                              : darkMode ? 'bg-white/10' : 'bg-black/10'
+                          }`}>
+                            <Gift size={20} className={upsell.isFreeGift ? 'text-green-500' : 'text-primary'} />
                           </div>
                         )}
                       </div>
@@ -449,30 +477,94 @@ export default function CartDrawer() {
                         </div>
                       </div>
 
-                      {/* Add button */}
-                      <button
-                        className={`px-3 py-1.5 text-xs transition-all hover:scale-105 flex-shrink-0 ${
-                          upsell.isFreeGift
-                            ? 'bg-green-500 text-white'
-                            : 'bg-primary text-white'
-                        }`}
-                        style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
-                        onClick={() => {
-                          addToCart({
-                            id: upsell.product.id,
-                            name: language === 'fr' ? upsell.product.name : (upsell.product.nameEn || upsell.product.name),
-                            price: upsell.isFreeGift ? 0 : upsell.effectivePrice,
-                            size: 'UNIQUE',
-                            color: '',
-                            quantity: 1,
-                            image: upsell.product.images[0] || '',
+                      {/* Add button / size picker */}
+                      {(() => {
+                        const variants = upsell.product.variants || [];
+                        const sizes = Array.from(new Map(variants.map(v => [v.size, v])).values())
+                          .sort((a, b) => {
+                            const ai = SIZE_ORDER.indexOf(a.size);
+                            const bi = SIZE_ORDER.indexOf(b.size);
+                            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
                           });
-                        }}
-                      >
-                        {upsell.isFreeGift
-                          ? `+ ${language === 'fr' ? 'AJOUTER' : 'ADD'}`
-                          : `+ ${language === 'fr' ? 'AJOUTER' : 'ADD'}`}
-                      </button>
+                        const needsSizePicker = sizes.length > 0 && !(sizes.length === 1 && sizes[0].size === 'Unique');
+
+                        if (needsSizePicker && upsellSizePicker === upsell.id) {
+                          return (
+                            <div className="flex flex-col gap-1 flex-shrink-0">
+                              <div className="flex flex-wrap gap-1 justify-end">
+                                {sizes.map(v => (
+                                  <button
+                                    key={v.size}
+                                    disabled={v.stock === 0}
+                                    className={`px-2 py-1 text-[10px] transition-all border ${
+                                      v.stock === 0
+                                        ? 'opacity-30 cursor-not-allowed border-gray-400 text-gray-400'
+                                        : upsellSelectedSizes[upsell.id] === v.size
+                                          ? 'bg-primary text-white border-primary'
+                                          : darkMode
+                                            ? 'border-white/30 text-white hover:border-primary hover:text-primary'
+                                            : 'border-black/30 text-black hover:border-primary hover:text-primary'
+                                    }`}
+                                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                                    onClick={() => {
+                                      if (v.stock === 0) return;
+                                      const selectedSize = v.size;
+                                      addToCart({
+                                        id: upsell.product.id,
+                                        name: language === 'fr' ? upsell.product.name : (upsell.product.nameEn || upsell.product.name),
+                                        price: upsell.isFreeGift ? 0 : upsell.effectivePrice,
+                                        size: selectedSize,
+                                        color: '',
+                                        quantity: 1,
+                                        image: upsell.product.images[0] || '',
+                                      });
+                                      setUpsellSizePicker(null);
+                                    }}
+                                  >
+                                    {v.size}
+                                  </button>
+                                ))}
+                              </div>
+                              <button
+                                className={`text-[10px] text-center ${darkMode ? 'text-white/40 hover:text-white/70' : 'text-black/40 hover:text-black/70'}`}
+                                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                onClick={() => setUpsellSizePicker(null)}
+                              >
+                                {language === 'fr' ? 'ANNULER' : 'CANCEL'}
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <button
+                            className={`px-3 py-1.5 text-xs transition-all hover:scale-105 flex-shrink-0 ${
+                              upsell.isFreeGift
+                                ? 'bg-green-500 text-white'
+                                : 'bg-primary text-white'
+                            }`}
+                            style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
+                            onClick={() => {
+                              if (needsSizePicker) {
+                                setUpsellSizePicker(upsell.id);
+                              } else {
+                                const size = sizes[0]?.size || 'Unique';
+                                addToCart({
+                                  id: upsell.product.id,
+                                  name: language === 'fr' ? upsell.product.name : (upsell.product.nameEn || upsell.product.name),
+                                  price: upsell.isFreeGift ? 0 : upsell.effectivePrice,
+                                  size,
+                                  color: '',
+                                  quantity: 1,
+                                  image: upsell.product.images[0] || '',
+                                });
+                              }
+                            }}
+                          >
+                            + {language === 'fr' ? 'AJOUTER' : 'ADD'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   );
                 })}

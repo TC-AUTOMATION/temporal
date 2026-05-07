@@ -34,9 +34,28 @@ export async function GET(request: NextRequest) {
         // Only include image files (webp, png, jpg, jpeg)
         const imageFiles = files
           .filter((file) => /\.(webp|png|jpg|jpeg|gif|svg)$/i.test(file))
-          .sort()
+          .sort();
+
+        // Deduplicate: when both a .webp and a .png/.jpg/.jpeg exist for the
+        // same base name, keep only the .webp version.
+        const webpBaseNames = new Set(
+          imageFiles
+            .filter((f) => /\.webp$/i.test(f))
+            .map((f) => f.replace(/\.webp$/i, ''))
+        );
+
+        const deduplicated = imageFiles
+          .filter((file) => {
+            if (/\.webp$/i.test(file)) return true;
+            const baseName = file.replace(/\.(png|jpg|jpeg)$/i, '');
+            // Drop non-webp if a .webp with the same base name exists
+            if (/\.(png|jpg|jpeg)$/i.test(file) && webpBaseNames.has(baseName)) {
+              return false;
+            }
+            return true;
+          })
           .map((file) => `/${folder}/${file}`);
-        result[folder] = imageFiles;
+        result[folder] = deduplicated;
       } catch {
         // Directory doesn't exist, skip
         result[folder] = [];

@@ -1,7 +1,17 @@
-import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/db/prisma';
 import { verifyToken } from '@/lib/auth/jwt';
+import { successResponse } from '@/lib/api/response';
+
+// Safari-compatible cookie deletion: set with maxAge: 0 and matching attributes
+// instead of cookieStore.delete() which Safari may ignore.
+const expiredCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: 0,
+};
 
 /**
  * POST /api/auth/logout
@@ -22,22 +32,16 @@ export async function POST() {
       }
     }
 
-    // Clear cookie
-    cookieStore.delete('auth_token');
+    // Clear cookie (Safari-compatible)
+    cookieStore.set('auth_token', '', expiredCookieOptions);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Déconnexion réussie',
-    });
+    return successResponse({ message: 'Déconnexion réussie' });
   } catch (error) {
     console.error('Logout error:', error);
     // Still clear cookie even if there's an error
     const cookieStore = await cookies();
-    cookieStore.delete('auth_token');
+    cookieStore.set('auth_token', '', expiredCookieOptions);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Déconnexion réussie',
-    });
+    return successResponse({ message: 'Déconnexion réussie' });
   }
 }

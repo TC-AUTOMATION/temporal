@@ -32,8 +32,10 @@ async function request<T>(
 
   const response = await fetch(url, {
     ...options,
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
       ...options.headers,
     },
   });
@@ -270,16 +272,16 @@ export const products = {
     return request<Product>(`/products/${id}`);
   },
 
-  create: async (product: Partial<Product>) => {
+  create: async (product: Record<string, unknown>) => {
     return request<Product>('/products', {
       method: 'POST',
       body: JSON.stringify(product),
     });
   },
 
-  update: async (id: string, product: Partial<Product>) => {
+  update: async (id: string, product: Record<string, unknown>) => {
     return request<Product>(`/products/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(product),
     });
   },
@@ -317,13 +319,18 @@ export interface Order {
   shippingCity: string | null;
   shippingPostalCode: string | null;
   shippingCountry: string | null;
+  // Relay point info
+  relayCarrier: string | null;
+  relayPointCode: string | null;
+  relayPointName: string | null;
+  relayPointAddress: string | null;
   subtotal: number;
   shippingCost: number;
   discount: number;
   total: number;
   status: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED';
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
-  deliveryMethod: 'DELIVERY' | 'HAND_DELIVERY';
+  deliveryMethod: 'DELIVERY' | 'RELAY' | 'HAND_DELIVERY';
   trackingNumber: string | null;
   trackingUrl: string | null;
   shippedAt: string | null;
@@ -334,6 +341,18 @@ export interface Order {
   items: OrderItem[];
   promoCode?: { code: string; type: string; value: number } | null;
   user?: { id: string; email: string; firstName: string | null; lastName: string | null } | null;
+  shipment?: {
+    id: string;
+    boxtalReference: string | null;
+    carrier: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+    labelUrl: string | null;
+    status: string;
+    weight: number | null;
+    dimensions: Record<string, number> | null;
+    createdAt: string;
+  } | null;
 }
 
 export interface OrderItem {
@@ -350,11 +369,12 @@ export interface OrderItem {
 }
 
 export const orders = {
-  list: async (params?: { status?: string; limit?: number; offset?: number }) => {
+  list: async (params?: { status?: string; limit?: number; offset?: number; mine?: boolean }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set('status', params.status);
     if (params?.limit) searchParams.set('limit', params.limit.toString());
     if (params?.offset) searchParams.set('offset', params.offset.toString());
+    if (params?.mine) searchParams.set('mine', 'true');
 
     const query = searchParams.toString();
     return request<{
@@ -389,8 +409,9 @@ export const orders = {
 export interface PromoCode {
   id: string;
   code: string;
-  type: 'PERCENTAGE' | 'FIXED' | 'FREE_SHIPPING';
+  type: 'PERCENTAGE' | 'FIXED' | 'FREE_SHIPPING' | 'PER_TRANCHE';
   value: number;
+  trancheSize: number | null;
   minPurchase: number | null;
   maxDiscount: number | null;
   maxUses: number | null;
@@ -412,6 +433,19 @@ export const promo = {
     return request<PromoCode>('/promo', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: Partial<PromoCode>) => {
+    return request<PromoCode>(`/promo/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string) => {
+    return request<{ message?: string; _deactivated?: boolean }>(`/promo/${id}`, {
+      method: 'DELETE',
     });
   },
 
@@ -452,6 +486,7 @@ export interface CheckoutData {
   country?: string;
   // Relay point info
   relayPointId?: string;
+  relayPointCode?: string;
   relayPointName?: string;
   relayPointAddress?: string;
   relayPointCity?: string;

@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
       prisma.product.count({ where }),
     ]);
 
-    const response = successResponse({
+    return successResponse({
       products,
       pagination: {
         total,
@@ -122,11 +122,6 @@ export async function GET(request: NextRequest) {
         hasMore: offset + products.length < total,
       },
     });
-    // Anti-cache headers for Safari compatibility
-    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('Expires', '0');
-    return response;
   } catch (error) {
     console.error('GET /api/products error:', error);
     return serverErrorResponse();
@@ -221,6 +216,26 @@ export async function POST(request: NextRequest) {
         stripeProductId: stripeProduct.id,
         stripePriceId: stripePrice.id,
       },
+    });
+
+    // Create variants if provided
+    if (data.variants && data.variants.length > 0) {
+      await prisma.productVariant.createMany({
+        data: data.variants.map((v: { sku: string; color: string; colorHex?: string | null; size: string; stock: number; isActive?: boolean }) => ({
+          productId: product.id,
+          sku: v.sku,
+          color: v.color,
+          colorHex: v.colorHex || null,
+          size: v.size,
+          stock: v.stock,
+          isActive: v.isActive ?? true,
+        })),
+      });
+    }
+
+    // Re-fetch with relations
+    const fullProduct = await prisma.product.findUnique({
+      where: { id: product.id },
       include: {
         category: true,
         variants: true,
@@ -229,7 +244,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return successResponse(product, 201);
+    return successResponse(fullProduct, 201);
   } catch (error) {
     console.error('POST /api/products error:', error);
     return serverErrorResponse();

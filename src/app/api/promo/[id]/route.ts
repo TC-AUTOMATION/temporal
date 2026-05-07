@@ -72,9 +72,11 @@ export async function PUT(
       }
     }
 
-    // Sync changes to Stripe
+    // Sync changes to Stripe (skip for dynamic PER_TRANCHE - applied at checkout)
     const stripe = getStripe();
-    const needsStripeRecreate = data.type !== undefined || data.value !== undefined;
+    const effectiveType = data.type || existing.type;
+    const isDynamic = effectiveType === 'PER_TRANCHE';
+    const needsStripeRecreate = !isDynamic && (data.type !== undefined || data.value !== undefined);
 
     if (needsStripeRecreate && existing.stripePromoId) {
       // Discount parameters changed - deactivate old promo and create new coupon+promo
@@ -157,6 +159,7 @@ export async function PUT(
         ...(data.code && { code: data.code }),
         ...(data.type && { type: data.type }),
         ...(data.value !== undefined && { value: data.value }),
+        ...(data.trancheSize !== undefined && { trancheSize: data.trancheSize }),
         ...(data.minPurchase !== undefined && { minPurchase: data.minPurchase }),
         ...(data.maxDiscount !== undefined && { maxDiscount: data.maxDiscount }),
         ...(data.maxUses !== undefined && { maxUses: data.maxUses }),

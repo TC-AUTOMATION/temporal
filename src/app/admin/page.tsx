@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAdminStore } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
 import {
@@ -16,18 +16,37 @@ import {
   Clock,
   CheckCircle,
   Truck,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboard() {
   const { getDashboardStats, orders, products, fetchProducts, fetchOrders, fetchPromoCodes } = useAdminStore();
   const { darkMode, language } = useStore();
+  const [onlineVisitors, setOnlineVisitors] = useState(0);
+
+  const fetchOnlineVisitors = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/online-visitors');
+      if (res.ok) {
+        const data = await res.json();
+        setOnlineVisitors(data.count);
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
 
   useEffect(() => {
     fetchProducts();
     fetchOrders();
     fetchPromoCodes();
-  }, [fetchProducts, fetchOrders, fetchPromoCodes]);
+    fetchOnlineVisitors();
+
+    // Refresh online visitors every 10 seconds
+    const interval = setInterval(fetchOnlineVisitors, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchProducts, fetchOrders, fetchPromoCodes, fetchOnlineVisitors]);
 
   const stats = getDashboardStats();
 
@@ -36,6 +55,8 @@ export default function AdminDashboard() {
     welcome: language === 'fr' ? 'Bienvenue sur votre Tableau de Bord' : 'Welcome to your Dashboard',
     overview: language === 'fr' ? 'Voici un aperçu de votre activité' : "Here's an overview of your activity",
     today: language === 'fr' ? "Aujourd'hui" : 'Today',
+    onlineNow: language === 'fr' ? 'En ligne' : 'Online Now',
+    live: language === 'fr' ? 'En direct' : 'Live',
     revenue: language === 'fr' ? 'Revenus' : 'Revenue',
     totalOrders: language === 'fr' ? 'Commandes' : 'Total Orders',
     pending: language === 'fr' ? 'En attente' : 'Pending',
@@ -78,6 +99,17 @@ export default function AdminDashboard() {
   const lowStockProducts = products.filter((p) => p.totalStock < 10);
 
   const statCards = [
+    {
+      title: t.onlineNow,
+      value: onlineVisitors.toString(),
+      change: t.live,
+      trend: 'up' as const,
+      icon: Users,
+      color: 'from-emerald-500/20 to-green-500/20',
+      iconColor: 'text-emerald-400',
+      borderColor: 'border-emerald-500/20',
+      isLive: true,
+    },
     {
       title: t.revenue,
       value: `${Number(stats.totalRevenue).toFixed(0)}€`,
@@ -199,7 +231,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {statCards.map((stat) => (
           <div
             key={stat.title}
@@ -209,10 +241,20 @@ export default function AdminDashboard() {
               <div className={`p-2.5 rounded-xl ${darkMode ? 'bg-white/5' : 'bg-white/50'} ${stat.iconColor}`}>
                 <stat.icon size={20} />
               </div>
-              <div className={`flex items-center gap-1 text-xs ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                {stat.trend === 'up' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                {stat.change}
-              </div>
+              {'isLive' in stat && stat.isLive ? (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                  </span>
+                  {stat.change}
+                </div>
+              ) : (
+                <div className={`flex items-center gap-1 text-xs ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                  {stat.trend === 'up' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                  {stat.change}
+                </div>
+              )}
             </div>
             <p
               className={`text-3xl mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}

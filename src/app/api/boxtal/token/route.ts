@@ -53,18 +53,29 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
+    // Handle both camelCase and snake_case responses from Boxtal API
+    const accessToken = data.accessToken || data.access_token;
+    const expiresIn = data.expiresIn || data.expires_in || 3600;
+
+    if (!accessToken) {
+      console.error('Boxtal token response missing accessToken:', JSON.stringify(data));
+      return NextResponse.json(
+        { error: 'No access token in Boxtal response' },
+        { status: 500 }
+      );
+    }
+
     // Cache the token (expires in 1 hour, cache for 55 minutes to be safe)
-    const expiresIn = data.expiresIn || 3600;
     cachedToken = {
-      accessToken: data.accessToken,
+      accessToken,
       expiresAt: Date.now() + (expiresIn - 300) * 1000, // 5 minutes buffer
     };
 
     console.log('Boxtal token obtained successfully');
 
     return NextResponse.json({
-      accessToken: data.accessToken,
-      expiresIn: expiresIn,
+      accessToken,
+      expiresIn,
     });
   } catch (error) {
     console.error('Error generating Boxtal token:', error);

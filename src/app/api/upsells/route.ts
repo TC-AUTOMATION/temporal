@@ -38,6 +38,11 @@ export async function GET(request: NextRequest) {
                 slug: true,
               },
             },
+            variants: {
+              where: { isActive: true },
+              select: { id: true, size: true, stock: true },
+              orderBy: { id: 'asc' },
+            },
           },
         },
       },
@@ -49,11 +54,16 @@ export async function GET(request: NextRequest) {
       if (!upsell.product.isActive) return false;
 
       switch (upsell.triggerType) {
+        case 'always':
+          return true;
+
         case 'cart_total':
           return cartTotal >= parseFloat(upsell.triggerValue);
 
-        case 'product_in_cart':
-          return productIds.includes(upsell.triggerValue);
+        case 'product_in_cart': {
+          const triggerProducts = upsell.triggerValue.split(',').map((s: string) => s.trim());
+          return triggerProducts.some((tp: string) => productIds.includes(tp));
+        }
 
         case 'category_in_cart':
           return categoryIds.includes(upsell.triggerValue);
@@ -65,9 +75,20 @@ export async function GET(request: NextRequest) {
 
     // Add computed fields: whether the item qualifies as free
     const enrichedUpsells = matchingUpsells.map((upsell) => {
-      const isFreeGift = upsell.freeThreshold
+      // Si l'upsell exige que certains produits soient dans le panier pour
+      // devenir gratuit (ex: « ensemble blanc » ou « ensemble noir »), on
+      // vérifie qu'au moins un de ces produits est présent.
+      const requiredIds = (upsell as { freeRequiredProductIds?: string[] }).freeRequiredProductIds || [];
+      const requiredIdsSatisfied =
+        requiredIds.length === 0 || requiredIds.some((id) => productIds.includes(id));
+
+      const thresholdReached = upsell.freeThreshold
         ? cartTotal >= Number(upsell.freeThreshold)
-        : upsell.discountType === 'free';
+        : false;
+
+      const isFreeGift = upsell.freeThreshold
+        ? thresholdReached && requiredIdsSatisfied
+        : upsell.discountType === 'free' && requiredIdsSatisfied;
 
       let effectivePrice = Number(upsell.product.price);
 
@@ -87,7 +108,15 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return successResponse({ upsells: enrichedUpsells });
+    // List of ALL product IDs that are configured as upsells for this display
+    // location (regardless of whether their conditions currently match). This
+    // allows the client to detect upsells that were added previously but no
+    // longer qualify, and auto-remove them from the cart.
+    const allUpsellProductIds = upsells
+      .filter((u) => u.product.isActive)
+      .map((u) => u.product.id);
+
+    return successResponse({ upsells: enrichedUpsells, allUpsellProductIds });
   } catch (error) {
     console.error('GET /api/upsells error:', error);
     return serverErrorResponse();

@@ -52,7 +52,7 @@ export default function WishlistPage() {
       setCartOpen(true);
     } else {
       // Navigate to product page to select size
-      router.push(`/products/${item.product.slug}`);
+      router.push(`/products/${item.product.id}`);
     }
   };
 
@@ -140,7 +140,7 @@ export default function WishlistPage() {
                   }`}
                 >
                   {/* Image */}
-                  <Link href={`/products/${item.product.slug}`} className="block aspect-[3/4] relative overflow-hidden">
+                  <Link href={`/products/${item.product.id}`} className="block aspect-[3/4] relative overflow-hidden">
                     {item.product.images[0] ? (
                       <Image
                         src={item.product.images[0]}
@@ -180,7 +180,7 @@ export default function WishlistPage() {
 
                   {/* Info */}
                   <div className="p-4">
-                    <Link href={`/products/${item.product.slug}`}>
+                    <Link href={`/products/${item.product.id}`}>
                       <p className={`text-xs mb-2 ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
                         {item.product.category.name}
                       </p>

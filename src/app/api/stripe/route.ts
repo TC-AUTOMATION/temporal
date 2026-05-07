@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db/prisma';
 import { checkoutSchema } from '@/lib/validations';
 import { getCurrentUser, generateOrderNumber } from '@/lib/auth/jwt';
 import { Prisma } from '@prisma/client';
+import { getGaugeConfig, getFreeShippingThreshold } from '@/lib/gauge';
+import { expandWithBundleComponents } from '@/lib/stock';
 
 type DecimalType = Prisma.Decimal;
 const DecimalCtor = Prisma.Decimal;
@@ -18,13 +20,20 @@ function getStripe() {
 
 /**
  * POST /api/stripe
- * Create a Stripe checkout session and prepare the order
- * All stock validation and decrement happens inside a transaction to prevent race conditions
+ * Create a Stripe checkout session and prepare the order.
+ *
+ * Flow:
+ * 1. Validate input
+ * 2. Transaction: validate stock, decrement stock, validate promo, create PENDING order
+ *    - Promo usedCount is NOT incremented here (done in webhook on payment success)
+ * 3. Create Stripe checkout session
+ * 4. If Stripe fails → rollback: cancel order, restore stock
+ * 5. Link session ID to order
  */
 export async function POST(request: NextRequest) {
   try {
     const stripe = getStripe();
-    const user = await getCurrentUser();
+    const currentUser = await getCurrentUser();
     const body = await request.json();
 
     // Validate input
@@ -37,6 +46,34 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data;
+
+    // Guest → account creation on opt-in
+    // If a guest checks "create my account", we create a passwordless User row
+    // matching the checkout email so subsequent orders link to the same profile
+    // and the customer can later claim it via the reset-password flow.
+    let user = currentUser;
+    if (!user && data.createAccount) {
+      const email = data.email.toLowerCase();
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (!existing) {
+        user = await prisma.user.create({
+          data: {
+            email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phone: data.phone,
+            // No password yet — they claim via /reset-password
+            newsletter: true,
+          },
+        });
+      } else if (!existing.password) {
+        // Existing passwordless account from a previous checkout — reuse it
+        user = existing;
+      }
+      // If an account with a password exists, we intentionally DON'T link
+      // (security: the guest may not be the account owner). They can sign
+      // in and retry instead.
+    }
 
     // Determine delivery method and shipping
     const isRelay = data.deliveryMethod === 'RELAY';
@@ -61,7 +98,11 @@ export async function POST(request: NextRequest) {
       shippingDescription = 'Colissimo avec suivi - 48-72h';
     }
 
-    // Use a transaction for all database operations to prevent race conditions
+    // Read the free-shipping threshold from the gauge config (null if none set)
+    const gaugeConfig = await getGaugeConfig();
+    const freeShippingThreshold = getFreeShippingThreshold(gaugeConfig);
+
+    // Use a transaction for all database operations
     const result = await prisma.$transaction(async (tx) => {
       // Fetch products with variants (inside transaction for consistency)
       const productIds = data.items.map(item => item.productId);
@@ -71,7 +112,9 @@ export async function POST(request: NextRequest) {
       });
 
       if (products.length !== productIds.length) {
-        throw new Error('Un ou plusieurs produits sont introuvables');
+        const foundIds = products.map(p => p.id);
+        const missingIds = productIds.filter(id => !foundIds.includes(id));
+        throw new Error(`Certains articles de votre panier ne sont plus disponibles. Veuillez vider votre panier et réessayer. (IDs: ${missingIds.join(', ')})`);
       }
 
       // Build line items and validate/decrement stock
@@ -109,6 +152,12 @@ export async function POST(request: NextRequest) {
           }
           // Queue for stock decrement
           variantsToDecrement.push({ id: variant.id, quantity: item.quantity });
+        } else if (product.variants.length > 0) {
+          // Product has variants but no size/color specified - check total stock
+          const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+          if (totalStock < item.quantity) {
+            throw new Error(`Stock insuffisant pour ${product.name}. Disponible: ${totalStock}`);
+          }
         }
 
         const unitPrice = new DecimalCtor(product.price.toString());
@@ -122,7 +171,6 @@ export async function POST(request: NextRequest) {
             quantity: item.quantity,
           });
         } else {
-          // Fallback to price_data for products not yet synced
           lineItems.push({
             price_data: {
               currency: 'eur',
@@ -151,15 +199,32 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Decrement stock for all variants (inside transaction)
-      for (const v of variantsToDecrement) {
-        await tx.productVariant.update({
-          where: { id: v.id },
+      // Atomic stock decrement with guard: fail if stock would go negative.
+      // On étend les variantes "bundle" en leurs composants (ex: ensemble = veste + jogging).
+      const expandedDecrements = await expandWithBundleComponents(tx, variantsToDecrement);
+      for (const v of expandedDecrements) {
+        const updated = await tx.productVariant.updateMany({
+          where: { id: v.id, stock: { gte: v.quantity } },
           data: { stock: { decrement: v.quantity } },
         });
+        if (updated.count === 0) {
+          throw new Error('Stock insuffisant (mis à jour par une autre commande)');
+        }
       }
 
-      // Apply promo code with per-user validation
+      // Apply free shipping if the cart reached the gauge threshold
+      if (
+        freeShippingThreshold != null &&
+        !isHandDelivery &&
+        subtotal.gte(freeShippingThreshold)
+      ) {
+        shippingCost = new DecimalCtor(0);
+        shippingDescription = shippingDescription
+          ? `${shippingDescription} (offerte)`
+          : 'Livraison offerte';
+      }
+
+      // Validate promo code (but do NOT increment usedCount - that happens on payment confirmation)
       let discount = new DecimalCtor(0);
       let promoCodeId: string | undefined;
 
@@ -174,7 +239,6 @@ export async function POST(request: NextRequest) {
           const validUntil = promo.validUntil || new Date('2099-12-31');
 
           if (now >= validFrom && now <= validUntil) {
-            // Check global max uses
             if (!promo.maxUses || promo.usedCount < promo.maxUses) {
               // Check per-user limit if user is authenticated
               if (promo.maxUsesPerUser && user?.id) {
@@ -202,13 +266,22 @@ export async function POST(request: NextRequest) {
                   discount = new DecimalCtor(promo.value.toString());
                 } else if (promo.type === 'FREE_SHIPPING') {
                   discount = shippingCost;
+                } else if (promo.type === 'PER_TRANCHE') {
+                  const trancheSize = promo.trancheSize
+                    ? new DecimalCtor(promo.trancheSize.toString())
+                    : new DecimalCtor(100);
+                  const tranches = Math.floor(Number(subtotal.div(trancheSize)));
+                  discount = new DecimalCtor(tranches).mul(promo.value);
+                  if (promo.maxDiscount && discount.gt(promo.maxDiscount)) {
+                    discount = new DecimalCtor(promo.maxDiscount.toString());
+                  }
+                  if (discount.gt(subtotal)) {
+                    discount = subtotal;
+                  }
                 }
 
-                // Increment promo code usage count
-                await tx.promoCode.update({
-                  where: { id: promo.id },
-                  data: { usedCount: { increment: 1 } },
-                });
+                // NOTE: usedCount is incremented in webhook handleCheckoutCompleted
+                // This prevents promo from being "used" if payment never completes
               }
             }
           }
@@ -220,17 +293,17 @@ export async function POST(request: NextRequest) {
       // Generate order number
       const orderNumber = generateOrderNumber();
 
-      // Build shipping address based on delivery method
-      let shippingStreet = data.address;
-      let shippingCity = data.city;
-      let shippingPostalCode = data.postalCode;
+      // Billing address is ALWAYS the real person's address (collected on the checkout form)
+      // Shipping address is what the carrier sees:
+      //   - DELIVERY     → same as billing
+      //   - RELAY        → the relay point address
+      //   - HAND_DELIVERY → same as billing (will be overridden by direct handover anyway)
+      let shippingStreet: string | null = data.address;
+      let shippingCity: string | null = data.city;
+      let shippingPostalCode: string | null = data.postalCode;
 
-      // For relay points, store relay info in shipping address
-      // Format: [RELAY:carrier-boxtalCode] Name - Address
-      if (isRelay && data.relayPointId) {
-        const relayCode = data.relayPointCode || data.relayPointId.split('-').slice(1).join('-');
-        const relayId = data.relayCarrier ? `${data.relayCarrier}-${relayCode}` : data.relayPointId;
-        shippingStreet = `[RELAY:${relayId}] ${data.relayPointName || ''} - ${data.relayPointAddress || ''}`;
+      if (isRelay && data.relayPointName) {
+        shippingStreet = data.relayPointAddress || data.relayPointName;
         shippingCity = data.relayPointCity || data.city;
         shippingPostalCode = data.relayPointPostalCode || data.postalCode;
       }
@@ -244,19 +317,27 @@ export async function POST(request: NextRequest) {
           customerPhone: data.phone,
           customerFirstName: data.firstName,
           customerLastName: data.lastName,
+          // Billing (always the real person)
+          billingStreet: data.address,
+          billingCity: data.city,
+          billingPostalCode: data.postalCode,
+          billingCountry: data.country,
+          // Shipping (where the carrier drops the parcel)
           shippingStreet,
           shippingCity,
           shippingPostalCode,
           shippingCountry: data.country,
+          relayCarrier: isRelay ? (data.relayCarrier || null) : null,
+          relayPointCode: isRelay ? (data.relayPointCode || data.relayPointId?.split('-').slice(1).join('-') || null) : null,
+          relayPointName: isRelay ? (data.relayPointName || null) : null,
+          relayPointAddress: isRelay ? (`${data.relayPointAddress || ''}${data.relayPointCity ? ', ' + data.relayPointPostalCode + ' ' + data.relayPointCity : ''}` || null) : null,
           subtotal,
           shippingCost,
           discount,
           total,
-          deliveryMethod: isRelay ? 'DELIVERY' : (data.deliveryMethod as 'DELIVERY' | 'HAND_DELIVERY'), // Map RELAY to DELIVERY for DB enum
+          deliveryMethod: data.deliveryMethod as 'DELIVERY' | 'RELAY' | 'HAND_DELIVERY',
           promoCodeId,
-          customerNotes: isRelay
-            ? `[POINT RELAIS: ${data.relayCarrier || ''} - ${data.relayPointName || ''}]\n${data.notes || ''}`
-            : data.notes,
+          customerNotes: data.notes || null,
           status: 'PENDING',
           paymentStatus: 'PENDING',
           items: {
@@ -265,7 +346,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return { order, lineItems, discount, orderNumber };
+      return { order, lineItems, discount, orderNumber, variantsToDecrement, promoCodeId };
     });
 
     // Add shipping to Stripe if applicable
@@ -283,25 +364,47 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: result.lineItems,
-      mode: 'payment',
-      customer_email: data.email,
-      metadata: {
-        orderId: result.order.id,
-        orderNumber: result.order.orderNumber,
-      },
-      // Apply discount as coupon if applicable
-      ...(result.discount.gt(0) ? {
-        discounts: [{
-          coupon: await createStripeCoupon(stripe, result.discount, data.promoCode || 'PROMO'),
-        }],
-      } : {}),
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin')}/checkout?success=true&order=${result.orderNumber}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin')}/checkout?canceled=true`,
-    });
+    // Create Stripe checkout session - if this fails, rollback the order
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await stripe.checkout.sessions.create(
+        {
+          payment_method_types: ['card'],
+          line_items: result.lineItems,
+          mode: 'payment',
+          customer_email: data.email,
+          metadata: {
+            orderId: result.order.id,
+            orderNumber: result.order.orderNumber,
+          },
+          ...(result.discount.gt(0) ? {
+            discounts: [{
+              coupon: await createStripeCoupon(stripe, result.discount, data.promoCode || 'PROMO'),
+            }],
+          } : {}),
+          success_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin')}/checkout?success=true&order=${result.orderNumber}`,
+          cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin')}/checkout?canceled=true`,
+        },
+        // Idempotency key prevents duplicate sessions on retry
+        { idempotencyKey: `checkout-${result.order.id}` }
+      );
+    } catch (stripeError) {
+      // Stripe session creation failed → rollback order, restore stock
+      console.error('Stripe session creation failed, rolling back:', stripeError);
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
+          where: { id: result.order.id },
+          data: { status: 'CANCELLED', paymentStatus: 'FAILED' },
+        });
+        for (const v of result.variantsToDecrement) {
+          await tx.productVariant.update({
+            where: { id: v.id },
+            data: { stock: { increment: v.quantity } },
+          });
+        }
+      });
+      throw stripeError;
+    }
 
     // Update order with Stripe session ID
     await prisma.order.update({
@@ -310,15 +413,18 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      sessionId: session.id,
-      sessionUrl: session.url,
-      orderNumber: result.order.orderNumber,
+      success: true,
+      data: {
+        sessionId: session.id,
+        sessionUrl: session.url,
+        orderNumber: result.order.orderNumber,
+      },
     });
   } catch (error) {
     console.error('Stripe checkout error:', error);
     const message = error instanceof Error ? error.message : 'Erreur lors de la création du paiement';
     return NextResponse.json(
-      { error: message },
+      { success: false, error: message },
       { status: 500 }
     );
   }

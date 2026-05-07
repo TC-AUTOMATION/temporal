@@ -13,6 +13,8 @@ import { sendEmail } from '@/lib/email/send';
 import { orderConfirmationEmail, paymentFailedEmail } from '@/lib/email/templates';
 import { checkAndNotifyLowStock } from '@/lib/stockAlerts';
 import { createShipmentForOrder } from '@/lib/boxtal';
+import { enterOrderInContests } from '@/lib/contests';
+import { expandWithBundleComponents } from '@/lib/stock';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -174,6 +176,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   try {
+    // Check if already processed (idempotency guard)
+    const existing = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!existing || existing.paymentStatus === 'PAID') {
+      console.log(`Order ${orderId} already processed, skipping checkout.completed`);
+      return;
+    }
+
     // Update order status
     const order = await prisma.order.update({
       where: { id: orderId },
@@ -199,12 +208,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       },
     });
 
-    // Stock was decremented and promo usage incremented in /api/stripe route
+    // Increment promo code usage now that payment is confirmed
+    if (order.promoCodeId) {
+      await prisma.promoCode.update({
+        where: { id: order.promoCodeId },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
     // Check stock levels and notify if low
     for (const item of order.items) {
       if (item.variantId) {
         await checkAndNotifyLowStock(item.variantId);
       }
+    }
+
+    // Enter the order into every eligible active contest
+    try {
+      const entered = await enterOrderInContests(order.id);
+      if (entered > 0) {
+        console.log(`Order ${order.orderNumber} entered into ${entered} contest(s)`);
+      }
+    } catch (e) {
+      console.error(`Failed to enter order ${order.orderNumber} into contests:`, e);
     }
 
     // Create admin notification (includes email for hand delivery)
@@ -230,52 +256,32 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     if (order.deliveryMethod !== 'HAND_DELIVERY') {
       try {
-        // Extract relay info from customerNotes if present
-        let relayCarrier: string | undefined;
-        let relayPointCode: string | undefined;
-
-        if (order.customerNotes?.startsWith('[POINT RELAIS:')) {
-          const match = order.customerNotes.match(/\[POINT RELAIS:\s*(\w+)\s*-/);
-          if (match) {
-            relayCarrier = match[1].toLowerCase();
-          }
-        }
-
-        // Also check shippingStreet for relay info
-        if (order.shippingStreet?.startsWith('[RELAY:')) {
-          const match = order.shippingStreet.match(/\[RELAY:([^\]]+)\]/);
-          if (match) {
-            const parts = match[1].split('-');
-            if (parts.length >= 2) {
-              relayCarrier = parts[0];
-              relayPointCode = parts.slice(1).join('-');
-            }
-          }
-        }
-
         const shipmentResult = await createShipmentForOrder({
           orderNumber: order.orderNumber,
           customerFirstName: order.customerFirstName,
           customerLastName: order.customerLastName,
           customerEmail: order.customerEmail,
           customerPhone: order.customerPhone || '',
-          deliveryMethod: order.deliveryMethod as 'DELIVERY' | 'HAND_DELIVERY',
+          deliveryMethod: order.deliveryMethod as 'DELIVERY' | 'RELAY' | 'HAND_DELIVERY',
           shippingStreet: order.shippingStreet || undefined,
           shippingCity: order.shippingCity || undefined,
           shippingPostalCode: order.shippingPostalCode || undefined,
           shippingCountry: order.shippingCountry || 'FR',
-          relayCarrier,
-          relayPointCode,
+          // Use dedicated relay columns instead of fragile parsing
+          relayCarrier: order.relayCarrier || undefined,
+          relayPointCode: order.relayPointCode || undefined,
+          relayPointName: order.relayPointName || undefined,
         });
 
-        if (shipmentResult.success) {
+        if (shipmentResult.success && shipmentResult.trackingNumber) {
           trackingNumber = shipmentResult.trackingNumber;
           labelUrl = shipmentResult.labelUrl;
 
-          // Update order with tracking info
+          // Update order with tracking info and set to PREPARING
           await prisma.order.update({
             where: { id: order.id },
             data: {
+              status: 'PREPARING',
               trackingNumber: trackingNumber,
               adminNotes: order.adminNotes
                 ? `${order.adminNotes}\n\n[EXPÉDITION CRÉÉE ${new Date().toISOString()}]\nN° suivi: ${trackingNumber}${labelUrl ? `\nÉtiquette: ${labelUrl}` : ''}`
@@ -323,8 +329,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         city: order.shippingCity || '',
         country: order.shippingCountry || 'France',
       } : undefined,
-      relayPointName: undefined,
-      relayPointAddress: undefined,
+      relayPointName: order.relayPointName || undefined,
+      relayPointAddress: order.relayPointAddress || undefined,
       trackingNumber, // Include tracking number in email if available
     };
 
@@ -342,7 +348,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 /**
- * Handle expired checkout session - restore stock and promo code usage
+ * Handle expired checkout session - restore stock
+ * Note: promo usedCount was never incremented (only on payment success), so no need to decrement
  */
 async function handleCheckoutExpired(session: Stripe.Checkout.Session) {
   const orderId = session.metadata?.orderId;
@@ -358,32 +365,26 @@ async function handleCheckoutExpired(session: Stripe.Checkout.Session) {
 
     if (!order || order.status !== 'PENDING') return;
 
-    // Cancel the pending order, restore stock and promo code usage
+    // Cancel the pending order, restore stock
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: orderId },
         data: {
           status: 'CANCELLED',
           paymentStatus: 'FAILED',
-          adminNotes: 'Session de paiement expirée - Stock et code promo restaurés automatiquement',
+          adminNotes: 'Session de paiement expirée - Stock restauré automatiquement',
         },
       });
 
-      // Restore stock for variants
-      for (const item of order.items) {
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
-          });
-        }
-      }
-
-      // Restore promo code usage if one was used
-      if (order.promoCodeId) {
-        await tx.promoCode.update({
-          where: { id: order.promoCodeId },
-          data: { usedCount: { decrement: 1 } },
+      // Restore stock for variants (y compris composants des bundles)
+      const restoreOps = order.items
+        .filter((item) => item.variantId)
+        .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
+      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
+      for (const v of expandedRestore) {
+        await tx.productVariant.update({
+          where: { id: v.id },
+          data: { stock: { increment: v.quantity } },
         });
       }
     });
@@ -395,7 +396,7 @@ async function handleCheckoutExpired(session: Stripe.Checkout.Session) {
 }
 
 /**
- * Handle failed payment - send email to customer
+ * Handle failed payment - restore stock and promo, send email to customer
  */
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   // Find order by payment intent or session
@@ -406,44 +407,65 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
         { stripeSessionId: paymentIntent.metadata?.sessionId },
       ],
     },
+    include: { items: true },
   });
 
-  if (order) {
-    await prisma.order.update({
+  if (!order) return;
+
+  // Only process if order is still PENDING - prevent downgrading PAID/CONFIRMED orders
+  if (order.paymentStatus !== 'PENDING') {
+    console.log(`Skipping payment_failed for order ${order.orderNumber} - already ${order.paymentStatus}`);
+    return;
+  }
+
+  // Restore stock in a transaction (promo was never incremented for PENDING orders)
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
       where: { id: order.id },
       data: {
         paymentStatus: 'FAILED',
         adminNotes: order.adminNotes
-          ? `${order.adminNotes}\n\n[PAIEMENT ÉCHOUÉ ${new Date().toISOString()}]\n${paymentIntent.last_payment_error?.message || 'Erreur inconnue'}`
-          : `[PAIEMENT ÉCHOUÉ ${new Date().toISOString()}]\n${paymentIntent.last_payment_error?.message || 'Erreur inconnue'}`,
+          ? `${order.adminNotes}\n\n[PAIEMENT ÉCHOUÉ ${new Date().toISOString()}]\n${paymentIntent.last_payment_error?.message || 'Erreur inconnue'}\nStock restauré`
+          : `[PAIEMENT ÉCHOUÉ ${new Date().toISOString()}]\n${paymentIntent.last_payment_error?.message || 'Erreur inconnue'}\nStock restauré`,
       },
     });
 
-    // Create admin notification
-    await notifyPaymentFailed({
-      orderNumber: order.orderNumber,
-      customerEmail: order.customerEmail,
-      error: paymentIntent.last_payment_error?.message || undefined,
-    });
-
-    // Send payment failed email to customer
-    try {
-      await sendEmail({
-        to: order.customerEmail,
-        subject: `Échec du paiement - Commande #${order.orderNumber} - Temporal`,
-        html: paymentFailedEmail({
-          orderNumber: order.orderNumber,
-          customerFirstName: order.customerFirstName,
-          errorMessage: paymentIntent.last_payment_error?.message || undefined,
-        }),
+    // Restore stock for variants (y compris composants des bundles)
+    const restoreOps = order.items
+      .filter((item) => item.variantId)
+      .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
+    const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
+    for (const v of expandedRestore) {
+      await tx.productVariant.update({
+        where: { id: v.id },
+        data: { stock: { increment: v.quantity } },
       });
-      console.log(`Payment failed email sent for order ${order.orderNumber}`);
-    } catch (emailError) {
-      console.error('Failed to send payment failed email:', emailError);
     }
+  });
 
-    console.log(`Payment failed for order ${order.orderNumber}`);
+  // Create admin notification
+  await notifyPaymentFailed({
+    orderNumber: order.orderNumber,
+    customerEmail: order.customerEmail,
+    error: paymentIntent.last_payment_error?.message || undefined,
+  });
+
+  // Send payment failed email to customer
+  try {
+    await sendEmail({
+      to: order.customerEmail,
+      subject: `Échec du paiement - Commande #${order.orderNumber} - Temporal`,
+      html: paymentFailedEmail({
+        orderNumber: order.orderNumber,
+        customerFirstName: order.customerFirstName,
+        errorMessage: paymentIntent.last_payment_error?.message || undefined,
+      }),
+    });
+  } catch (emailError) {
+    console.error('Failed to send payment failed email:', emailError);
   }
+
+  console.log(`Payment failed for order ${order.orderNumber} - stock and promo restored`);
 }
 
 /**
@@ -481,29 +503,47 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   const isFullRefund = refundedAmount >= totalAmount;
 
   try {
+    // Calculate refund ratio for proportional stock restoration
+    const refundRatio = Math.min(refundedAmount / totalAmount, 1);
+
     await prisma.$transaction(async (tx) => {
-      // Update order status
       await tx.order.update({
         where: { id: order.id },
         data: {
           status: isFullRefund ? 'REFUNDED' : order.status,
           paymentStatus: isFullRefund ? 'REFUNDED' : 'PAID',
           adminNotes: order.adminNotes
-            ? `${order.adminNotes}\n\n[REMBOURSEMENT STRIPE ${new Date().toISOString()}]\nMontant: ${refundedAmount.toFixed(2)}€ (via Stripe)`
-            : `[REMBOURSEMENT STRIPE ${new Date().toISOString()}]\nMontant: ${refundedAmount.toFixed(2)}€ (via Stripe)`,
+            ? `${order.adminNotes}\n\n[REMBOURSEMENT STRIPE ${new Date().toISOString()}]\nMontant: ${refundedAmount.toFixed(2)}€ ${isFullRefund ? '(total)' : '(partiel)'} - Stock restauré proportionnellement`
+            : `[REMBOURSEMENT STRIPE ${new Date().toISOString()}]\nMontant: ${refundedAmount.toFixed(2)}€ ${isFullRefund ? '(total)' : '(partiel)'} - Stock restauré proportionnellement`,
         },
       });
 
-      // Restore stock for full refunds
-      if (isFullRefund) {
-        for (const item of order.items) {
-          if (item.variantId) {
-            await tx.productVariant.update({
-              where: { id: item.variantId },
-              data: { stock: { increment: item.quantity } },
-            });
-          }
+      // Restore stock proportionally to refund amount (y compris composants des bundles)
+      // Full refund: restore all stock. Partial: restore proportional amount (rounded down)
+      const restoreOps: { id: string; quantity: number }[] = [];
+      for (const item of order.items) {
+        if (!item.variantId) continue;
+        const restoreQty = isFullRefund
+          ? item.quantity
+          : Math.floor(item.quantity * refundRatio);
+        if (restoreQty > 0) {
+          restoreOps.push({ id: item.variantId, quantity: restoreQty });
         }
+      }
+      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
+      for (const v of expandedRestore) {
+        await tx.productVariant.update({
+          where: { id: v.id },
+          data: { stock: { increment: v.quantity } },
+        });
+      }
+
+      // Restore promo code usage on full refund
+      if (isFullRefund && order.promoCodeId) {
+        await tx.promoCode.update({
+          where: { id: order.promoCodeId },
+          data: { usedCount: { decrement: 1 } },
+        });
       }
     });
 
@@ -512,7 +552,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
       orderNumber: order.orderNumber,
       customerEmail: order.customerEmail,
       amount: refundedAmount,
-      reason: 'Remboursement via Stripe Dashboard',
+      reason: `Remboursement ${isFullRefund ? 'total' : 'partiel'} via Stripe Dashboard`,
     });
 
     console.log(`Order ${order.orderNumber} refunded via Stripe: ${refundedAmount.toFixed(2)}€`);
@@ -593,6 +633,9 @@ async function handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
     }
 
     // Cancel order and restore stock
+    // If order was PAID (promo already incremented), also decrement promo
+    const wasPaid = order.paymentStatus === 'PAID';
+
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: order.id },
@@ -605,18 +648,20 @@ async function handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
         },
       });
 
-      // Restore stock for variants
-      for (const item of order.items) {
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
-          });
-        }
+      // Restore stock for variants (y compris composants des bundles)
+      const restoreOps = order.items
+        .filter((item) => item.variantId)
+        .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
+      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
+      for (const v of expandedRestore) {
+        await tx.productVariant.update({
+          where: { id: v.id },
+          data: { stock: { increment: v.quantity } },
+        });
       }
 
-      // Restore promo code usage
-      if (order.promoCodeId) {
+      // Only restore promo if it was incremented (i.e., order was PAID)
+      if (wasPaid && order.promoCodeId) {
         await tx.promoCode.update({
           where: { id: order.promoCodeId },
           data: { usedCount: { decrement: 1 } },
@@ -657,6 +702,12 @@ async function handleChargeFailed(charge: Stripe.Charge) {
     });
 
     if (order) {
+      // Only update if order is still PENDING - prevent downgrading PAID/CONFIRMED orders
+      if (order.paymentStatus === 'PAID' || order.status === 'CONFIRMED') {
+        console.log(`Skipping charge.failed for order ${order.orderNumber} - already ${order.paymentStatus}`);
+        return;
+      }
+
       // Update order with failure details
       await prisma.order.update({
         where: { id: order.id },
@@ -674,22 +725,6 @@ async function handleChargeFailed(charge: Stripe.Charge) {
         customerEmail: order.customerEmail,
         error: charge.failure_message || undefined,
       });
-
-      // Send email to customer if not already sent by payment_intent.payment_failed
-      try {
-        await sendEmail({
-          to: order.customerEmail,
-          subject: `Échec du paiement - Commande #${order.orderNumber} - Temporal`,
-          html: paymentFailedEmail({
-            orderNumber: order.orderNumber,
-            customerFirstName: order.customerFirstName,
-            errorMessage: charge.failure_message || undefined,
-          }),
-        });
-        console.log(`Charge failed email sent for order ${order.orderNumber}`);
-      } catch (emailError) {
-        console.error('Failed to send charge failed email:', emailError);
-      }
 
       console.log(`Charge failed for order ${order.orderNumber}: ${charge.failure_message}`);
     }
@@ -748,6 +783,12 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
     });
 
     if (order) {
+      // Skip if already refunded (idempotency guard)
+      if (order.status === 'REFUNDED') {
+        console.log(`Order ${order.orderNumber} already refunded, skipping dispute close`);
+        return;
+      }
+
       const disputeWon = dispute.status === 'won';
       const disputeLost = dispute.status === 'lost';
 
@@ -764,15 +805,24 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
           },
         });
 
-        // If dispute lost, restore stock
+        // If dispute lost, restore stock and promo
         if (disputeLost) {
-          for (const item of order.items) {
-            if (item.variantId) {
-              await tx.productVariant.update({
-                where: { id: item.variantId },
-                data: { stock: { increment: item.quantity } },
-              });
-            }
+          const restoreOps = order.items
+            .filter((item) => item.variantId)
+            .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
+          const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
+          for (const v of expandedRestore) {
+            await tx.productVariant.update({
+              where: { id: v.id },
+              data: { stock: { increment: v.quantity } },
+            });
+          }
+
+          if (order.promoCodeId) {
+            await tx.promoCode.update({
+              where: { id: order.promoCodeId },
+              data: { usedCount: { decrement: 1 } },
+            });
           }
         }
       });

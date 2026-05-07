@@ -31,6 +31,19 @@ const storeSettingsSchema = z.object({
   termsUrl: z.string().url().optional().or(z.literal('')),
   privacyUrl: z.string().url().optional().or(z.literal('')),
   returnPolicyUrl: z.string().url().optional().or(z.literal('')),
+  // Billing / invoice
+  companyLegalName: z.string().max(200).optional(),
+  companyLegalForm: z.string().max(100).optional(),
+  companyAddress: z.string().max(200).optional(),
+  companyPostalCode: z.string().max(20).optional(),
+  companyCity: z.string().max(100).optional(),
+  companyCountry: z.string().max(100).optional(),
+  companySiret: z.string().max(30).optional(),
+  companyVatNumber: z.string().max(30).optional(),
+  companyRcs: z.string().max(100).optional(),
+  companyCapital: z.string().max(50).optional(),
+  invoicePrefix: z.string().max(20).optional(),
+  invoiceFooterNote: z.string().max(500).optional(),
 });
 
 type StoreSettings = z.infer<typeof storeSettingsSchema>;
@@ -39,9 +52,9 @@ type StoreSettings = z.infer<typeof storeSettingsSchema>;
 const defaultSettings: StoreSettings = {
   storeName: 'Temporal',
   storeDescription: 'Streetwear moderne et authentique',
-  contactEmail: 'contact@temporal.fr',
-  contactPhone: '+33 1 23 45 67 89',
-  supportEmail: 'support@temporal.fr',
+  contactEmail: 'contact@temporal-clothes.com',
+  contactPhone: '07 68 28 13 95',
+  supportEmail: 'contact@temporal-clothes.com',
   shippingCostFrance: 5.99,
   shippingCostEurope: 9.99,
   shippingCostWorld: 19.99,
@@ -56,6 +69,18 @@ const defaultSettings: StoreSettings = {
   termsUrl: '',
   privacyUrl: '',
   returnPolicyUrl: '',
+  companyLegalName: 'Temporal',
+  companyLegalForm: '',
+  companyAddress: '22 Rue Pierre Brossolette',
+  companyPostalCode: '27000',
+  companyCity: 'Évreux',
+  companyCountry: 'France',
+  companySiret: '',
+  companyVatNumber: '',
+  companyRcs: '',
+  companyCapital: '',
+  invoicePrefix: 'FAC-',
+  invoiceFooterNote: 'TVA non applicable, art. 293 B du CGI.',
 };
 
 /**
@@ -145,6 +170,18 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // Support single key/value update (for siteMode, countdownDate, etc.)
+    if (body.key && body.value !== undefined) {
+      const allowedKeys = ['siteMode', 'countdownDate', 'sitePassword'];
+      if (!allowedKeys.includes(body.key)) {
+        return errorResponse('Clé non autorisée');
+      }
+      await setSetting(body.key, String(body.value), body.type || 'string');
+      return successResponse({ [body.key]: body.value });
+    }
+
+    // Bulk settings update
     const validation = storeSettingsSchema.safeParse(body);
 
     if (!validation.success) {

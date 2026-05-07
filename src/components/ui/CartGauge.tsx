@@ -58,11 +58,21 @@ export default function CartGauge() {
 
   const sortedTiers = [...gaugeConfig.tiers].sort((a, b) => a.threshold - b.threshold);
 
-  const scrollToContests = (e: React.MouseEvent) => {
+  const goToContest = (e: React.MouseEvent, tier: GaugeTier) => {
     e.stopPropagation();
-    const contestsSection = document.getElementById('contests');
-    if (contestsSection) {
-      contestsSection.scrollIntoView({ behavior: 'smooth' });
+    // Si un contestId est défini pour ce palier, on va sur la page concours
+    // avec un paramètre focus pour déclencher l'animation de mise en avant.
+    if (tier.contestId) {
+      const url = `/concours?focus=${encodeURIComponent(tier.contestId)}#contest-${encodeURIComponent(tier.contestId)}`;
+      window.location.href = url;
+      return;
+    }
+    // Fallback : si on est déjà sur la page concours, simple scroll
+    if (typeof window !== 'undefined' && window.location.pathname === '/concours') {
+      const section = document.getElementById('contests');
+      if (section) section.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.location.href = '/concours#contests';
     }
   };
 
@@ -105,7 +115,7 @@ export default function CartGauge() {
         {sortedTiers.map((tier) => (
           <button
             key={tier.id}
-            onClick={scrollToContests}
+            onClick={(e) => goToContest(e, tier)}
             className={`absolute right-0 flex items-center justify-center transition-all duration-500 cursor-pointer hover:scale-110 ${
               isTierReached(tier.threshold)
                 ? 'opacity-100'

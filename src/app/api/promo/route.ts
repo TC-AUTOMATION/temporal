@@ -107,6 +107,10 @@ export async function POST(request: NextRequest) {
         // Free shipping = fixed discount of shipping cost (5.90€)
         couponParams.amount_off = 590;
         couponParams.currency = 'eur';
+      } else if (data.type === 'PER_TRANCHE') {
+        // Dynamic discount: actual amount computed at checkout (one-time coupon).
+        // No reusable Stripe coupon is created here.
+        throw new Error('PER_TRANCHE is dynamic and applied at checkout time');
       }
 
       if (data.validUntil) {
@@ -160,6 +164,7 @@ export async function POST(request: NextRequest) {
         code: data.code,
         type: data.type,
         value: data.value,
+        trancheSize: data.trancheSize,
         minPurchase: data.minPurchase,
         maxDiscount: data.maxDiscount,
         maxUses: data.maxUses,

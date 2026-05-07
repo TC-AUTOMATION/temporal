@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Save, FolderOpen, Clock, Loader2, Check } from 'lucide-react';
+import { Save, FolderOpen, Clock, Loader2, Check, Eye, Lock, Timer } from 'lucide-react';
 
 interface StoreSettings {
   storeName: string;
@@ -29,12 +29,24 @@ interface StoreSettings {
   termsUrl: string;
   privacyUrl: string;
   returnPolicyUrl: string;
+  companyLegalName?: string;
+  companyLegalForm?: string;
+  companyAddress?: string;
+  companyPostalCode?: string;
+  companyCity?: string;
+  companyCountry?: string;
+  companySiret?: string;
+  companyVatNumber?: string;
+  companyRcs?: string;
+  companyCapital?: string;
+  invoicePrefix?: string;
+  invoiceFooterNote?: string;
 }
 
-type SectionKey = 'shipping' | 'store' | 'stock';
+type SectionKey = 'shipping' | 'store' | 'stock' | 'billing';
 
 export default function SettingsPage() {
-  const { categories, fetchCategories, products, fetchProducts, countdownDate, setCountdownDate } = useAdminStore();
+  const { categories, fetchCategories, products, fetchProducts, countdownDate, setCountdownDate, siteMode, setSiteMode } = useAdminStore();
   const { darkMode, language } = useStore();
 
   // Settings state loaded from API
@@ -54,10 +66,34 @@ export default function SettingsPage() {
   const [contactEmail, setContactEmail] = useState('');
   const [currency, setCurrency] = useState('EUR');
   const [taxRate, setTaxRate] = useState(0);
+  const [deliveryTime, setDeliveryTime] = useState('2-4');
+  const [deliveryCountries, setDeliveryCountries] = useState('France, Belgique, Suisse');
+  const [lowStockThreshold, setLowStockThreshold] = useState(10);
+  const [emailNotification, setEmailNotification] = useState(true);
+  // Billing / invoice fields
+  const [companyLegalName, setCompanyLegalName] = useState('');
+  const [companyLegalForm, setCompanyLegalForm] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyPostalCode, setCompanyPostalCode] = useState('');
+  const [companyCity, setCompanyCity] = useState('');
+  const [companyCountry, setCompanyCountry] = useState('France');
+  const [companySiret, setCompanySiret] = useState('');
+  const [companyVatNumber, setCompanyVatNumber] = useState('');
+  const [companyRcs, setCompanyRcs] = useState('');
+  const [companyCapital, setCompanyCapital] = useState('');
+  const [invoicePrefix, setInvoicePrefix] = useState('FAC-');
+  const [invoiceFooterNote, setInvoiceFooterNote] = useState('');
 
   // Translations
   const t = {
-    countdownTitle: language === 'fr' ? 'Compte à rebours landing page' : 'Landing Page Countdown',
+    siteModeTitle: language === 'fr' ? 'Mode d\'affichage du site' : 'Site Display Mode',
+    siteModeDesc: language === 'fr' ? 'Choisissez comment les visiteurs accèdent au site' : 'Choose how visitors access the site',
+    passwordMode: language === 'fr' ? 'Page d\'accès avec mot de passe' : 'Password Gate',
+    passwordModeDesc: language === 'fr' ? 'Les visiteurs doivent entrer un mot de passe pour accéder au site. Le compte à rebours est affiché sur la page d\'accueil.' : 'Visitors must enter a password to access the site. Countdown is shown on the landing page.',
+    countdownMode: language === 'fr' ? 'Boutique ouverte avec compteur' : 'Open Shop with Countdown',
+    countdownModeDesc: language === 'fr' ? 'Le site est accessible directement. Un compteur s\'affiche sur la hero section. Le paiement est bloqué tant que la date du drop n\'est pas atteinte.' : 'Site is directly accessible. A countdown is displayed on the hero section. Payment is blocked until the drop date.',
+    currentMode: language === 'fr' ? 'Mode actuel' : 'Current mode',
+    countdownTitle: language === 'fr' ? 'Compte à rebours / Date du drop' : 'Countdown / Drop Date',
     dropDate: language === 'fr' ? 'Date du drop' : 'Drop date',
     countdownDesc: language === 'fr' ? 'Le compte à rebours sur la page d\'accueil affichera le temps restant jusqu\'à cette date' : 'The countdown on the landing page will show the time remaining until this date',
     categories: language === 'fr' ? 'Catégories' : 'Categories',
@@ -92,7 +128,10 @@ export default function SettingsPage() {
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch('/api/admin/settings');
+      const res = await fetch('/api/admin/settings', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
       const json = await res.json();
       if (json.success && json.data) {
         const data = json.data as StoreSettings;
@@ -103,6 +142,22 @@ export default function SettingsPage() {
         setContactEmail(data.contactEmail);
         setCurrency(data.currency);
         setTaxRate(data.taxRate);
+        if ((data as any).deliveryTime) setDeliveryTime((data as any).deliveryTime);
+        if ((data as any).deliveryCountries) setDeliveryCountries((data as any).deliveryCountries);
+        if ((data as any).lowStockThreshold !== undefined) setLowStockThreshold((data as any).lowStockThreshold);
+        if ((data as any).emailNotification !== undefined) setEmailNotification((data as any).emailNotification);
+        setCompanyLegalName(data.companyLegalName || '');
+        setCompanyLegalForm(data.companyLegalForm || '');
+        setCompanyAddress(data.companyAddress || '');
+        setCompanyPostalCode(data.companyPostalCode || '');
+        setCompanyCity(data.companyCity || '');
+        setCompanyCountry(data.companyCountry || 'France');
+        setCompanySiret(data.companySiret || '');
+        setCompanyVatNumber(data.companyVatNumber || '');
+        setCompanyRcs(data.companyRcs || '');
+        setCompanyCapital(data.companyCapital || '');
+        setInvoicePrefix(data.invoicePrefix || 'FAC-');
+        setInvoiceFooterNote(data.invoiceFooterNote || '');
       } else {
         setFetchError(json.error || t.errorLoading);
       }
@@ -127,7 +182,8 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
         body: JSON.stringify(data),
       });
       const json = await res.json();
@@ -157,9 +213,13 @@ export default function SettingsPage() {
     return products.filter((p) => p.category === categorySlug).length;
   };
 
+  // datetime-local inputs read/write in the browser's local timezone, without any offset.
+  // Using toISOString() here would feed UTC back into a local-time field and shift the hour.
   const formatDateForInput = (isoDate: string) => {
-    const date = new Date(isoDate);
-    return date.toISOString().slice(0, 16);
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const renderSaveButton = (section: SectionKey) => {
@@ -174,7 +234,9 @@ export default function SettingsPage() {
               saveSettings(section, {
                 shippingCostFrance,
                 freeShippingThreshold,
-              });
+                deliveryTime,
+                deliveryCountries,
+              } as any);
             } else if (section === 'store') {
               saveSettings(section, {
                 storeName,
@@ -184,7 +246,23 @@ export default function SettingsPage() {
               });
             } else if (section === 'stock') {
               saveSettings(section, {
-                taxRate,
+                lowStockThreshold,
+                emailNotification,
+              } as any);
+            } else if (section === 'billing') {
+              saveSettings(section, {
+                companyLegalName,
+                companyLegalForm,
+                companyAddress,
+                companyPostalCode,
+                companyCity,
+                companyCountry,
+                companySiret,
+                companyVatNumber,
+                companyRcs,
+                companyCapital,
+                invoicePrefix,
+                invoiceFooterNote,
               });
             }
           }}
@@ -228,7 +306,64 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Countdown Settings */}
+      {/* Site Display Mode */}
+      <Card className={darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            <Eye className="h-5 w-5" />
+            {t.siteModeTitle}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className={`text-sm ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+            {t.siteModeDesc}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Password Mode */}
+            <button
+              onClick={() => setSiteMode('password')}
+              className={`p-4 rounded-lg border-2 text-left transition-all ${
+                siteMode === 'password'
+                  ? 'border-primary bg-primary/10'
+                  : darkMode
+                    ? 'border-white/10 bg-white/5 hover:border-white/20'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`p-2 rounded-lg ${siteMode === 'password' ? 'bg-primary/20' : darkMode ? 'bg-white/10' : 'bg-gray-200'}`}>
+                  <Lock className={`h-5 w-5 ${siteMode === 'password' ? 'text-primary' : darkMode ? 'text-white/60' : 'text-gray-600'}`} />
+                </div>
+                <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.passwordMode}</span>
+                {siteMode === 'password' && <Badge className="ml-auto bg-primary text-white">{t.currentMode}</Badge>}
+              </div>
+              <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{t.passwordModeDesc}</p>
+            </button>
+            {/* Countdown Mode */}
+            <button
+              onClick={() => setSiteMode('countdown')}
+              className={`p-4 rounded-lg border-2 text-left transition-all ${
+                siteMode === 'countdown'
+                  ? 'border-primary bg-primary/10'
+                  : darkMode
+                    ? 'border-white/10 bg-white/5 hover:border-white/20'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`p-2 rounded-lg ${siteMode === 'countdown' ? 'bg-primary/20' : darkMode ? 'bg-white/10' : 'bg-gray-200'}`}>
+                  <Timer className={`h-5 w-5 ${siteMode === 'countdown' ? 'text-primary' : darkMode ? 'text-white/60' : 'text-gray-600'}`} />
+                </div>
+                <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.countdownMode}</span>
+                {siteMode === 'countdown' && <Badge className="ml-auto bg-primary text-white">{t.currentMode}</Badge>}
+              </div>
+              <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{t.countdownModeDesc}</p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Countdown / Drop Date Settings */}
       <Card className={darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}>
         <CardHeader>
           <CardTitle className={`flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -321,11 +456,11 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.deliveryTime}</label>
-              <Input type="text" defaultValue="2-4" className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+              <Input type="text" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
             </div>
             <div>
               <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.deliveryCountries}</label>
-              <Input type="text" defaultValue="France, Belgique, Suisse" className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+              <Input type="text" value={deliveryCountries} onChange={(e) => setDeliveryCountries(e.target.value)} className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
             </div>
           </div>
           {renderSaveButton('shipping')}
@@ -391,18 +526,159 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{t.lowStockThreshold}</label>
-            <Input type="number" defaultValue={10} className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
+            <Input type="number" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(parseInt(e.target.value) || 0)} className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''} />
             <p className={`text-sm mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
               {t.stockAlertDesc}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="emailAlert" defaultChecked />
+            <input type="checkbox" id="emailAlert" checked={emailNotification} onChange={(e) => setEmailNotification(e.target.checked)} />
             <label htmlFor="emailAlert" className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
               {t.emailNotification}
             </label>
           </div>
           {renderSaveButton('stock')}
+        </CardContent>
+      </Card>
+
+      {/* Billing / Invoice company info */}
+      <Card className={darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}>
+        <CardHeader>
+          <CardTitle className={darkMode ? 'text-white' : 'text-gray-900'}>
+            {language === 'fr' ? 'Facturation & mentions légales' : 'Billing & Legal info'}
+          </CardTitle>
+          <p className={`text-xs mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+            {language === 'fr'
+              ? 'Informations affichées sur les factures imprimées via la station d\'impression.'
+              : 'Information displayed on invoices printed via the print station.'}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Raison sociale' : 'Legal name'}
+              </label>
+              <Input
+                value={companyLegalName}
+                onChange={(e) => setCompanyLegalName(e.target.value)}
+                placeholder="Temporal SAS"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Forme juridique' : 'Legal form'}
+              </label>
+              <Input
+                value={companyLegalForm}
+                onChange={(e) => setCompanyLegalForm(e.target.value)}
+                placeholder="SAS, SARL, auto-entrepreneur…"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Adresse' : 'Address'}
+              </label>
+              <Input
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                placeholder="22 Rue Pierre Brossolette"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Code postal' : 'Postal code'}
+              </label>
+              <Input
+                value={companyPostalCode}
+                onChange={(e) => setCompanyPostalCode(e.target.value)}
+                placeholder="27000"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Ville' : 'City'}
+              </label>
+              <Input
+                value={companyCity}
+                onChange={(e) => setCompanyCity(e.target.value)}
+                placeholder="Évreux"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>SIRET</label>
+              <Input
+                value={companySiret}
+                onChange={(e) => setCompanySiret(e.target.value)}
+                placeholder="123 456 789 00010"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'N° TVA intracommunautaire' : 'VAT number'}
+              </label>
+              <Input
+                value={companyVatNumber}
+                onChange={(e) => setCompanyVatNumber(e.target.value)}
+                placeholder="FR12345678901"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>RCS</label>
+              <Input
+                value={companyRcs}
+                onChange={(e) => setCompanyRcs(e.target.value)}
+                placeholder="RCS Évreux 123 456 789"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Capital social' : 'Share capital'}
+              </label>
+              <Input
+                value={companyCapital}
+                onChange={(e) => setCompanyCapital(e.target.value)}
+                placeholder="1 000 €"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Préfixe de facture' : 'Invoice prefix'}
+              </label>
+              <Input
+                value={invoicePrefix}
+                onChange={(e) => setInvoicePrefix(e.target.value)}
+                placeholder="FAC-"
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {language === 'fr' ? 'Mention légale en bas de facture' : 'Legal footer note'}
+              </label>
+              <Input
+                value={invoiceFooterNote}
+                onChange={(e) => setInvoiceFooterNote(e.target.value)}
+                placeholder="TVA non applicable, art. 293 B du CGI."
+                className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+              />
+              <p className={`text-xs mt-1 ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>
+                {language === 'fr'
+                  ? 'Auto-entrepreneur en franchise de TVA : "TVA non applicable, art. 293 B du CGI." — sinon laissez vide.'
+                  : 'VAT-exempt micro-business: "TVA non applicable, art. 293 B du CGI." — otherwise leave empty.'}
+              </p>
+            </div>
+          </div>
+          {renderSaveButton('billing')}
         </CardContent>
       </Card>
     </div>

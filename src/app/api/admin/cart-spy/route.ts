@@ -124,89 +124,73 @@ export async function GET(request: NextRequest) {
 async function getAnalytics() {
   try {
     const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // Active carts (updated in last 24h with items)
-    const activeCarts = await prisma.cartSnapshot.findMany({
-      where: {
-        updatedAt: { gte: twentyFourHoursAgo },
-        itemCount: { gt: 0 },
-      },
+    // All carts with items
+    const allCarts = await prisma.cartSnapshot.findMany({
+      where: { itemCount: { gt: 0 } },
     });
 
-    const totalActiveCarts = activeCarts.length;
-    const totalPotentialRevenue = activeCarts.reduce(
+    const totalCarts = allCarts.length;
+    const totalPotentialRevenue = allCarts.reduce(
       (sum, c) => sum + Number(c.total),
       0
     );
-    const avgCartValue = totalActiveCarts > 0 ? totalPotentialRevenue / totalActiveCarts : 0;
+    const avgCartValue = totalCarts > 0 ? totalPotentialRevenue / totalCarts : 0;
 
-    // Most popular products across all active carts
-    const productCounts: Record<string, { name: string; count: number; image?: string }> = {};
-    for (const cart of activeCarts) {
-      const items = cart.items as Array<{ id?: string; name?: string; quantity?: number; image?: string }>;
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          const key = item.id || item.name || 'unknown';
-          if (!productCounts[key]) {
-            productCounts[key] = { name: item.name || 'Unknown', count: 0, image: item.image };
-          }
-          productCounts[key].count += item.quantity || 1;
-        }
-      }
-    }
+    // Recent carts (7 days) for the "active" metric
+    const recentCarts = allCarts.filter(
+      (c) => new Date(c.updatedAt).getTime() >= sevenDaysAgo.getTime()
+    );
+    const carts24h = allCarts.filter(
+      (c) => new Date(c.updatedAt).getTime() >= twentyFourHoursAgo.getTime()
+    );
 
-    const popularProducts = Object.entries(productCounts)
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => b.count - a.count);
-
-    const mostPopularProduct = popularProducts[0] || null;
-
-    // All-time product analytics for most added products
-    const allCarts = await prisma.cartSnapshot.findMany({
-      where: { itemCount: { gt: 0 } },
-      select: { items: true, createdAt: true, updatedAt: true },
-    });
-
-    const allProductCounts: Record<string, { name: string; count: number; cartCount: number; image?: string }> = {};
+    // Most popular products across ALL carts
+    const productCounts: Record<string, { name: string; count: number; cartCount: number; image?: string }> = {};
     for (const cart of allCarts) {
       const items = cart.items as Array<{ id?: string; name?: string; quantity?: number; image?: string }>;
       if (Array.isArray(items)) {
         for (const item of items) {
           const key = item.id || item.name || 'unknown';
-          if (!allProductCounts[key]) {
-            allProductCounts[key] = { name: item.name || 'Unknown', count: 0, cartCount: 0, image: item.image };
+          if (!productCounts[key]) {
+            productCounts[key] = { name: item.name || 'Unknown', count: 0, cartCount: 0, image: item.image };
           }
-          allProductCounts[key].count += item.quantity || 1;
-          allProductCounts[key].cartCount += 1;
+          productCounts[key].count += item.quantity || 1;
+          productCounts[key].cartCount += 1;
         }
       }
     }
 
-    const mostAddedProducts = Object.entries(allProductCounts)
+    const mostAddedProducts = Object.entries(productCounts)
       .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Cart age stats
+    const mostPopularProduct = mostAddedProducts[0] || null;
+
+    // Cart age stats (how long since last update)
     const cartAges = allCarts.map((c) => {
-      const age = new Date(c.updatedAt).getTime() - new Date(c.createdAt).getTime();
+      const age = now.getTime() - new Date(c.updatedAt).getTime();
       return age / (1000 * 60 * 60); // in hours
     });
     const avgCartAge = cartAges.length > 0
       ? cartAges.reduce((a, b) => a + b, 0) / cartAges.length
       : 0;
 
-    // Logged in vs anonymous
-    const loggedInCount = activeCarts.filter((c) => c.userId).length;
-    const anonymousCount = activeCarts.filter((c) => !c.userId).length;
+    // Logged in vs anonymous (all carts)
+    const loggedInCount = allCarts.filter((c) => c.userId).length;
+    const anonymousCount = allCarts.filter((c) => !c.userId).length;
 
     return successResponse({
-      totalActiveCarts,
+      totalCarts,
+      totalActiveCarts: recentCarts.length,
+      carts24h: carts24h.length,
       avgCartValue: Math.round(avgCartValue * 100) / 100,
       totalPotentialRevenue: Math.round(totalPotentialRevenue * 100) / 100,
       mostPopularProduct,
-      popularProducts: popularProducts.slice(0, 10),
+      popularProducts: mostAddedProducts.slice(0, 10),
       mostAddedProducts,
       avgCartAgeHours: Math.round(avgCartAge * 10) / 10,
       loggedInCount,

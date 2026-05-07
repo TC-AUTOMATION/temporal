@@ -49,6 +49,8 @@ export default function PromosPage() {
     endDate: language === 'fr' ? 'Date de fin' : 'End date',
     percentage: language === 'fr' ? 'Pourcentage (%)' : 'Percentage (%)',
     fixedAmount: language === 'fr' ? 'Montant fixe (€)' : 'Fixed amount (€)',
+    perTranche: language === 'fr' ? 'Par tranche (dynamique)' : 'Per tranche (dynamic)',
+    trancheSizeLabel: language === 'fr' ? 'Taille de tranche (€)' : 'Tranche size (€)',
     activateNow: language === 'fr' ? 'Activer immédiatement' : 'Activate immediately',
     cancel: language === 'fr' ? 'Annuler' : 'Cancel',
     save: language === 'fr' ? 'Enregistrer' : 'Save',
@@ -93,8 +95,9 @@ export default function PromosPage() {
 
   const [formData, setFormData] = useState({
     code: '',
-    type: 'percentage' as 'percentage' | 'fixed' | 'free_shipping',
+    type: 'percentage' as 'percentage' | 'fixed' | 'free_shipping' | 'per_tranche',
     value: 10,
+    trancheSize: 100,
     minPurchase: 0,
     maxUses: 0,
     validFrom: new Date().toISOString().split('T')[0],
@@ -108,6 +111,7 @@ export default function PromosPage() {
       code: '',
       type: 'percentage',
       value: 10,
+      trancheSize: 100,
       minPurchase: 0,
       maxUses: 0,
       validFrom: new Date().toISOString().split('T')[0],
@@ -123,6 +127,7 @@ export default function PromosPage() {
       code: promo.code,
       type: promo.type,
       value: promo.value,
+      trancheSize: promo.trancheSize || 100,
       minPurchase: promo.minPurchase || 0,
       maxUses: promo.maxUses || 0,
       validFrom: new Date(promo.validFrom).toISOString().split('T')[0],
@@ -136,6 +141,7 @@ export default function PromosPage() {
     const promoData = {
       ...formData,
       code: formData.code.toUpperCase(),
+      trancheSize: formData.type === 'per_tranche' ? formData.trancheSize : undefined,
       minPurchase: formData.minPurchase || undefined,
       maxUses: formData.maxUses || undefined,
       validFrom: new Date(formData.validFrom).toISOString(),
@@ -245,7 +251,11 @@ export default function PromosPage() {
                   <div className="flex justify-between">
                     <span className={darkMode ? 'text-white/50' : 'text-gray-500'}>{t.discount}</span>
                     <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {promo.type === 'percentage' ? `${promo.value}%` : `${promo.value} €`}
+                      {promo.type === 'percentage'
+                        ? `${promo.value}%`
+                        : promo.type === 'per_tranche'
+                          ? `-${promo.value}€ / ${promo.trancheSize ?? 100}€`
+                          : `${promo.value} €`}
                     </span>
                   </div>
 
@@ -336,17 +346,22 @@ export default function PromosPage() {
                 <select
                   value={formData.type}
                   onChange={(e) =>
-                    setFormData({ ...formData, type: e.target.value as 'percentage' | 'fixed' | 'free_shipping' })
+                    setFormData({ ...formData, type: e.target.value as 'percentage' | 'fixed' | 'free_shipping' | 'per_tranche' })
                   }
                   className="w-full mt-1 px-3 py-2 border rounded-md"
                 >
                   <option value="percentage">{t.percentage}</option>
                   <option value="fixed">{t.fixedAmount}</option>
                   <option value="free_shipping">{language === 'fr' ? 'Livraison gratuite' : 'Free shipping'}</option>
+                  <option value="per_tranche">{t.perTranche}</option>
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium">{t.value}</label>
+                <label className="text-sm font-medium">
+                  {formData.type === 'per_tranche'
+                    ? (language === 'fr' ? 'Réduction par tranche (€)' : 'Discount per tranche (€)')
+                    : t.value}
+                </label>
                 <Input
                   type="number"
                   value={formData.value}
@@ -355,6 +370,24 @@ export default function PromosPage() {
                 />
               </div>
             </div>
+
+            {formData.type === 'per_tranche' && (
+              <div>
+                <label className="text-sm font-medium">{t.trancheSizeLabel}</label>
+                <Input
+                  type="number"
+                  value={formData.trancheSize}
+                  onChange={(e) => setFormData({ ...formData, trancheSize: Number(e.target.value) })}
+                  min={1}
+                  placeholder="100"
+                />
+                <p className={`text-xs mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+                  {language === 'fr'
+                    ? `Ex: -${formData.value}€ par tranche de ${formData.trancheSize}€ d'achat`
+                    : `Ex: -${formData.value}€ per ${formData.trancheSize}€ purchase tranche`}
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

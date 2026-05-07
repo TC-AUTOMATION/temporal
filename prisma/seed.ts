@@ -284,6 +284,30 @@ async function main() {
     },
   });
 
+  const sacLavage = await prisma.product.upsert({
+    where: { sku: 'SAC-LAVAGE-TPL' },
+    update: {},
+    create: {
+      sku: 'SAC-LAVAGE-TPL',
+      name: 'Sac de lavage',
+      nameEn: 'Washing bag',
+      slug: 'sac-de-lavage',
+      description: 'Protège tes vêtements pendant le lavage en machine. Filet à maille fine qui préserve les impressions et les tissus.',
+      descriptionEn: 'Protect your clothes during machine washing. Fine mesh bag that preserves prints and fabrics.',
+      price: 0,
+      categoryId: categories[3].id, // accessoires
+      images: [],
+      isActive: true,
+      isFeatured: false,
+      isNew: false,
+      variants: {
+        create: [
+          { sku: 'SAC-LAVAGE-TPL-U', color: 'Noir', colorHex: '#000000', size: 'Unique', stock: 999 },
+        ],
+      },
+    },
+  });
+
   console.log('Created products:', [
     vesteNoire.name,
     vesteBlanche.name,
@@ -294,6 +318,7 @@ async function main() {
     bonnetNoir.name,
     bonnetBlanc.name,
     stickers.name,
+    sacLavage.name,
   ]);
 
   // Create promo codes
@@ -371,41 +396,38 @@ async function main() {
   console.log('Created settings');
 
   // Create default upsell: Washing bag (Sac de lavage)
-  // Uses the first available product as the upsell target
-  const firstProduct = await prisma.product.findFirst({
-    where: { isActive: true },
-    orderBy: { createdAt: 'asc' },
+  const existingUpsell = await prisma.upsell.findFirst({
+    where: { name: 'Sac de lavage' },
   });
 
-  if (firstProduct) {
-    const existingUpsell = await prisma.upsell.findFirst({
-      where: { name: 'Sac de lavage' },
+  if (!existingUpsell) {
+    await prisma.upsell.create({
+      data: {
+        name: 'Sac de lavage',
+        nameEn: 'Washing bag',
+        description: 'Protege tes vetements pendant le lavage',
+        descriptionEn: 'Protect your clothes during washing',
+        productId: sacLavage.id,
+        triggerType: 'cart_total',
+        triggerValue: '50',
+        displayLocation: 'cart',
+        discountType: null,
+        discountValue: null,
+        freeThreshold: 100,
+        message: 'Protegez vos vetements avec notre sac de lavage',
+        messageEn: 'Protect your clothes with our washing bag',
+        isActive: true,
+        sortOrder: 0,
+      },
     });
-
-    if (!existingUpsell) {
-      await prisma.upsell.create({
-        data: {
-          name: 'Sac de lavage',
-          nameEn: 'Washing bag',
-          description: 'Protege tes vetements pendant le lavage',
-          descriptionEn: 'Protect your clothes during washing',
-          productId: firstProduct.id,
-          triggerType: 'cart_total',
-          triggerValue: '50',
-          displayLocation: 'cart',
-          discountType: null,
-          discountValue: null,
-          freeThreshold: 100,
-          message: 'Protegez vos vetements avec notre sac de lavage',
-          messageEn: 'Protect your clothes with our washing bag',
-          isActive: true,
-          sortOrder: 0,
-        },
-      });
-      console.log('Created default upsell: Sac de lavage');
-    } else {
-      console.log('Default upsell already exists, skipping');
-    }
+    console.log('Created default upsell: Sac de lavage');
+  } else {
+    // Fix existing upsell to point to the correct product
+    await prisma.upsell.update({
+      where: { id: existingUpsell.id },
+      data: { productId: sacLavage.id },
+    });
+    console.log('Updated upsell to point to Sac de lavage product');
   }
 
   console.log('Seed completed!');

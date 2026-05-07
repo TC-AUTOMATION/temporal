@@ -49,41 +49,55 @@ export async function POST(
     const randomIndex = Math.floor(Math.random() * contest.entries.length);
     const winnerEntry = contest.entries[randomIndex];
 
-    // Update contest with winner
+    // Update contest with winner (peut être null si la participation est manuelle)
     const updatedContest = await prisma.contest.update({
       where: { id },
       data: {
-        winnerId: winnerEntry.userId,
-        winnerOrderId: winnerEntry.orderId,
+        winnerId: winnerEntry.userId ?? null,
+        winnerOrderId: winnerEntry.orderId ?? null,
         drawnAt: new Date(),
         isActive: false, // Close contest after drawing
       },
     });
 
-    // Get winner user info
-    const winner = await prisma.user.findUnique({
-      where: { id: winnerEntry.userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
+    // Get winner user info (si la participation gagnante n'est pas manuelle)
+    const winner = winnerEntry.userId
+      ? await prisma.user.findUnique({
+          where: { id: winnerEntry.userId },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        })
+      : null;
 
-    // Get winning order info
-    const order = await prisma.order.findUnique({
-      where: { id: winnerEntry.orderId },
-      select: {
-        id: true,
-        orderNumber: true,
-        total: true,
-      },
-    });
+    // Get winning order info (si applicable)
+    const order = winnerEntry.orderId
+      ? await prisma.order.findUnique({
+          where: { id: winnerEntry.orderId },
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+          },
+        })
+      : null;
+
+    // Pour les participations manuelles, inclure les infos saisies à la main
+    const manualWinner =
+      !winner && (winnerEntry as { manualName?: string | null }).manualName
+        ? {
+            manualName: (winnerEntry as { manualName?: string | null }).manualName,
+            manualEmail: (winnerEntry as { manualEmail?: string | null }).manualEmail,
+          }
+        : null;
 
     return successResponse({
       contest: updatedContest,
       winner,
+      manualWinner,
       winningOrder: order,
       totalEntries: contest.entries.length,
     });

@@ -55,6 +55,7 @@ interface Upsell {
   discountType: string | null;
   discountValue: number | null;
   freeThreshold: number | null;
+  freeRequiredProductIds: string[];
   message: string | null;
   messageEn: string | null;
   image: string | null;
@@ -85,12 +86,13 @@ const defaultFormData = {
   description: '',
   descriptionEn: '',
   productId: '',
-  triggerType: 'cart_total' as string,
-  triggerValue: '50',
+  triggerType: 'always' as string,
+  triggerValue: 'always',
   displayLocation: 'cart' as string,
   discountType: '' as string,
   discountValue: 0,
   freeThreshold: 0,
+  freeRequiredProductIds: [] as string[],
   message: '',
   messageEn: '',
   image: '',
@@ -115,12 +117,15 @@ export default function UpsellsPage() {
     selectProduct: language === 'fr' ? 'Sélectionner un produit' : 'Select a product',
     searchProducts: language === 'fr' ? 'Rechercher un produit...' : 'Search product...',
     triggerType: language === 'fr' ? 'Type de déclencheur' : 'Trigger type',
+    always: language === 'fr' ? 'Toujours affiché' : 'Always shown',
     cartTotal: language === 'fr' ? 'Total panier' : 'Cart total',
     productInCart: language === 'fr' ? 'Produit dans le panier' : 'Product in cart',
     categoryInCart: language === 'fr' ? 'Catégorie dans le panier' : 'Category in cart',
     triggerValue: language === 'fr' ? 'Valeur du déclencheur' : 'Trigger value',
     minimumAmount: language === 'fr' ? 'Montant minimum' : 'Minimum amount',
     selectTriggerProduct: language === 'fr' ? 'Produit déclencheur' : 'Trigger product',
+    searchTriggerProducts: language === 'fr' ? 'Rechercher un produit déclencheur...' : 'Search trigger product...',
+    triggerProducts: language === 'fr' ? 'Produits déclencheurs' : 'Trigger products',
     selectCategory: language === 'fr' ? 'Catégorie' : 'Category',
     displayLocation: language === 'fr' ? 'Emplacement d\'affichage' : 'Display location',
     cart: language === 'fr' ? 'Panier' : 'Cart',
@@ -140,6 +145,10 @@ export default function UpsellsPage() {
     messageFr: language === 'fr' ? 'Message (FR)' : 'Message (FR)',
     messageEn: language === 'fr' ? 'Message (EN)' : 'Message (EN)',
     imageUrl: language === 'fr' ? 'URL de l\'image' : 'Image URL',
+    imageSource: language === 'fr' ? 'Image' : 'Image',
+    noImage: language === 'fr' ? 'Pas d\'image' : 'No image',
+    productImage: language === 'fr' ? 'Image du produit' : 'Product image',
+    customImage: language === 'fr' ? 'Image personnalisée' : 'Custom image',
     active: language === 'fr' ? 'Actif' : 'Active',
     inactive: language === 'fr' ? 'Inactif' : 'Inactive',
     activate: language === 'fr' ? 'Activer' : 'Activate',
@@ -173,6 +182,8 @@ export default function UpsellsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [triggerProductSearch, setTriggerProductSearch] = useState('');
+  const [showTriggerProductDropdown, setShowTriggerProductDropdown] = useState(false);
   const [formData, setFormData] = useState(defaultFormData);
 
   const fetchUpsells = useCallback(async () => {
@@ -232,6 +243,7 @@ export default function UpsellsPage() {
     setEditingUpsell(null);
     setFormData(defaultFormData);
     setProductSearch('');
+    setTriggerProductSearch('');
     setIsModalOpen(true);
   };
 
@@ -249,6 +261,7 @@ export default function UpsellsPage() {
       discountType: upsell.discountType || '',
       discountValue: upsell.discountValue ? Number(upsell.discountValue) : 0,
       freeThreshold: upsell.freeThreshold ? Number(upsell.freeThreshold) : 0,
+      freeRequiredProductIds: upsell.freeRequiredProductIds || [],
       message: upsell.message || '',
       messageEn: upsell.messageEn || '',
       image: upsell.image || '',
@@ -256,6 +269,7 @@ export default function UpsellsPage() {
       sortOrder: upsell.sortOrder,
     });
     setProductSearch(upsell.product.name);
+    setTriggerProductSearch('');
     setIsModalOpen(true);
   };
 
@@ -267,6 +281,7 @@ export default function UpsellsPage() {
         discountType: formData.discountType || null,
         discountValue: formData.discountValue || null,
         freeThreshold: formData.freeThreshold || null,
+        freeRequiredProductIds: formData.freeRequiredProductIds || [],
         nameEn: formData.nameEn || null,
         description: formData.description || null,
         descriptionEn: formData.descriptionEn || null,
@@ -371,6 +386,7 @@ export default function UpsellsPage() {
 
   const getTriggerLabel = (type: string) => {
     switch (type) {
+      case 'always': return t.always;
       case 'cart_total': return t.cartTotal;
       case 'product_in_cart': return t.productInCart;
       case 'category_in_cart': return t.categoryInCart;
@@ -469,21 +485,26 @@ export default function UpsellsPage() {
                 </div>
 
                 {/* Product image */}
-                <div className={`w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 ${
-                  darkMode ? 'bg-white/10' : 'bg-gray-100'
-                }`}>
-                  {(upsell.image || upsell.product.images[0]) ? (
-                    <img
-                      src={upsell.image || upsell.product.images[0]}
-                      alt={upsell.name}
-                      className="w-full h-full object-cover"
-                    />
+                {(() => {
+                  const cardImage = upsell.image === '__product__' ? upsell.product.images[0] : (upsell.image || null);
+                  return cardImage ? (
+                    <div className={`w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 ${
+                      darkMode ? 'bg-white/10' : 'bg-gray-100'
+                    }`}>
+                      <img
+                        src={cardImage}
+                        alt={upsell.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+                    <div className={`w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center ${
+                      darkMode ? 'bg-white/10' : 'bg-gray-100'
+                    }`}>
                       <Gift size={20} className="text-primary/50" />
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
@@ -517,8 +538,16 @@ export default function UpsellsPage() {
                     <TrendingUp size={12} />
                     {t.trigger}
                   </span>
-                  <span className={darkMode ? 'text-white/80' : 'text-gray-700'}>
-                    {getTriggerLabel(upsell.triggerType)}: {upsell.triggerValue}{upsell.triggerType === 'cart_total' ? '€' : ''}
+                  <span className={`${darkMode ? 'text-white/80' : 'text-gray-700'} text-right`}>
+                    {getTriggerLabel(upsell.triggerType)}
+                    {upsell.triggerType === 'cart_total' && `: ${upsell.triggerValue}€`}
+                    {upsell.triggerType === 'product_in_cart' && `: ${
+                      upsell.triggerValue.split(',').map(id => {
+                        const p = products.find(pr => pr.id === id.trim());
+                        return p ? p.name : id.trim();
+                      }).join(', ')
+                    }`}
+                    {upsell.triggerType === 'category_in_cart' && `: ${upsell.triggerValue}`}
                   </span>
                 </div>
 
@@ -750,53 +779,161 @@ export default function UpsellsPage() {
                     setFormData({
                       ...formData,
                       triggerType: val,
-                      triggerValue: val === 'cart_total' ? '50' : '',
+                      triggerValue: val === 'always' ? 'always' : val === 'cart_total' ? '50' : '',
                     });
+                    setTriggerProductSearch('');
+                    setShowTriggerProductDropdown(false);
                   }}
                   className="w-full px-3 py-2 border rounded-md text-sm"
                 >
+                  <option value="always">{t.always}</option>
                   <option value="cart_total">{t.cartTotal}</option>
                   <option value="product_in_cart">{t.productInCart}</option>
                   <option value="category_in_cart">{t.categoryInCart}</option>
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">{t.triggerValue}</label>
-                {formData.triggerType === 'cart_total' && (
-                  <Input
-                    type="number"
-                    value={formData.triggerValue}
-                    onChange={(e) => setFormData({ ...formData, triggerValue: e.target.value })}
-                    placeholder={t.minimumAmount}
-                    min={0}
-                  />
+                {formData.triggerType === 'always' && (
+                  <div className="flex items-center h-full pt-6">
+                    <p className={`text-sm italic ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
+                      {language === 'fr' ? 'L\'upsell sera toujours proposé' : 'The upsell will always be shown'}
+                    </p>
+                  </div>
                 )}
-                {formData.triggerType === 'product_in_cart' && (
-                  <select
-                    value={formData.triggerValue}
-                    onChange={(e) => setFormData({ ...formData, triggerValue: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md text-sm"
-                  >
-                    <option value="">{t.selectTriggerProduct}</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                {formData.triggerType === 'cart_total' && (
+                  <>
+                    <label className="text-sm font-medium mb-1 block">{t.triggerValue}</label>
+                    <Input
+                      type="number"
+                      value={formData.triggerValue}
+                      onChange={(e) => setFormData({ ...formData, triggerValue: e.target.value })}
+                      placeholder={t.minimumAmount}
+                      min={0}
+                    />
+                  </>
                 )}
                 {formData.triggerType === 'category_in_cart' && (
-                  <select
-                    value={formData.triggerValue}
-                    onChange={(e) => setFormData({ ...formData, triggerValue: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md text-sm"
-                  >
-                    <option value="">{t.selectCategory}</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.slug}>{c.name}</option>
-                    ))}
-                  </select>
+                  <>
+                    <label className="text-sm font-medium mb-1 block">{t.triggerValue}</label>
+                    <select
+                      value={formData.triggerValue}
+                      onChange={(e) => setFormData({ ...formData, triggerValue: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                    >
+                      <option value="">{t.selectCategory}</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.slug}>{c.name}</option>
+                      ))}
+                    </select>
+                  </>
                 )}
               </div>
             </div>
+
+            {/* Multi-product trigger selector (full width, outside the 2-col grid) */}
+            {formData.triggerType === 'product_in_cart' && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">{t.triggerProducts}</label>
+                {/* Selected products as chips */}
+                {formData.triggerValue && formData.triggerValue.split(',').filter(Boolean).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {formData.triggerValue.split(',').filter(Boolean).map((id) => {
+                      const p = products.find((pr) => pr.id === id.trim());
+                      return (
+                        <span
+                          key={id}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            darkMode
+                              ? 'bg-primary/20 text-primary border border-primary/30'
+                              : 'bg-primary/10 text-primary border border-primary/20'
+                          }`}
+                        >
+                          {p ? p.name : id.trim()}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ids = formData.triggerValue.split(',').filter(Boolean).map(s => s.trim());
+                              const newIds = ids.filter(i => i !== id.trim());
+                              setFormData({ ...formData, triggerValue: newIds.join(',') });
+                            }}
+                            className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Search input + dropdown */}
+                <div className="relative">
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      value={triggerProductSearch}
+                      onChange={(e) => {
+                        setTriggerProductSearch(e.target.value);
+                        setShowTriggerProductDropdown(true);
+                      }}
+                      onFocus={() => setShowTriggerProductDropdown(true)}
+                      placeholder={t.searchTriggerProducts}
+                      className="pl-9"
+                    />
+                  </div>
+                  {showTriggerProductDropdown && (
+                    (() => {
+                      const selectedIds = formData.triggerValue.split(',').filter(Boolean).map(s => s.trim());
+                      const availableProducts = products.filter(
+                        (p) =>
+                          !selectedIds.includes(p.id) &&
+                          (p.name.toLowerCase().includes(triggerProductSearch.toLowerCase()) ||
+                            (p.nameEn && p.nameEn.toLowerCase().includes(triggerProductSearch.toLowerCase())))
+                      );
+                      return availableProducts.length > 0 ? (
+                        <div className={`absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-lg border shadow-xl ${
+                          darkMode ? 'bg-zinc-900 border-white/10' : 'bg-white border-gray-200'
+                        }`}>
+                          {availableProducts.slice(0, 20).map((product) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              onClick={() => {
+                                const currentIds = formData.triggerValue.split(',').filter(Boolean).map(s => s.trim());
+                                currentIds.push(product.id);
+                                setFormData({ ...formData, triggerValue: currentIds.join(',') });
+                                setTriggerProductSearch('');
+                                setShowTriggerProductDropdown(false);
+                              }}
+                              className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                                darkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded overflow-hidden flex-shrink-0 ${
+                                darkMode ? 'bg-white/10' : 'bg-gray-100'
+                              }`}>
+                                {product.images[0] ? (
+                                  <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400">
+                                    TPL
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm truncate">{product.name}</p>
+                                <p className={`text-xs ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
+                                  {product.price}€ - {product.category.name}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Display location */}
             <div>
@@ -870,6 +1007,76 @@ export default function UpsellsPage() {
                   {t.freeThresholdHelp}
                 </p>
               </div>
+
+              {/* Produits requis pour que l'upsell devienne gratuit */}
+              <div className="mt-3">
+                <label className="text-xs font-medium mb-1 block">
+                  {language === 'fr'
+                    ? 'Produits requis dans le panier pour gratuité'
+                    : 'Products required in cart for free gift'}
+                </label>
+                <p className={`text-[11px] mb-2 ${darkMode ? 'text-white/40' : 'text-gray-400'}`}>
+                  {language === 'fr'
+                    ? 'Vide = aucune contrainte. Si rempli, au moins un de ces produits doit être dans le panier pour que l\'article soit offert.'
+                    : 'Empty = no constraint. If set, at least one of these products must be in the cart for the gift to apply.'}
+                </p>
+                {/* Selected chips */}
+                {formData.freeRequiredProductIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {formData.freeRequiredProductIds.map((id) => {
+                      const p = products.find((pr) => pr.id === id);
+                      return (
+                        <span
+                          key={id}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            darkMode
+                              ? 'bg-primary/20 text-primary border border-primary/30'
+                              : 'bg-primary/10 text-primary border border-primary/20'
+                          }`}
+                        >
+                          {p ? p.name : id}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                freeRequiredProductIds: formData.freeRequiredProductIds.filter((x) => x !== id),
+                              });
+                            }}
+                            className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Select dropdown to add */}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    if (formData.freeRequiredProductIds.includes(e.target.value)) return;
+                    setFormData({
+                      ...formData,
+                      freeRequiredProductIds: [...formData.freeRequiredProductIds, e.target.value],
+                    });
+                  }}
+                  className="w-full px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="">
+                    {language === 'fr' ? '+ Ajouter un produit requis' : '+ Add required product'}
+                  </option>
+                  {products
+                    .filter((p) => !formData.freeRequiredProductIds.includes(p.id))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
             </div>
 
             {/* Message FR/EN */}
@@ -892,17 +1099,55 @@ export default function UpsellsPage() {
               </div>
             </div>
 
-            {/* Image URL */}
+            {/* Image source */}
             <div>
-              <label className="text-sm font-medium mb-1 block">{t.imageUrl}</label>
-              <Input
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="/images/upsell.webp"
-              />
-              {formData.image && (
+              <label className="text-sm font-medium mb-1 block">{t.imageSource}</label>
+              <div className="flex gap-2 mb-2">
+                {([
+                  { value: '', label: t.noImage },
+                  { value: '__product__', label: t.productImage },
+                  { value: '__custom__', label: t.customImage },
+                ] as const).map((opt) => {
+                  const isSelected = opt.value === ''
+                    ? !formData.image
+                    : opt.value === '__product__'
+                      ? formData.image === '__product__'
+                      : !!formData.image && formData.image !== '__product__';
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: opt.value === '__custom__' ? '/images/' : opt.value })}
+                      className={`flex-1 px-3 py-2 rounded-lg border-2 transition-all text-sm ${
+                        isSelected
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : darkMode
+                            ? 'border-white/10 hover:border-white/20'
+                            : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {formData.image && formData.image !== '__product__' && (
+                <div>
+                  <Input
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="/images/upsell.webp"
+                  />
+                  {formData.image && (
+                    <div className="mt-2 w-16 h-16 rounded-lg overflow-hidden bg-gray-100">
+                      <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
+              {formData.image === '__product__' && selectedProduct?.images[0] && (
                 <div className="mt-2 w-16 h-16 rounded-lg overflow-hidden bg-gray-100">
-                  <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                  <img src={selectedProduct.images[0]} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
@@ -938,7 +1183,7 @@ export default function UpsellsPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || !formData.name || !formData.productId || !formData.triggerValue}
+              disabled={saving || !formData.name || !formData.productId || (formData.triggerType !== 'always' && !formData.triggerValue)}
             >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingUpsell ? t.save : t.create}

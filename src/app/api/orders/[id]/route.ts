@@ -13,6 +13,7 @@ import {
 import { sanitizeNote } from '@/lib/sanitize';
 import { sendEmail } from '@/lib/email/send';
 import { orderShippedEmail, orderStatusUpdateEmail } from '@/lib/email/templates';
+import { expandWithBundleComponents } from '@/lib/stock';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         user: {
           select: { id: true, email: true, firstName: true, lastName: true, phone: true },
         },
+        shipment: true,
       },
     });
 
@@ -228,21 +230,34 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Cancel order and restore stock
+    // Cancel order, restore stock and promo code usage
+    // Promo is only incremented after payment (PAID), so only decrement if order was paid
+    const wasPaid = order.paymentStatus === 'PAID';
+
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id },
         data: { status: 'CANCELLED' },
       });
 
-      // Restore stock for variants
-      for (const item of order.items) {
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
-          });
-        }
+      // Restore stock for variants (y compris composants des bundles)
+      const restoreOps = order.items
+        .filter((item) => item.variantId)
+        .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
+      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
+      for (const v of expandedRestore) {
+        await tx.productVariant.update({
+          where: { id: v.id },
+          data: { stock: { increment: v.quantity } },
+        });
+      }
+
+      // Restore promo code usage only if it was incremented (payment was confirmed)
+      if (wasPaid && order.promoCodeId) {
+        await tx.promoCode.update({
+          where: { id: order.promoCodeId },
+          data: { usedCount: { decrement: 1 } },
+        });
       }
     });
 

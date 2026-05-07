@@ -75,8 +75,25 @@ export async function POST(request: NextRequest) {
       }
       discountLabel = `${Number(promo.value).toFixed(2)}€ de réduction`;
     } else if (promo.type === 'FREE_SHIPPING') {
-      discount = new DecimalCtor(5.9); // Standard shipping cost
-      discountLabel = 'Livraison gratuite';
+      // Show max possible discount (home delivery cost)
+      // Actual discount is calculated at checkout based on chosen delivery method
+      discount = new DecimalCtor(5.9);
+      discountLabel = 'Livraison gratuite (jusqu\'a 5,90€)';
+    } else if (promo.type === 'PER_TRANCHE') {
+      const trancheSize = promo.trancheSize ? new DecimalCtor(promo.trancheSize.toString()) : new DecimalCtor(100);
+      const tranches = Math.floor(Number(cartDecimal.div(trancheSize)));
+      discount = new DecimalCtor(tranches).mul(promo.value);
+      if (promo.maxDiscount && discount.gt(promo.maxDiscount)) {
+        discount = new DecimalCtor(promo.maxDiscount.toString());
+      }
+      if (discount.gt(cartDecimal)) {
+        discount = cartDecimal;
+      }
+      const valueNum = Number(promo.value).toFixed(2);
+      const trancheNum = Number(trancheSize).toFixed(0);
+      discountLabel = tranches > 0
+        ? `-${Number(discount).toFixed(2)}€ (${tranches}× ${valueNum}€ par tranche de ${trancheNum}€)`
+        : `${valueNum}€ par tranche de ${trancheNum}€`;
     }
 
     return successResponse({

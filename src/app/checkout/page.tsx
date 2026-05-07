@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useStore } from '@/stores/useStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useAdminStore } from '@/stores/useAdminStore';
 import { translations } from '@/lib/translations';
 import { stripe as stripeApi, promo as promoApi } from '@/lib/api/client';
 import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
@@ -12,13 +13,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import BoxtalMapWidget, { RelayPoint } from '@/components/checkout/BoxtalMapWidget';
 
-// Carrier type for checkout
-type RelayCarrier = 'mondial_relay' | 'chronopost' | 'colissimo' | 'ups';
+// Carrier type for checkout (relay only - Colissimo is home delivery)
+type RelayCarrier = 'mondial_relay' | 'chronopost' | 'ups';
 
-// Carrier display data
+// Relay carrier display data - only those with a Boxtal v3.1 relay offer
 const carriers = [
   { id: 'mondial_relay' as RelayCarrier, name: 'Mondial Relay', logo: '/point-relais/mondial-relay.svg', delay: '3-5 jours' },
-  { id: 'colissimo' as RelayCarrier, name: 'Colissimo', logo: '/point-relais/colissimo.png', delay: '2-3 jours' },
   { id: 'chronopost' as RelayCarrier, name: 'Chronopost', logo: '/point-relais/chronopost pickup.png', delay: '1-2 jours' },
   { id: 'ups' as RelayCarrier, name: 'UPS Access Point', logo: '/point-relais/ups-access-point.avif', delay: '2-3 jours' },
 ];
@@ -47,8 +47,21 @@ function CheckoutLoading() {
 function CheckoutContent() {
   const { language, cart, cartTotal, clearCart, darkMode, addToCart } = useStore();
   const { user, isAuthenticated } = useAuthStore();
+  const { siteMode, countdownDate } = useAdminStore();
   const t = translations[language];
   const searchParams = useSearchParams();
+
+  // Redirect admins away from checkout
+  useEffect(() => {
+    if (user?.isAdmin) {
+      window.location.replace('/admin');
+    }
+  }, [user]);
+
+  if (user?.isAdmin) return <CheckoutLoading />;
+
+  // Check if drop date has passed (payment is blocked until then in countdown mode) — admins bypass
+  const isDropPending = !user?.isAdmin && siteMode === 'countdown' && new Date(countdownDate).getTime() > Date.now();
 
   const [mounted, setMounted] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(null);
@@ -61,11 +74,14 @@ function CheckoutContent() {
   const [promoMessage, setPromoMessage] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
   const [newsletter, setNewsletter] = useState(true);
+  const [createAccount, setCreateAccount] = useState(true);
   const [showHandDeliveryConfirm, setShowHandDeliveryConfirm] = useState(false);
   const [showHandDeliveryModal, setShowHandDeliveryModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [shippingMethods, setShippingMethods] = useState<any[]>([]);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number | null>(null);
   const [checkoutUpsells, setCheckoutUpsells] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -101,6 +117,32 @@ function CheckoutContent() {
     if (mounted) {
       fetchShippingMethods();
     }
+  }, [mounted]);
+
+  // Fetch free-shipping threshold from the gauge config
+  useEffect(() => {
+    if (!mounted) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/gauge');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tiers = data?.data?.config?.tiers || [];
+        const shippingTiers = tiers.filter((t: any) => {
+          if (t.type === 'shipping') return true;
+          if (t.type) return false;
+          const label = `${t.labelFr || ''} ${t.labelEn || ''}`.toLowerCase();
+          return label.includes('livraison') || label.includes('shipping');
+        });
+        if (shippingTiers.length > 0) {
+          setFreeShippingThreshold(Math.min(...shippingTiers.map((t: any) => Number(t.threshold))));
+        } else {
+          setFreeShippingThreshold(null);
+        }
+      } catch (err) {
+        console.error('Error fetching gauge config:', err);
+      }
+    })();
   }, [mounted]);
 
   // Fetch checkout upsells
@@ -164,6 +206,17 @@ function CheckoutContent() {
   const total = mounted ? cartTotal() : 0;
   const cartItems = mounted ? cart : [];
 
+  // Whether all mandatory contact/billing fields are filled (gates step 1 → step 2)
+  const infoComplete = Boolean(
+    formData.email.trim() &&
+    formData.firstName.trim() &&
+    formData.lastName.trim() &&
+    formData.phone.trim() &&
+    formData.address.trim() &&
+    formData.postalCode.trim() &&
+    formData.city.trim()
+  );
+
   // Shipping costs based on delivery method - using API data
   const getShippingCost = () => {
     if (!deliveryMethod || shippingMethods.length === 0) return 0;
@@ -174,10 +227,23 @@ function CheckoutContent() {
     if (deliveryMethod === 'delivery') methodId = 'delivery';
 
     const method = shippingMethods.find(m => m.id === methodId);
-    return method ? method.price : 0;
+    if (!method) return 0;
+
+    // Free shipping above the gauge threshold (hand delivery is always free anyway)
+    if (
+      freeShippingThreshold != null &&
+      methodId !== 'handDelivery' &&
+      total >= freeShippingThreshold
+    ) {
+      return 0;
+    }
+
+    return method.price;
   };
   const shippingCost = getShippingCost();
-  const finalTotal = Math.max(0, total + shippingCost - promoDiscount);
+  const shippingIsFree =
+    freeShippingThreshold != null && total >= freeShippingThreshold;
+  const finalTotal = Math.round(Math.max(0, total + shippingCost - promoDiscount) * 100) / 100;
 
   // Get carrier info helper
   const getCarrierInfo = (carrierId: RelayCarrier) => {
@@ -218,6 +284,7 @@ function CheckoutContent() {
     if (cartItems.length === 0) return;
 
     setIsSubmitting(true);
+    setCheckoutError(null);
 
     try {
       // Map delivery method to API format
@@ -242,11 +309,13 @@ function CheckoutContent() {
         phone: formData.phone,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        // Home delivery address
-        address: deliveryMethod === 'delivery' ? formData.address : undefined,
-        city: deliveryMethod === 'delivery' ? formData.city : undefined,
-        postalCode: deliveryMethod === 'delivery' ? formData.postalCode : undefined,
+        // Billing address — always sent, used for invoice + as fallback shipping for home delivery
+        address: formData.address,
+        city: formData.city,
+        postalCode: formData.postalCode,
         country: formData.country,
+        // Account creation opt-in (only matters for guests)
+        createAccount: !isAuthenticated && createAccount,
         // Relay point info
         relayPointId: deliveryMethod === 'relay' && selectedRelayPoint ? selectedRelayPoint.id : undefined,
         relayPointCode: deliveryMethod === 'relay' && selectedRelayPoint ? (selectedRelayPoint.code || selectedRelayPoint.id.split('-').slice(1).join('-')) : undefined,
@@ -269,7 +338,7 @@ function CheckoutContent() {
     } catch (error) {
       console.error('Checkout error:', error);
       const message = error instanceof Error ? error.message : 'Payment error';
-      alert(message);
+      setCheckoutError(message);
       setIsSubmitting(false);
     }
   };
@@ -378,7 +447,7 @@ function CheckoutContent() {
                   </p>
                   <div className="flex items-center justify-between mt-1.5">
                     <p className="text-sm sm:text-base text-primary font-bold" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
-                      {item.price}€
+                      {Number(item.price).toFixed(2)}€
                     </p>
                     {item.quantity > 1 && (
                       <p className={`text-[10px] sm:text-xs font-medium ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
@@ -640,8 +709,143 @@ function CheckoutContent() {
           </div>
 
           <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
-            {/* Left - Delivery options */}
+            {/* Left - Info + Delivery options */}
             <div className="lg:col-span-2">
+              {/* Contact & billing info */}
+              <h2
+                className="text-2xl md:text-3xl mb-6"
+                style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+              >
+                {language === 'fr' ? 'VOS INFORMATIONS' : 'YOUR INFORMATION'}
+              </h2>
+              <div className={`p-5 rounded-2xl mb-8 space-y-3 ${darkMode ? 'bg-white/[0.02] border border-white/10' : 'bg-black/[0.02] border border-black/10'}`}>
+                {/* Email */}
+                <input
+                  type="email"
+                  placeholder={t.emailAddress}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                    darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                  }`}
+                />
+                {/* First + last name */}
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder={t.firstName}
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    required
+                    className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                      darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    placeholder={t.lastName}
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    required
+                    className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                      darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                    }`}
+                  />
+                </div>
+                {/* Phone */}
+                <input
+                  type="tel"
+                  placeholder={t.phone}
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required
+                  className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                    darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                  }`}
+                />
+                {/* Billing address */}
+                <div className={`pt-3 mt-1 border-t ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+                  <p className={`text-xs mb-2 ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                    {language === 'fr' ? 'ADRESSE DE FACTURATION' : 'BILLING ADDRESS'}
+                  </p>
+                  <input
+                    type="text"
+                    placeholder={t.address}
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    required
+                    className={`w-full px-4 py-3.5 mb-3 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                      darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                    }`}
+                  />
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <input
+                      type="text"
+                      placeholder={t.postalCode}
+                      value={formData.postalCode}
+                      onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                      required
+                      className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                        darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                      }`}
+                    />
+                    <input
+                      type="text"
+                      placeholder={t.city}
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      required
+                      className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                        darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                      }`}
+                    />
+                  </div>
+                  <select
+                    value={formData.country}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
+                      darkMode ? 'border-white/10 text-white' : 'border-black/10 text-black'
+                    }`}
+                  >
+                    <option value="France" className={darkMode ? 'bg-black' : 'bg-white'}>France</option>
+                    <option value="Belgique" className={darkMode ? 'bg-black' : 'bg-white'}>Belgique</option>
+                    <option value="Suisse" className={darkMode ? 'bg-black' : 'bg-white'}>Suisse</option>
+                  </select>
+                </div>
+
+                {/* Create account opt-in */}
+                {!isAuthenticated && (
+                  <label className={`flex items-start gap-3 pt-3 mt-1 border-t cursor-pointer ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+                    <input
+                      type="checkbox"
+                      checked={createAccount}
+                      onChange={(e) => setCreateAccount(e.target.checked)}
+                      className="w-5 h-5 mt-0.5 accent-primary flex-shrink-0"
+                    />
+                    <span className={`text-sm ${darkMode ? 'text-white/70' : 'text-black/70'}`}>
+                      {language === 'fr'
+                        ? 'Créer mon compte avec cet email pour retrouver mes commandes et suivre mes envois'
+                        : 'Create an account with this email to track my orders and save my info'}
+                    </span>
+                  </label>
+                )}
+
+                {/* Newsletter opt-in */}
+                <label className={`flex items-start gap-3 cursor-pointer`}>
+                  <input
+                    type="checkbox"
+                    checked={newsletter}
+                    onChange={(e) => setNewsletter(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 accent-primary flex-shrink-0"
+                  />
+                  <span className={`text-sm ${darkMode ? 'text-white/70' : 'text-black/70'}`}>
+                    {t.receiveOffersEmail}
+                  </span>
+                </label>
+              </div>
+
+              {/* Delivery method heading */}
               <h2
                 className="text-2xl md:text-3xl mb-8"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
@@ -689,12 +893,26 @@ function CheckoutContent() {
                               {t.homeDeliverySubtitle}
                             </p>
                             <div className="flex items-center gap-3 mt-3">
-                              <span
-                                className={`text-lg md:text-xl ${deliveryMethod === 'delivery' ? 'text-primary' : ''}`}
-                                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-                              >
-                                5.90€
-                              </span>
+                              {shippingIsFree ? (
+                                <>
+                                  <span
+                                    className={`text-lg md:text-xl line-through ${darkMode ? 'text-white/30' : 'text-black/30'}`}
+                                    style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                  >
+                                    {shippingMethods.find(m => m.id === 'delivery')?.price?.toFixed(2) || '5.90'}€
+                                  </span>
+                                  <span className="text-lg md:text-xl text-green-500" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                    {t.free.toUpperCase()}
+                                  </span>
+                                </>
+                              ) : (
+                                <span
+                                  className={`text-lg md:text-xl ${deliveryMethod === 'delivery' ? 'text-primary' : ''}`}
+                                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                >
+                                  {shippingMethods.find(m => m.id === 'delivery')?.price?.toFixed(2) || '5.90'}€
+                                </span>
+                              )}
                               <span className={`text-[10px] px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/10 text-white/60' : 'bg-black/10 text-black/60'}`}>
                                 {t.trackingIncluded}
                               </span>
@@ -766,12 +984,26 @@ function CheckoutContent() {
                                 }
                               </p>
                               <div className="flex items-center gap-3 mt-3">
-                                <span
-                                  className={`text-lg md:text-xl ${deliveryMethod === 'relay' ? 'text-primary' : ''}`}
-                                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-                                >
-                                  3.90€
-                                </span>
+                                {shippingIsFree ? (
+                                  <>
+                                    <span
+                                      className={`text-lg md:text-xl line-through ${darkMode ? 'text-white/30' : 'text-black/30'}`}
+                                      style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                    >
+                                      3.90€
+                                    </span>
+                                    <span className="text-lg md:text-xl text-green-500" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+                                      {t.free.toUpperCase()}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span
+                                    className={`text-lg md:text-xl ${deliveryMethod === 'relay' ? 'text-primary' : ''}`}
+                                    style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                  >
+                                    3.90€
+                                  </span>
+                                )}
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 font-medium">
                                   {t.economic}
                                 </span>
@@ -978,25 +1210,47 @@ function CheckoutContent() {
                 </div>
               )}
 
+              {isDropPending && (
+                <div className="mt-6 p-4 bg-primary/10 border border-primary/30 rounded-xl text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Clock size={16} className="text-primary" />
+                    <p className="text-sm font-medium text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                      {language === 'fr' ? 'DROP PAS ENCORE DISPONIBLE' : 'DROP NOT YET AVAILABLE'}
+                    </p>
+                  </div>
+                  <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
+                    {language === 'fr'
+                      ? `Le paiement sera disponible le ${new Date(countdownDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : `Payment will be available on ${new Date(countdownDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                    }
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={() => {
-                  if (deliveryMethod) setStep('payment');
+                  if (deliveryMethod && !isDropPending && infoComplete) setStep('payment');
                 }}
                 disabled={
+                  isDropPending ||
                   !deliveryMethod ||
+                  !infoComplete ||
                   (deliveryMethod === 'handDelivery' && !showHandDeliveryConfirm) ||
                   (deliveryMethod === 'relay' && !selectedRelayPoint)
                 }
                 className="w-full mt-6 py-4 bg-primary text-white hover:bg-primary/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed rounded-xl flex items-center justify-center gap-2 group"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                {t.continueButton}
-                <ArrowLeft size={16} className="rotate-180 group-hover:translate-x-1 transition-transform" />
+                {isDropPending
+                  ? (language === 'fr' ? 'PAIEMENT INDISPONIBLE' : 'PAYMENT UNAVAILABLE')
+                  : t.continueButton
+                }
+                {!isDropPending && <ArrowLeft size={16} className="rotate-180 group-hover:translate-x-1 transition-transform" />}
               </button>
 
               {/* Footer links */}
               <div className={`mt-10 pt-6 border-t flex flex-wrap gap-4 text-[11px] ${darkMode ? 'border-white/10 text-white/30' : 'border-black/10 text-black/30'}`}>
-                <Link href="/refund" className="hover:text-primary transition-colors">{t.refund}</Link>
+                <Link href="/returns" className="hover:text-primary transition-colors">{t.refund}</Link>
                 <Link href="/shipping" className="hover:text-primary transition-colors">{t.shipping}</Link>
                 <Link href="/privacy" className="hover:text-primary transition-colors">{t.privacy}</Link>
                 <Link href="/terms" className="hover:text-primary transition-colors">{t.terms}</Link>
@@ -1006,7 +1260,7 @@ function CheckoutContent() {
             {/* Right - Order summary */}
             <div className="lg:col-span-1">
               <div className="lg:sticky lg:top-6">
-                <OrderSummary />
+                {OrderSummary()}
               </div>
             </div>
           </div>
@@ -1077,7 +1331,7 @@ function CheckoutContent() {
           {/* Left - Form */}
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Contact */}
+              {/* Review block — read-only summary of what the user entered on step 1 */}
               <div className={`p-5 rounded-2xl ${darkMode ? 'bg-white/[0.02] border border-white/10' : 'bg-black/[0.02] border border-black/10'}`}>
                 <div className="flex items-center justify-between mb-4">
                   <h3
@@ -1085,145 +1339,75 @@ function CheckoutContent() {
                     style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                   >
                     <CreditCard size={18} className="text-primary" />
-                    {t.contactSection}
+                    {language === 'fr' ? 'RÉCAPITULATIF' : 'SUMMARY'}
                   </h3>
-                  {!isAuthenticated && (
-                    <Link
-                      href="/profile"
-                      className="text-xs text-primary hover:underline"
-                      style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-                    >
-                      {t.logIn}
-                    </Link>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setStep('delivery')}
+                    className="text-xs text-primary hover:underline"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
+                  >
+                    {language === 'fr' ? 'MODIFIER' : 'EDIT'}
+                  </button>
                 </div>
-                <input
-                  type="email"
-                  placeholder={t.emailAddress}
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                    darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                  }`}
-                />
-                <label className={`flex items-center gap-2.5 mt-4 text-xs cursor-pointer ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
-                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                    newsletter
-                      ? 'bg-primary border-primary'
-                      : darkMode ? 'border-white/30' : 'border-black/30'
-                  }`}>
-                    {newsletter && <Check size={10} className="text-white" />}
+
+                <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                  {/* Contact */}
+                  <div>
+                    <p className={`text-[10px] mb-1 ${darkMode ? 'text-white/40' : 'text-black/40'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                      {language === 'fr' ? 'CONTACT' : 'CONTACT'}
+                    </p>
+                    <p className="font-medium">{formData.firstName} {formData.lastName}</p>
+                    <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>{formData.email}</p>
+                    <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>{formData.phone}</p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={newsletter}
-                    onChange={(e) => setNewsletter(e.target.checked)}
-                    className="sr-only"
-                  />
-                  {t.receiveOffersEmail}
-                </label>
+                  {/* Billing */}
+                  <div>
+                    <p className={`text-[10px] mb-1 ${darkMode ? 'text-white/40' : 'text-black/40'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                      {language === 'fr' ? 'FACTURATION' : 'BILLING'}
+                    </p>
+                    <p className={`text-xs ${darkMode ? 'text-white/80' : 'text-black/80'}`}>{formData.address}</p>
+                    <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>{formData.postalCode} {formData.city}</p>
+                    <p className={`text-xs ${darkMode ? 'text-white/60' : 'text-black/60'}`}>{formData.country}</p>
+                  </div>
+                  {/* Delivery */}
+                  <div className="sm:col-span-2 pt-3 border-t border-dashed border-white/10">
+                    <p className={`text-[10px] mb-1 ${darkMode ? 'text-white/40' : 'text-black/40'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                      {language === 'fr' ? 'LIVRAISON' : 'DELIVERY'}
+                    </p>
+                    {deliveryMethod === 'delivery' && (
+                      <p className="text-xs">{t.homeDelivery} · {formData.address}, {formData.postalCode} {formData.city}</p>
+                    )}
+                    {deliveryMethod === 'relay' && selectedRelayPoint && (
+                      <p className="text-xs">
+                        {t.relayPoint} · <span className="font-medium">{selectedRelayPoint.name}</span> ({selectedRelayPoint.address}, {selectedRelayPoint.postalCode} {selectedRelayPoint.city})
+                      </p>
+                    )}
+                    {deliveryMethod === 'handDelivery' && (
+                      <p className="text-xs">{language === 'fr' ? 'Remise en main propre' : 'Hand delivery'}</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Delivery info */}
+              {/* Optional order note */}
               <div className={`p-5 rounded-2xl ${darkMode ? 'bg-white/[0.02] border border-white/10' : 'bg-black/[0.02] border border-black/10'}`}>
                 <h3
-                  className="text-lg mb-4 flex items-center gap-2"
+                  className="text-lg mb-3 flex items-center gap-2"
                   style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}
                 >
                   <Package size={18} className="text-primary" />
-                  {t.deliveryInformation}
+                  {language === 'fr' ? 'NOTE (FACULTATIF)' : 'NOTE (OPTIONAL)'}
                 </h3>
-                <div className="space-y-3">
-                  <select
-                    value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                      darkMode ? 'border-white/10 text-white' : 'border-black/10 text-black'
-                    }`}
-                  >
-                    <option value="France" className={darkMode ? 'bg-black' : 'bg-white'}>France</option>
-                    <option value="Belgique" className={darkMode ? 'bg-black' : 'bg-white'}>Belgique</option>
-                    <option value="Suisse" className={darkMode ? 'bg-black' : 'bg-white'}>Suisse</option>
-                  </select>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder={t.firstName}
-                      value={formData.firstName}
-                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                      required
-                      className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                        darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                      }`}
-                    />
-                    <input
-                      type="text"
-                      placeholder={t.lastName}
-                      value={formData.lastName}
-                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                      required
-                      className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                        darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                      }`}
-                    />
-                  </div>
-                  <input
-                    type="tel"
-                    placeholder={t.phone}
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
-                    className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                      darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                    }`}
-                  />
-                  {deliveryMethod === 'delivery' && (
-                    <>
-                      <input
-                        type="text"
-                        placeholder={t.address}
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        required
-                        className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                          darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                        }`}
-                      />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder={t.postalCode}
-                          value={formData.postalCode}
-                          onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-                          required
-                          className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                            darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                          }`}
-                        />
-                        <input
-                          type="text"
-                          placeholder={t.city}
-                          value={formData.city}
-                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                          required
-                          className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm ${
-                            darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                          }`}
-                        />
-                      </div>
-                    </>
-                  )}
-                  <textarea
-                    placeholder={t.notes}
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={2}
-                    className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm resize-none ${
-                      darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
-                    }`}
-                  />
-                </div>
+                <textarea
+                  placeholder={t.notes}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={2}
+                  className={`w-full px-4 py-3.5 bg-transparent border-2 rounded-xl focus:outline-none focus:border-primary transition-colors text-sm resize-none ${
+                    darkMode ? 'border-white/10 text-white placeholder-white/30' : 'border-black/10 text-black placeholder-black/30'
+                  }`}
+                />
               </div>
 
               {/* Checkout Upsells */}
@@ -1241,7 +1425,7 @@ function CheckoutContent() {
                       const upsellMessage = language === 'fr'
                         ? upsell.message
                         : (upsell.messageEn || upsell.message);
-                      const upsellImage = upsell.image || upsell.product.images[0];
+                      const upsellImage = upsell.image === '__product__' ? upsell.product.images[0] : (upsell.image || null);
                       const upsellName = language === 'fr'
                         ? upsell.name
                         : (upsell.nameEn || upsell.name);
@@ -1277,8 +1461,10 @@ function CheckoutContent() {
                             {upsellImage ? (
                               <img src={upsellImage} alt={upsellName} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Gift size={20} className="text-primary/50" />
+                              <div className={`w-full h-full flex items-center justify-center ${
+                                upsell.isFreeGift ? 'bg-green-500/20' : ''
+                              }`}>
+                                <Gift size={22} className={upsell.isFreeGift ? 'text-green-500' : 'text-primary'} />
                               </div>
                             )}
                           </div>
@@ -1350,13 +1536,35 @@ function CheckoutContent() {
                 </div>
               )}
 
+              {isDropPending && (
+                <div className="p-4 bg-primary/10 border border-primary/30 rounded-xl text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Clock size={16} className="text-primary" />
+                    <p className="text-sm font-medium text-primary" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                      {language === 'fr' ? 'DROP PAS ENCORE DISPONIBLE' : 'DROP NOT YET AVAILABLE'}
+                    </p>
+                  </div>
+                  <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-black/50'}`}>
+                    {language === 'fr'
+                      ? `Le paiement sera disponible le ${new Date(countdownDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : `Payment will be available on ${new Date(countdownDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                    }
+                  </p>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={isSubmitting || cartItems.length === 0}
+                disabled={isDropPending || isSubmitting || cartItems.length === 0}
                 className="w-full py-4 bg-primary text-white hover:bg-primary/90 transition-all rounded-xl flex items-center justify-center gap-3 group shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
               >
-                {isSubmitting ? (
+                {isDropPending ? (
+                  <>
+                    <Clock size={18} />
+                    {language === 'fr' ? 'PAIEMENT INDISPONIBLE' : 'PAYMENT UNAVAILABLE'}
+                  </>
+                ) : isSubmitting ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
                     {t.processing}
@@ -1369,6 +1577,15 @@ function CheckoutContent() {
                 )}
               </button>
 
+              {checkoutError && (
+                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
+                  <p className="text-sm text-red-500 flex items-center justify-center gap-2">
+                    <AlertTriangle size={16} />
+                    {checkoutError}
+                  </p>
+                </div>
+              )}
+
               <p className={`text-center text-xs ${darkMode ? 'text-white/40' : 'text-black/40'}`}>
                 {t.stripeRedirect}
               </p>
@@ -1376,7 +1593,7 @@ function CheckoutContent() {
 
             {/* Footer links */}
             <div className={`mt-10 pt-6 border-t flex flex-wrap gap-4 text-[11px] ${darkMode ? 'border-white/10 text-white/30' : 'border-black/10 text-black/30'}`}>
-              <Link href="/refund" className="hover:text-primary transition-colors">{t.refund}</Link>
+              <Link href="/returns" className="hover:text-primary transition-colors">{t.refund}</Link>
               <Link href="/shipping" className="hover:text-primary transition-colors">{t.shipping}</Link>
               <Link href="/privacy" className="hover:text-primary transition-colors">{t.privacy}</Link>
               <Link href="/terms" className="hover:text-primary transition-colors">{t.terms}</Link>
@@ -1386,7 +1603,7 @@ function CheckoutContent() {
           {/* Right - Order summary */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-6">
-              <OrderSummary />
+              {OrderSummary()}
             </div>
           </div>
         </div>

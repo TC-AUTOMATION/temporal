@@ -1,19 +1,132 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ChevronDown } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
+import { useAdminStore } from '@/stores/useAdminStore';
 import { translations } from '@/lib/translations';
 import Starfield from '@/components/ui/Starfield';
 import CartGauge from '@/components/ui/CartGauge';
 import Link from 'next/link';
 
+// ── Confetti canvas ────────────────────────────────────────────────
+const CONFETTI_COLORS = ['#44047C', '#5B2D8E', '#9333ea', '#a855f7', '#c084fc', '#ffffff', '#e9d5ff'];
+
+interface Particle {
+  x: number; y: number;
+  vx: number; vy: number;
+  color: string;
+  w: number; h: number;
+  rotation: number;
+  rotationSpeed: number;
+  opacity: number;
+  shape: 'rect' | 'circle';
+}
+
+function ConfettiCanvas({ active }: { active: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const particles = useRef<Particle[]>([]);
+  const rafRef = useRef<number | null>(null);
+  const launched = useRef(false);
+
+  useEffect(() => {
+    if (!active || launched.current) return;
+    launched.current = true;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const ctx = canvas.getContext('2d')!;
+
+    // Spawn 180 particles from random x positions at the top
+    for (let i = 0; i < 180; i++) {
+      particles.current.push({
+        x: Math.random() * canvas.width,
+        y: -10 - Math.random() * 200,
+        vx: (Math.random() - 0.5) * 4,
+        vy: 2 + Math.random() * 4,
+        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        w: 6 + Math.random() * 8,
+        h: 4 + Math.random() * 6,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.15,
+        opacity: 1,
+        shape: Math.random() > 0.6 ? 'circle' : 'rect',
+      });
+    }
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const p of particles.current) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.06; // gravity
+        p.rotation += p.rotationSpeed;
+        if (p.y > canvas.height * 0.7) p.opacity -= 0.012;
+        if (p.opacity <= 0) continue;
+        alive = true;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.opacity);
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        if (p.shape === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        }
+        ctx.restore();
+      }
+      if (alive) rafRef.current = requestAnimationFrame(animate);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [active]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 z-50 pointer-events-none"
+      style={{ display: active ? 'block' : 'none' }}
+    />
+  );
+}
+// ───────────────────────────────────────────────────────────────────
+
 export default function HeroSection() {
   const { language, darkMode } = useStore();
+  const { siteMode: localSiteMode, countdownDate: localCountdownDate, setSiteMode, setCountdownDate } = useAdminStore();
   const t = translations[language];
   const [scrollY, setScrollY] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [dropPassed, setDropPassed] = useState(false);
+  const [siteMode, setSiteModeLocal] = useState(localSiteMode);
+  const [countdownDate, setCountdownDateLocal] = useState(localCountdownDate);
+
+  // Fetch siteMode from server (source of truth) to override localStorage
+  useEffect(() => {
+    fetch('/api/settings/site-mode')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.data) {
+          setSiteModeLocal(json.data.siteMode);
+          setCountdownDateLocal(json.data.countdownDate);
+          // Also update the store so other components see it
+          if (json.data.siteMode !== localSiteMode) setSiteMode(json.data.siteMode);
+          if (json.data.countdownDate !== localCountdownDate) setCountdownDate(json.data.countdownDate);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -26,12 +139,43 @@ export default function HeroSection() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Countdown timer for countdown mode
+  useEffect(() => {
+    if (siteMode !== 'countdown') return;
+
+    const updateCountdown = () => {
+      const targetDate = new Date(countdownDate).getTime();
+      const now = Date.now();
+      const diff = targetDate - now;
+
+      if (diff > 0) {
+        setDropPassed(false);
+        setCountdown({
+          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((diff / (1000 * 60)) % 60),
+          seconds: Math.floor((diff / 1000) % 60),
+        });
+      } else {
+        setDropPassed(true);
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [siteMode, countdownDate]);
+
   const scrollProgress = Math.min(scrollY / 300, 1);
   const logoScale = Math.max(0.16, 1 - scrollProgress);
   const contentOpacity = Math.max(0, 1 - scrollY / 300);
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-background">
+      {/* Confetti on drop */}
+      <ConfettiCanvas active={dropPassed} />
+
       {/* Starfield background */}
       <div className="absolute inset-0 z-0">
         <Starfield />
@@ -40,7 +184,57 @@ export default function HeroSection() {
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background z-[1]" />
 
-      {/* Cart Gauge - à droite en haut */}
+      {/* Countdown timer - stuck to left edge, upper area */}
+      {siteMode === 'countdown' && (
+        <div
+          className="absolute left-0 top-[30%] z-30 transition-all duration-700"
+          style={{ opacity: isLoaded ? contentOpacity : 0 }}
+        >
+          {!dropPassed ? (
+            <div className={`backdrop-blur-sm border border-l-0 rounded-r-xl px-4 py-3 md:px-5 md:py-4 ${darkMode ? 'bg-white/10 border-white/20' : 'bg-black/5 border-black/10'}`}>
+              <p
+                className={`text-base md:text-xl lg:text-2xl tracking-wider whitespace-nowrap ${darkMode ? 'text-white' : 'text-black'}`}
+                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              >
+                <span className="tabular-nums">{String(countdown.days).padStart(2, '0')}</span>
+                <span className="text-primary">j</span>
+                <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
+                <span className="tabular-nums">{String(countdown.hours).padStart(2, '0')}</span>
+                <span className="text-primary">h</span>
+                <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
+                <span className="tabular-nums">{String(countdown.minutes).padStart(2, '0')}</span>
+                <span className="text-primary">m</span>
+                <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
+                <span className="tabular-nums">{String(countdown.seconds).padStart(2, '0')}</span>
+                <span className="text-primary">s</span>
+              </p>
+            </div>
+          ) : (
+            <div className="bg-primary/25 backdrop-blur-sm border border-primary/60 border-l-0 rounded-r-xl px-5 py-3 md:px-6 md:py-4 shadow-[0_0_24px_rgba(68,4,124,0.5)]">
+              <div className="flex items-center gap-2.5">
+                <div className="relative flex-shrink-0">
+                  <div className="w-3 h-3 bg-primary rounded-full animate-ping absolute" />
+                  <div className="w-3 h-3 bg-primary rounded-full" />
+                </div>
+                <p
+                  className="text-primary text-base md:text-xl lg:text-2xl tracking-wider"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                >
+                  DROP DISPONIBLE
+                </p>
+              </div>
+              <p
+                className="text-primary/70 text-[10px] md:text-xs tracking-[0.2em] mt-0.5 ml-5"
+                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              >
+                COMMANDE MAINTENANT
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Cart Gauge - right side */}
       <div
         className="absolute right-4 md:right-8 top-24 z-30 transition-opacity duration-500"
         style={{ opacity: contentOpacity }}
@@ -150,36 +344,13 @@ interface ContestData {
   _count: { entries: number };
 }
 
-function clamp(v: number, min: number, max: number) {
-  return Math.min(Math.max(v, min), max);
-}
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-function easeOut(t: number) {
-  return 1 - Math.pow(1 - t, 3);
-}
-
 /*
- * ContestSection — scroll-driven reveal
- *
- * Two hero images are rendered as a SEPARATE overlay, properly centered
- * with a gap between them. As the user scrolls:
- *   0-15%  : photos visible, big, centered, dark bg
- *   15-35% : colors fade in
- *   30-55% : overlay photos fade out, final layout appears
- *   50-75% : text fades in
- *
- * Wrapper is 150vh + sticky so the animation has room to breathe.
+ * ContestSection — static display, no scroll animation
  */
 export function ContestSection() {
   const { language, darkMode } = useStore();
   const t = translations[language];
   const [contests, setContests] = useState<ContestData[]>([]);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
-  const progressRef = useRef(0);
-  const [, rerender] = useState(0);
 
   useEffect(() => {
     fetch('/api/contests')
@@ -190,79 +361,16 @@ export function ContestSection() {
       .catch(() => {});
   }, []);
 
-  const update = useCallback(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const vh = window.innerHeight;
-    // Start when section top reaches 60% from viewport top (halfway visible)
-    // Uses the full 150vh wrapper scroll distance for a slow, luxurious pace
-    const scrollRange = el.offsetHeight - vh;
-    const scrolled = -rect.top + vh * 0.7; // starts when section is just 30% from bottom of viewport
-    const p = clamp(scrolled / scrollRange, 0, 1);
-    if (Math.abs(p - progressRef.current) > 0.002) {
-      progressRef.current = p;
-      rerender((n) => n + 1);
-    }
-  }, []);
-
-  const onScroll = useCallback(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(update);
-  }, [update]);
-
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          window.addEventListener('scroll', onScroll, { passive: true });
-          update();
-        } else {
-          window.removeEventListener('scroll', onScroll);
-        }
-      },
-      { rootMargin: '100px' }
-    );
-    obs.observe(el);
-    return () => { obs.disconnect(); window.removeEventListener('scroll', onScroll); };
-  }, [contests, onScroll, update]);
-
   const c1 = contests[0];
   const c2 = contests[1];
   if (!c1 && !c2) return null;
 
-  const p = progressRef.current;
   const bebas: React.CSSProperties = { fontFamily: '"Bebas Neue", sans-serif' };
 
-  // --- Phases (spread over full 0→1 range for slow, luxurious pace) ---
-  // Phase 1: Images stay centered (0→0.25 = no movement, just visible)
-
-  // Phase 2: Overlay images SLIDE apart from center (25→65%)
-  const slideP = clamp((p - 0.25) / 0.40, 0, 1);
-  const slideEp = easeOut(slideP);
-  const img1SlideX = lerp(0, -35, slideEp);
-  const img2SlideX = lerp(0, 35, slideEp);
-  const imgOverlayScale = lerp(1, 0.85, slideEp);
-
-  // Phase 2b: Background colors appear while images slide (30→60%)
-  const bgOpacity = easeOut(clamp((p - 0.30) / 0.30, 0, 1));
-
-  // Phase 3: Overlay fades out, final layout fades in (55→75%)
-  const overlayOpacity = 1 - easeOut(clamp((p - 0.55) / 0.20, 0, 1));
-  const layoutOpacity = easeOut(clamp((p - 0.58) / 0.17, 0, 1));
-
-  // Phase 4: Text arrives (75→100%)
-  const textOpacity = clamp((p - 0.75) / 0.25, 0, 1);
-  const textY = lerp(25, 0, easeOut(textOpacity));
-  const sepOpacity = clamp((p - 0.72) / 0.18, 0, 1);
-
-  // Helper to render a contest text block
   const renderText = (c: ContestData, variant: 'light' | 'dark') => {
     const isLight = variant === 'light';
     return (
-      <div style={{ opacity: textOpacity, transform: `translateY(${textY}px)`, willChange: 'opacity, transform' }}>
+      <div>
         <div className="flex items-center gap-4 md:gap-6">
           <span className={`${isLight ? 'text-white/30' : 'text-primary/30'} text-6xl md:text-8xl lg:text-9xl font-bold leading-none`} style={bebas}>{c.number}</span>
           <div className="flex-1">
@@ -292,112 +400,91 @@ export function ContestSection() {
   };
 
   return (
-    <div id="contests" ref={wrapperRef} className="relative z-30 -mt-20 scroll-mt-20" style={{ height: '150vh' }}>
-      <div className="sticky top-0 w-full overflow-hidden">
-        <div className="relative w-full" style={{ minHeight: '280px' }}>
-
-          {/* === Base background (matches page, no dark strip) === */}
-          <div className="absolute inset-0 bg-background z-0" style={{ opacity: 1 - bgOpacity }} />
-
-          {/* === HERO OVERLAY: two photos that SLIDE apart === */}
-          {overlayOpacity > 0.01 && c1?.prizeImage && c2?.prizeImage && (
-            <div
-              className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none"
-              style={{ opacity: overlayOpacity }}
-            >
-              <img
-                src={c1.prizeImage}
-                alt=""
-                className="h-full w-auto max-w-[50%] object-cover"
-                style={{
-                  willChange: 'transform',
-                  transform: `translateX(${img1SlideX}vw) scale(${imgOverlayScale})`,
-                }}
-              />
-              <img
-                src={c2.prizeImage}
-                alt=""
-                className="h-full w-auto max-w-[50%] object-cover"
-                style={{
-                  willChange: 'transform',
-                  transform: `translateX(${img2SlideX}vw) scale(${imgOverlayScale})`,
-                }}
-              />
-            </div>
-          )}
-
-          {/* === FINAL LAYOUT (fades in as overlay fades out) === */}
-          <div style={{ opacity: layoutOpacity }}>
-            {/* Desktop */}
-            <div className="hidden md:flex w-full" style={{ minHeight: '280px' }}>
-              {c1 && (
-                <div className={`relative ${c2 ? 'w-1/2' : 'w-full'}`}>
-                  <div className="absolute inset-0 bg-primary" style={{ opacity: bgOpacity }} />
-                  <div className="relative flex items-stretch min-h-[280px]">
-                    <div className="relative w-40 lg:w-48 flex-shrink-0 self-stretch bg-white/10 overflow-hidden">
-                      {c1.prizeImage && <img src={c1.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-                    </div>
-                    <div className="p-6 md:p-8 lg:p-10 md:pr-16 flex flex-col justify-center flex-1">
-                      {renderText(c1, 'light')}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {c1 && c2 && (
-                <div className="absolute left-1/2 top-0 bottom-0 w-[60px] -translate-x-1/2 z-10 pointer-events-none" style={{ opacity: sepOpacity }}>
-                  <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    <polygon points="0,0 70,0 30,100 0,100" className="fill-primary" />
-                    <polygon points="70,0 100,0 100,100 30,100" className={darkMode ? 'fill-[#0a0a0a]' : 'fill-white'} />
-                  </svg>
-                </div>
-              )}
-              {c2 && (
-                <div className={`relative ${c1 ? 'w-1/2' : 'w-full'}`}>
-                  <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} style={{ opacity: bgOpacity }} />
-                  <div className="relative flex items-stretch min-h-[280px]">
-                    <div className="p-6 md:p-8 lg:p-10 md:pl-16 flex flex-col justify-center flex-1">
-                      {renderText(c2, 'dark')}
-                    </div>
-                    <div className={`relative w-40 lg:w-48 flex-shrink-0 self-stretch overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
-                      {c2.prizeImage && <img src={c2.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Mobile */}
-            <div className="flex flex-col md:hidden">
-              {c1 && (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary" style={{ opacity: bgOpacity }} />
-                  <div className="relative flex items-stretch min-h-[200px]">
-                    <div className="relative w-28 flex-shrink-0 self-stretch bg-white/10 overflow-hidden">
-                      {c1.prizeImage && <img src={c1.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-                    </div>
-                    <div className="p-5 flex flex-col justify-center flex-1">
-                      {renderText(c1, 'light')}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {c2 && (
-                <div className="relative border-t border-white/10">
-                  <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} style={{ opacity: bgOpacity }} />
-                  <div className="relative flex items-stretch min-h-[200px]">
-                    <div className={`relative w-28 flex-shrink-0 self-stretch overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
-                      {c2.prizeImage && <img src={c2.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-                    </div>
-                    <div className="p-5 flex flex-col justify-center flex-1">
-                      {renderText(c2, 'dark')}
-                    </div>
-                  </div>
-                </div>
-              )}
+    <div id="contests" className="relative z-30">
+      {/* Title above both contests */}
+      <div className={`${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'} px-4 pt-10 md:pt-14 pb-4 md:pb-6 text-center`}>
+        <h2
+          className={`text-4xl md:text-5xl lg:text-6xl ${darkMode ? 'text-white' : 'text-black'}`}
+          style={{ ...bebas, letterSpacing: '0.04em' }}
+        >
+          {t.concoursActiveContests}
+        </h2>
+        <div className="h-1 w-16 md:w-20 bg-primary mx-auto mt-3" />
+        <p
+          className={`mt-4 text-xs md:text-sm tracking-[0.15em] uppercase ${darkMode ? 'text-white/50' : 'text-black/50'}`}
+          style={bebas}
+        >
+          {language === 'fr'
+            ? 'UNE SEULE PARTICIPATION PAR COMMANDE — LE PALIER LE PLUS HAUT ATTEINT'
+            : 'ONE ENTRY PER ORDER — HIGHEST TIER REACHED ONLY'}
+        </p>
+      </div>
+      {/* Desktop */}
+      <div className="hidden md:flex w-full relative" style={{ minHeight: '280px' }}>
+        {c1 && (
+          <div className={`relative ${c2 ? 'w-1/2' : 'w-full'}`}>
+            <div className="absolute inset-0 bg-primary" />
+            <div className="relative flex items-stretch min-h-[280px]">
+              <div className="relative w-40 lg:w-48 flex-shrink-0 self-stretch bg-white/10 overflow-hidden">
+                {c1.prizeImage && <img src={c1.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+              </div>
+              <div className="p-6 md:p-8 lg:p-10 md:pr-16 flex flex-col justify-center flex-1">
+                {renderText(c1, 'light')}
+              </div>
             </div>
           </div>
+        )}
+        {c1 && c2 && (
+          <div className="absolute left-1/2 top-0 bottom-0 w-[60px] -translate-x-1/2 z-10 pointer-events-none">
+            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+              <polygon points="0,0 70,0 30,100 0,100" className="fill-primary" />
+              <polygon points="70,0 100,0 100,100 30,100" className={darkMode ? 'fill-[#0a0a0a]' : 'fill-white'} />
+            </svg>
+          </div>
+        )}
+        {c2 && (
+          <div className={`relative ${c1 ? 'w-1/2' : 'w-full'}`}>
+            <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} />
+            <div className="relative flex items-stretch min-h-[280px]">
+              <div className="p-6 md:p-8 lg:p-10 md:pl-16 flex flex-col justify-center flex-1">
+                {renderText(c2, 'dark')}
+              </div>
+              <div className={`relative w-40 lg:w-48 flex-shrink-0 self-stretch overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                {c2.prizeImage && <img src={c2.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
-        </div>
+      {/* Mobile */}
+      <div className="flex flex-col md:hidden">
+        {c1 && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary" />
+            <div className="relative flex items-stretch min-h-[200px]">
+              <div className="relative w-28 flex-shrink-0 self-stretch bg-white/10 overflow-hidden">
+                {c1.prizeImage && <img src={c1.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+              </div>
+              <div className="p-5 flex flex-col justify-center flex-1">
+                {renderText(c1, 'light')}
+              </div>
+            </div>
+          </div>
+        )}
+        {c2 && (
+          <div className="relative border-t border-white/10">
+            <div className={`absolute inset-0 ${darkMode ? 'bg-[#0a0a0a]' : 'bg-white'}`} />
+            <div className="relative flex items-stretch min-h-[200px]">
+              <div className={`relative w-28 flex-shrink-0 self-stretch overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                {c2.prizeImage && <img src={c2.prizeImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+              </div>
+              <div className="p-5 flex flex-col justify-center flex-1">
+                {renderText(c2, 'dark')}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -82,7 +82,7 @@ export default function PackGrid({ limit = 2 }: PackGridProps) {
   if (loading) return null;
 
   return (
-    <section ref={sectionRef} className="pt-12 md:pt-20 pb-8 md:pb-12 bg-background relative overflow-hidden">
+    <section ref={sectionRef} className="pt-6 md:pt-10 pb-8 md:pb-12 bg-background relative overflow-hidden">
       {/* Section header */}
       <div
         className={`text-center mb-8 md:mb-12 px-4 relative z-10 transition-all duration-700 ${

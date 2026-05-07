@@ -52,6 +52,8 @@ export default function CareGuidesAdminPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<any>(emptyGuide);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ nameFr?: boolean; nameEn?: boolean }>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [assigningGuideId, setAssigningGuideId] = useState<string | null>(null);
   const [allProducts, setAllProducts] = useState<{ id: string; name: string; careGuideId?: string | null }[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -85,6 +87,18 @@ export default function CareGuidesAdminPage() {
   useEffect(() => { fetchGuides(); }, []);
 
   const handleSave = async () => {
+    const newErrors: { nameFr?: boolean; nameEn?: boolean } = {};
+    if (!form.nameFr?.trim()) newErrors.nameFr = true;
+    if (!form.nameEn?.trim()) newErrors.nameEn = true;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setSaveError(language === 'fr' ? 'Veuillez remplir les champs obligatoires en rouge' : 'Please fill in the required fields in red');
+      return;
+    }
+
+    setErrors({});
+    setSaveError(null);
     setSaving(true);
     try {
       const method = editing ? 'PUT' : 'POST';
@@ -101,10 +115,11 @@ export default function CareGuidesAdminPage() {
         setCreating(false);
         setForm(emptyGuide);
       } else {
-        alert(data.error || 'Erreur');
+        setSaveError(data.error || 'Erreur');
       }
     } catch (err) {
       console.error(err);
+      setSaveError(language === 'fr' ? 'Erreur réseau' : 'Network error');
     } finally {
       setSaving(false);
     }
@@ -196,7 +211,7 @@ export default function CareGuidesAdminPage() {
         </div>
         {!isFormOpen && (
           <button
-            onClick={() => { setCreating(true); setEditing(null); setForm({ ...emptyGuide, iconSymbols: [] }); }}
+            onClick={() => { setCreating(true); setEditing(null); setForm({ ...emptyGuide, iconSymbols: [] }); setErrors({}); setSaveError(null); }}
             className="flex items-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/90"
             style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
           >
@@ -220,35 +235,65 @@ export default function CareGuidesAdminPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>SLUG CAT&Eacute;GORIE</label>
-              <input type="text" value={form.categorySlug} onChange={(e) => setForm({ ...form, categorySlug: e.target.value })} placeholder="vestes, tshirts..." className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
+              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                NOM (FR) <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.nameFr}
+                onChange={(e) => { setForm({ ...form, nameFr: e.target.value }); if (errors.nameFr) setErrors({ ...errors, nameFr: false }); }}
+                placeholder="Vestes"
+                className={`w-full px-4 py-3 border ${
+                  errors.nameFr
+                    ? 'border-red-500 ring-1 ring-red-500/40'
+                    : darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'
+                }`}
+              />
+              {errors.nameFr && (
+                <p className="text-xs text-red-400 mt-1" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                  {language === 'fr' ? 'CHAMP OBLIGATOIRE' : 'REQUIRED FIELD'}
+                </p>
+              )}
             </div>
             <div>
-              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>ORDRE</label>
-              <input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })} className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
-            </div>
-            <div>
-              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>NOM (FR)</label>
-              <input type="text" value={form.nameFr} onChange={(e) => setForm({ ...form, nameFr: e.target.value })} placeholder="Vestes" className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
-            </div>
-            <div>
-              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>NOM (EN)</label>
-              <input type="text" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} placeholder="Jackets" className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
+              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                NOM (EN) <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.nameEn}
+                onChange={(e) => { setForm({ ...form, nameEn: e.target.value }); if (errors.nameEn) setErrors({ ...errors, nameEn: false }); }}
+                placeholder="Jackets"
+                className={`w-full px-4 py-3 border ${
+                  errors.nameEn
+                    ? 'border-red-500 ring-1 ring-red-500/40'
+                    : darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'
+                }`}
+              />
+              {errors.nameEn && (
+                <p className="text-xs text-red-400 mt-1" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                  {language === 'fr' ? 'CHAMP OBLIGATOIRE' : 'REQUIRED FIELD'}
+                </p>
+              )}
             </div>
             <div className="md:col-span-2">
-              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>INSTRUCTIONS (FR)</label>
-              <textarea value={form.instructionsFr} onChange={(e) => setForm({ ...form, instructionsFr: e.target.value })} rows={4} placeholder="Lavage machine 30\u00b0C..." className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
+              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                INSTRUCTIONS (FR) <span className={darkMode ? 'text-white/30' : 'text-black/30'}>({language === 'fr' ? 'facultatif' : 'optional'})</span>
+              </label>
+              <textarea value={form.instructionsFr} onChange={(e) => setForm({ ...form, instructionsFr: e.target.value })} rows={4} placeholder="Lavage machine 30°C..." className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
             </div>
             <div className="md:col-span-2">
-              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>INSTRUCTIONS (EN)</label>
-              <textarea value={form.instructionsEn} onChange={(e) => setForm({ ...form, instructionsEn: e.target.value })} rows={4} placeholder="Machine wash 30\u00b0C..." className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
+              <label className={`text-xs mb-1 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                INSTRUCTIONS (EN) <span className={darkMode ? 'text-white/30' : 'text-black/30'}>({language === 'fr' ? 'facultatif' : 'optional'})</span>
+              </label>
+              <textarea value={form.instructionsEn} onChange={(e) => setForm({ ...form, instructionsEn: e.target.value })} rows={4} placeholder="Machine wash 30°C..." className={`w-full px-4 py-3 border ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200'}`} />
             </div>
           </div>
 
           {/* Wash symbols picker */}
           <div>
             <label className={`text-xs mb-3 block ${darkMode ? 'text-white/50' : 'text-black/50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-              {language === 'fr' ? 'SYMBOLES D\'ENTRETIEN' : 'CARE SYMBOLS'}
+              {language === 'fr' ? 'SYMBOLES D\'ENTRETIEN' : 'CARE SYMBOLS'} <span className={darkMode ? 'text-white/30' : 'text-black/30'}>({language === 'fr' ? 'facultatif' : 'optional'})</span>
             </label>
             <div className="flex flex-wrap gap-2">
               {WASH_SYMBOLS.map((sym) => {
@@ -271,19 +316,21 @@ export default function CareGuidesAdminPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-5 h-5 accent-primary" />
-            <label style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>{language === 'fr' ? 'ACTIF' : 'ACTIVE'}</label>
-          </div>
-
-          <div className="flex gap-3">
-            <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-8 py-3 bg-primary text-white hover:bg-primary/90 disabled:opacity-50" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-              <Save size={18} />
-              {saving ? (language === 'fr' ? 'SAUVEGARDE...' : 'SAVING...') : (language === 'fr' ? 'SAUVEGARDER' : 'SAVE')}
-            </button>
-            <button onClick={() => { setEditing(null); setCreating(false); }} className={`px-8 py-3 border ${darkMode ? 'border-white/20 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
-              {language === 'fr' ? 'ANNULER' : 'CANCEL'}
-            </button>
+          <div className="space-y-3">
+            {saveError && (
+              <div className="px-4 py-3 border border-red-500/40 bg-red-500/10 text-red-400 text-sm" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+                {saveError}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-8 py-3 bg-primary text-white hover:bg-primary/90 disabled:opacity-50" style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                <Save size={18} />
+                {saving ? (language === 'fr' ? 'SAUVEGARDE...' : 'SAVING...') : (language === 'fr' ? 'SAUVEGARDER' : 'SAVE')}
+              </button>
+              <button onClick={() => { setEditing(null); setCreating(false); setErrors({}); setSaveError(null); }} className={`px-8 py-3 border ${darkMode ? 'border-white/20 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                {language === 'fr' ? 'ANNULER' : 'CANCEL'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -344,7 +391,7 @@ export default function CareGuidesAdminPage() {
                     {language === 'fr' ? 'ASSIGNER' : 'ASSIGN'}
                   </button>
                   <button
-                    onClick={() => { setEditing(guide.id); setCreating(false); setForm({ categorySlug: guide.categorySlug, nameFr: guide.nameFr, nameEn: guide.nameEn, instructionsFr: guide.instructionsFr, instructionsEn: guide.instructionsEn, iconSymbols: guide.iconSymbols || [], sortOrder: guide.sortOrder, isActive: guide.isActive }); }}
+                    onClick={() => { setEditing(guide.id); setCreating(false); setErrors({}); setSaveError(null); setForm({ categorySlug: guide.categorySlug, nameFr: guide.nameFr, nameEn: guide.nameEn, instructionsFr: guide.instructionsFr, instructionsEn: guide.instructionsEn, iconSymbols: guide.iconSymbols || [], sortOrder: guide.sortOrder, isActive: guide.isActive }); }}
                     className={`w-10 h-10 flex items-center justify-center ${darkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
                   >
                     <Edit2 size={16} />

@@ -18,6 +18,7 @@ const tierSchema = z.object({
   labelFr: z.string().min(1),
   labelEn: z.string().min(1),
   contestId: z.string().optional().nullable(),
+  type: z.enum(['gift', 'shipping', 'other']).default('gift'),
   sortOrder: z.number().min(0),
 });
 
@@ -32,9 +33,9 @@ export type GaugeConfig = z.infer<typeof gaugeConfigSchema>;
 const DEFAULT_CONFIG: GaugeConfig = {
   maxAmount: 250,
   tiers: [
-    { id: 'tier-1', threshold: 80, labelFr: 'Livraison gratuite', labelEn: 'Free shipping', contestId: null, sortOrder: 0 },
-    { id: 'tier-2', threshold: 150, labelFr: 'Bonnet', labelEn: 'Beanie', contestId: null, sortOrder: 1 },
-    { id: 'tier-3', threshold: 200, labelFr: 'Veste', labelEn: 'Jacket', contestId: null, sortOrder: 2 },
+    { id: 'tier-1', threshold: 80, labelFr: 'Livraison gratuite', labelEn: 'Free shipping', contestId: null, type: 'shipping', sortOrder: 0 },
+    { id: 'tier-2', threshold: 150, labelFr: 'Bonnet', labelEn: 'Beanie', contestId: null, type: 'gift', sortOrder: 1 },
+    { id: 'tier-3', threshold: 200, labelFr: 'Veste', labelEn: 'Jacket', contestId: null, type: 'gift', sortOrder: 2 },
   ],
 };
 

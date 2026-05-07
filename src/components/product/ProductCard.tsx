@@ -74,8 +74,14 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const colors = product.colors || (productAny.variants ?
     Array.from(new Map(productAny.variants.map((v: any) => [v.color, { name: v.color, hex: v.colorHex || '#000000' }])).values()) :
     []);
+  const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Unique'];
   const sizes = product.sizes || (productAny.variants ?
-    Array.from(new Map(productAny.variants.map((v: any) => [v.size, { name: v.size, available: v.stock > 0 }])).values()) :
+    Array.from(new Map(productAny.variants.map((v: any) => [v.size, { name: v.size, available: v.stock > 0 }])).values())
+      .sort((a: any, b: any) => {
+        const ai = SIZE_ORDER.indexOf(a.name);
+        const bi = SIZE_ORDER.indexOf(b.name);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      }) :
     []);
 
   const isLiked = isInWishlist(product.id);

@@ -12,6 +12,8 @@ import {
 } from '@/lib/api/response';
 import { Prisma } from '@prisma/client';
 import { sanitizeNote } from '@/lib/sanitize';
+import { getGaugeConfig, getFreeShippingThreshold } from '@/lib/gauge';
+import { expandWithBundleComponents } from '@/lib/stock';
 
 type DecimalType = Prisma.Decimal;
 const DecimalCtor = Prisma.Decimal;
@@ -29,13 +31,14 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const mine = searchParams.get('mine');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
     const where: Record<string, unknown> = {};
 
-    // Non-admins can only see their own orders
-    if (!user.isAdmin) {
+    // Non-admins can only see their own orders; admins see all unless ?mine=true
+    if (!user.isAdmin || mine === 'true') {
       where.userId = user.id;
     }
 
@@ -60,6 +63,7 @@ export async function GET(request: NextRequest) {
           user: {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
+          shipment: true,
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -157,7 +161,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate shipping
-    const shippingCost = data.deliveryMethod === 'HAND_DELIVERY' ? new DecimalCtor(0) : new DecimalCtor(5.9);
+    const isRelay = data.deliveryMethod === 'RELAY';
+    const isHandDelivery = data.deliveryMethod === 'HAND_DELIVERY';
+    let shippingCost = isHandDelivery ? new DecimalCtor(0) : isRelay ? new DecimalCtor(3.9) : new DecimalCtor(5.9);
+
+    // Apply free shipping if the cart reached the gauge threshold
+    if (!isHandDelivery) {
+      const gaugeConfig = await getGaugeConfig();
+      const freeShippingThreshold = getFreeShippingThreshold(gaugeConfig);
+      if (freeShippingThreshold != null && subtotal.gte(freeShippingThreshold)) {
+        shippingCost = new DecimalCtor(0);
+      }
+    }
 
     // Apply promo code if provided
     let discount = new DecimalCtor(0);
@@ -175,6 +190,20 @@ export async function POST(request: NextRequest) {
 
         if (now >= validFrom && now <= validUntil) {
           if (!promo.maxUses || promo.usedCount < promo.maxUses) {
+            // Check per-user limit if user is authenticated
+            if (promo.maxUsesPerUser && user?.id) {
+              const userUsageCount = await prisma.order.count({
+                where: {
+                  userId: user.id,
+                  promoCodeId: promo.id,
+                  paymentStatus: { in: ['PAID', 'PENDING'] },
+                },
+              });
+              if (userUsageCount >= promo.maxUsesPerUser) {
+                throw new Error('Vous avez déjà utilisé ce code promo le nombre maximum de fois');
+              }
+            }
+
             if (!promo.minPurchase || subtotal.gte(promo.minPurchase)) {
               promoCodeId = promo.id;
 
@@ -187,6 +216,18 @@ export async function POST(request: NextRequest) {
                 discount = new DecimalCtor(promo.value.toString());
               } else if (promo.type === 'FREE_SHIPPING') {
                 discount = shippingCost;
+              } else if (promo.type === 'PER_TRANCHE') {
+                const trancheSize = promo.trancheSize
+                  ? new DecimalCtor(promo.trancheSize.toString())
+                  : new DecimalCtor(100);
+                const tranches = Math.floor(Number(subtotal.div(trancheSize)));
+                discount = new DecimalCtor(tranches).mul(promo.value);
+                if (promo.maxDiscount && discount.gt(promo.maxDiscount)) {
+                  discount = new DecimalCtor(promo.maxDiscount.toString());
+                }
+                if (discount.gt(subtotal)) {
+                  discount = subtotal;
+                }
               }
             }
           }
@@ -211,6 +252,11 @@ export async function POST(request: NextRequest) {
           shippingCity: data.shippingCity,
           shippingPostalCode: data.shippingPostalCode,
           shippingCountry: data.shippingCountry,
+          // Relay point info
+          relayCarrier: data.relayCarrier || null,
+          relayPointCode: data.relayPointCode || null,
+          relayPointName: data.relayPointName || null,
+          relayPointAddress: data.relayPointAddress || null,
           subtotal,
           shippingCost,
           discount,
@@ -224,10 +270,11 @@ export async function POST(request: NextRequest) {
         },
         include: {
           items: true,
+          shipment: true,
         },
       });
 
-      // Update promo code usage
+      // Increment promo code usage (direct order = already paid/admin)
       if (promoCodeId) {
         await tx.promoCode.update({
           where: { id: promoCodeId },
@@ -235,13 +282,18 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Decrement stock for variants
-      for (const item of orderItems) {
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { decrement: item.quantity } },
-          });
+      // Atomic stock decrement with guard (y compris composants des bundles)
+      const decrementOps = orderItems
+        .filter((item) => item.variantId)
+        .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
+      const expandedDecrements = await expandWithBundleComponents(tx, decrementOps);
+      for (const v of expandedDecrements) {
+        const updated = await tx.productVariant.updateMany({
+          where: { id: v.id, stock: { gte: v.quantity } },
+          data: { stock: { decrement: v.quantity } },
+        });
+        if (updated.count === 0) {
+          throw new Error(`Stock insuffisant (variant ${v.id})`);
         }
       }
 

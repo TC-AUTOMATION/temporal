@@ -354,15 +354,17 @@ enum PromoType {
   PERCENTAGE  // e.g., 20% off
   FIXED       // e.g., 10€ off
   FREE_SHIPPING
+  PER_TRANCHE // e.g., 5€ off per 100€ tranche (dynamic)
 }
 
 model PromoCode {
   id              String    @id @default(cuid())
   code            String    @unique
   type            PromoType
-  value           Decimal   @db.Decimal(10, 2) // Percentage or fixed amount
+  value           Decimal   @db.Decimal(10, 2) // Percentage, fixed amount, or discount per tranche
+  trancheSize     Decimal?  @db.Decimal(10, 2) // For PER_TRANCHE: cart amount step (e.g. 100€)
   minPurchase     Decimal?  @db.Decimal(10, 2) // Minimum cart value
-  maxDiscount     Decimal?  @db.Decimal(10, 2) // Maximum discount (for percentage)
+  maxDiscount     Decimal?  @db.Decimal(10, 2) // Maximum discount (for percentage / per-tranche cap)
   maxUses         Int?      // Total uses allowed
   maxUsesPerUser  Int?      // Uses per user
   usedCount       Int       @default(0)

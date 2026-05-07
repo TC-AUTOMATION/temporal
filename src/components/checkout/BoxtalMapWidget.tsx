@@ -3,6 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, X, AlertCircle, MapPin, Clock, Truck, Check } from 'lucide-react';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
+
+// Fallback: chargement dynamique du sélecteur Leaflet
+const RelayPointSelectorFallback = dynamic(
+  () => import('@/components/checkout/RelayPointSelector'),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-96"><Loader2 size={32} className="animate-spin text-primary" /></div> }
+);
 
 // Boxtal parcel point type - structure réelle retournée par le widget
 export interface BoxtalParcelPoint {
@@ -164,6 +171,7 @@ export default function BoxtalMapWidget({
   const boxtalMapsRef = useRef<BoxtalMapsInstance | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
   const [postalCode, setPostalCode] = useState('');
   const [selectedPoint, setSelectedPoint] = useState<RelayPoint | null>(externalSelectedPoint);
   const [hasSearched, setHasSearched] = useState(false);
@@ -171,35 +179,67 @@ export default function BoxtalMapWidget({
   // Charger le script Boxtal et initialiser la carte
   useEffect(() => {
     let mounted = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     const initializeBoxtal = async () => {
       try {
         // Récupérer le token d'accès
         const tokenResponse = await fetch('/api/boxtal/token');
         if (!tokenResponse.ok) {
+          const errData = await tokenResponse.json().catch(() => ({}));
+          console.error('Boxtal token error:', tokenResponse.status, errData);
           throw new Error('Impossible de récupérer le token Boxtal');
         }
-        const { accessToken } = await tokenResponse.json();
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.accessToken || tokenData.access_token;
+
+        if (!accessToken) {
+          throw new Error('Token Boxtal invalide');
+        }
 
         if (!mounted) return;
 
         // Charger le script Boxtal s'il n'est pas déjà chargé
         if (!window.BoxtalParcelPointMap) {
           await new Promise<void>((resolve, reject) => {
+            // Timeout de 8 secondes pour le chargement du script
+            const loadTimeout = setTimeout(() => {
+              reject(new Error('Timeout chargement script Boxtal'));
+            }, 8000);
+
             const script = document.createElement('script');
             script.src = 'https://maps.boxtal.com/app/v3/assets/dependencies/@boxtal/parcel-point-map/dist/index.global.js';
             script.async = true;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Impossible de charger le script Boxtal'));
+            script.onload = () => {
+              clearTimeout(loadTimeout);
+              resolve();
+            };
+            script.onerror = () => {
+              clearTimeout(loadTimeout);
+              reject(new Error('Impossible de charger le script Boxtal'));
+            };
             document.head.appendChild(script);
           });
         }
 
-        if (!mounted || !window.BoxtalParcelPointMap) return;
+        if (!mounted || !window.BoxtalParcelPointMap) {
+          if (mounted) throw new Error('Widget Boxtal non disponible');
+          return;
+        }
 
-        // Initialiser la carte
+        // Initialiser la carte avec timeout
         const BoxtalMaps = window.BoxtalParcelPointMap.BoxtalParcelPointMap;
 
+        // Timeout: si onMapLoaded n'est pas appelé en 10s, fallback
+        timeoutId = setTimeout(() => {
+          if (mounted && isLoading) {
+            console.warn('Boxtal map initialization timeout - switching to fallback');
+            setUseFallback(true);
+            setIsLoading(false);
+          }
+        }, 10000);
+
+        // Only carriers with a Boxtal v3.1 relay shipping offer
         boxtalMapsRef.current = new BoxtalMaps({
           domToLoadMap: '#boxtal-map-container',
           accessToken,
@@ -207,7 +247,6 @@ export default function BoxtalMapWidget({
             locale: 'fr',
             parcelPointNetworks: [
               { code: 'MONR_NETWORK', markerTemplate: { color: '#E30613' } },
-              { code: 'SOGP_NETWORK', markerTemplate: { color: '#FFCC00' } },
               { code: 'CHRP_NETWORK', markerTemplate: { color: '#003DA5' } },
               { code: 'UPSE_NETWORK', markerTemplate: { color: '#351C15' } },
             ],
@@ -218,14 +257,17 @@ export default function BoxtalMapWidget({
           },
           onMapLoaded: () => {
             if (mounted) {
+              clearTimeout(timeoutId);
               setIsLoading(false);
             }
           },
         });
       } catch (err) {
         if (mounted) {
-          console.error('Erreur initialisation Boxtal:', err);
-          setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
+          console.error('Erreur initialisation Boxtal, passage au mode alternatif:', err);
+          // Basculer automatiquement vers le sélecteur alternatif
+          setUseFallback(true);
+          setError(null);
           setIsLoading(false);
         }
       }
@@ -235,6 +277,7 @@ export default function BoxtalMapWidget({
 
     return () => {
       mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
 
@@ -275,6 +318,37 @@ export default function BoxtalMapWidget({
       color: '#6D28D9',
     };
   };
+
+  // Si fallback activé, utiliser le sélecteur Leaflet alternatif
+  if (useFallback) {
+    return (
+      <RelayPointSelectorFallback
+        darkMode={darkMode}
+        onSelect={(point, carrier) => {
+          // Adapter le type RelayPoint du fallback vers notre format
+          const adapted: RelayPoint = {
+            id: point.id,
+            code: (point as any).code || point.id.split('-').slice(1).join('-'),
+            carrier: carrier,
+            carrierName: { mondial_relay: 'Mondial Relay', colissimo: 'Colissimo', chronopost: 'Chronopost', ups: 'UPS' }[carrier] || carrier,
+            name: point.name,
+            address: point.address,
+            city: point.city,
+            postalCode: point.postalCode,
+            country: (point as any).country || 'FR',
+            lat: point.lat,
+            lng: point.lng,
+            distance: point.distance,
+            distanceMeters: point.distanceMeters,
+            hours: point.hours,
+          };
+          onSelect(adapted, carrier);
+        }}
+        selectedPoint={externalSelectedPoint as any}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -367,12 +441,20 @@ export default function BoxtalMapWidget({
                   <p className={`text-sm mb-4 ${darkMode ? 'text-white/60' : 'text-black/60'}`}>
                     {error}
                   </p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    Réessayer
-                  </button>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => window.location.reload()}
+                      className={`px-6 py-2 rounded-lg transition-colors ${darkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-black hover:bg-gray-300'}`}
+                    >
+                      Réessayer
+                    </button>
+                    <button
+                      onClick={() => { setError(null); setUseFallback(true); }}
+                      className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    >
+                      Utiliser la carte alternative
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

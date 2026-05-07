@@ -51,6 +51,8 @@ services:
         condition: service_healthy
     volumes:
       - ./public:/app/public:ro
+      - /var/www/temporal-static/clothes:/app/public/clothes
+      - /var/www/temporal-static/stickers:/app/public/stickers
     ports:
       - "127.0.0.1:3010:3000"
     environment:
@@ -69,6 +71,9 @@ services:
       - BOXTAL_SECRET_KEY=${BOXTAL_SECRET_KEY}
       - BOXTAL_MAP_ACCESS_KEY=${BOXTAL_MAP_ACCESS_KEY}
       - BOXTAL_MAP_SECRET_KEY=${BOXTAL_MAP_SECRET_KEY}
+      - BOXTAL_V3_ACCESS_KEY=${BOXTAL_V3_ACCESS_KEY}
+      - BOXTAL_V3_SECRET_KEY=${BOXTAL_V3_SECRET_KEY}
+      - BOXTAL_V3_USER=${BOXTAL_V3_USER}
       # SMTP OVH
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}

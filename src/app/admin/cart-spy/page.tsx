@@ -51,7 +51,9 @@ interface CartSnapshot {
 }
 
 interface Analytics {
+  totalCarts: number;
   totalActiveCarts: number;
+  carts24h: number;
   avgCartValue: number;
   totalPotentialRevenue: number;
   mostPopularProduct: { id: string; name: string; count: number; image?: string } | null;
@@ -93,7 +95,9 @@ export default function CartSpyPage() {
   // Translations
   const t = {
     title: language === 'fr' ? 'PANIERS EN TEMPS REEL' : 'REAL-TIME CARTS',
-    activeCarts: language === 'fr' ? 'Paniers actifs (24h)' : 'Active carts (24h)',
+    totalCarts: language === 'fr' ? 'Total paniers' : 'Total carts',
+    activeCarts: language === 'fr' ? 'Actifs (7j)' : 'Active (7d)',
+    carts24h: language === 'fr' ? '24h' : '24h',
     avgValue: language === 'fr' ? 'Valeur moyenne' : 'Average value',
     potentialRevenue: language === 'fr' ? 'Revenu potentiel' : 'Potential revenue',
     mostPopular: language === 'fr' ? 'Produit populaire' : 'Popular product',
@@ -231,7 +235,7 @@ export default function CartSpyPage() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Active Carts */}
+        {/* Total Carts */}
         <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-gradient-to-br from-purple-500/10 to-violet-500/10 border-purple-500/20' : 'bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200'}`}>
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-purple-500/20">
@@ -242,11 +246,16 @@ export default function CartSpyPage() {
                 className={`text-3xl ${darkMode ? 'text-white' : 'text-gray-900'}`}
                 style={{ fontFamily: '"Bebas Neue", sans-serif' }}
               >
-                {analyticsLoading ? '-' : (analytics?.totalActiveCarts ?? 0)}
+                {analyticsLoading ? '-' : (analytics?.totalCarts ?? 0)}
               </p>
               <p className={`text-xs ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
-                {t.activeCarts}
+                {t.totalCarts}
               </p>
+              {!analyticsLoading && analytics && (
+                <p className={`text-[10px] mt-0.5 ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                  {analytics.totalActiveCarts} {t.activeCarts} · {analytics.carts24h} {t.carts24h}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -857,7 +866,7 @@ export default function CartSpyPage() {
                   )}
                 </div>
 
-                {/* Active carts summary */}
+                {/* Carts summary */}
                 <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}`}>
                   <div className="flex items-center gap-3 mb-3">
                     <div className="p-2.5 rounded-xl bg-purple-500/20">
@@ -867,17 +876,20 @@ export default function CartSpyPage() {
                       className={`text-sm ${darkMode ? 'text-white/50' : 'text-gray-500'}`}
                       style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}
                     >
-                      {t.activeCarts}
+                      {t.totalCarts}
                     </p>
                   </div>
                   <p
                     className={`text-3xl ${darkMode ? 'text-white' : 'text-gray-900'}`}
                     style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                   >
-                    {analytics.totalActiveCarts}
+                    {analytics.totalCarts}
                   </p>
                   <p className={`text-sm mt-1 ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>
                     {t.potentialRevenue}: <span className="text-primary">{analytics.totalPotentialRevenue.toFixed(2)}&euro;</span>
+                  </p>
+                  <p className={`text-xs mt-0.5 ${darkMode ? 'text-white/30' : 'text-gray-400'}`}>
+                    {analytics.totalActiveCarts} {t.activeCarts} · {analytics.carts24h} {t.carts24h}
                   </p>
                 </div>
               </div>

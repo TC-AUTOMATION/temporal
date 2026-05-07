@@ -50,15 +50,23 @@ export const productSchema = z.object({
   careInstructions: z.string().max(2000).optional(),
   careInstructionsEn: z.string().max(2000).optional(),
   modelInfo: z.string().max(500).optional(),
-  price: z.number().positive('Le prix doit être positif'),
-  originalPrice: z.number().positive().optional(),
+  price: z.number().min(0, 'Le prix ne peut pas être négatif'),
+  originalPrice: z.number().min(0).optional(),
   categoryId: z.string().min(1, 'Catégorie requise'),
-  images: z.array(z.string().min(1)).min(1, 'Au moins une image requise'),
+  images: z.array(z.string().min(1)),
   isActive: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   isNew: z.boolean().default(true),
   sizeGuideId: z.string().nullable().optional(),
   careGuideId: z.string().nullable().optional(),
+  variants: z.array(z.object({
+    sku: z.string().min(1).max(100),
+    color: z.string().min(1).max(50),
+    colorHex: z.string().nullable().optional(),
+    size: z.string().min(1).max(20),
+    stock: z.number().int().min(0),
+    isActive: z.boolean().default(true),
+  })).optional(),
 });
 
 export const productVariantSchema = z.object({
@@ -93,7 +101,7 @@ export const orderItemSchema = z.object({
 
 export const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'Le panier est vide'),
-  deliveryMethod: z.enum(['DELIVERY', 'HAND_DELIVERY']),
+  deliveryMethod: z.enum(['DELIVERY', 'RELAY', 'HAND_DELIVERY']),
   customerEmail: emailSchema,
   customerPhone: z.string().min(10).max(20).optional(),
   customerFirstName: z.string().min(1).max(50),
@@ -102,6 +110,11 @@ export const createOrderSchema = z.object({
   shippingCity: z.string().max(100).optional(),
   shippingPostalCode: z.string().max(20).optional(),
   shippingCountry: z.string().max(100).default('France'),
+  // Relay point info
+  relayCarrier: z.string().max(50).optional(),
+  relayPointCode: z.string().max(50).optional(),
+  relayPointName: z.string().max(200).optional(),
+  relayPointAddress: z.string().max(200).optional(),
   promoCode: z.string().max(50).optional(),
   customerNotes: z.string().max(1000).optional(),
 });
@@ -117,8 +130,9 @@ export const updateOrderStatusSchema = z.object({
 
 export const promoCodeSchema = z.object({
   code: z.string().min(1, 'Code requis').max(50).toUpperCase(),
-  type: z.enum(['PERCENTAGE', 'FIXED', 'FREE_SHIPPING']),
+  type: z.enum(['PERCENTAGE', 'FIXED', 'FREE_SHIPPING', 'PER_TRANCHE']),
   value: z.number().positive('Valeur invalide'),
+  trancheSize: z.number().positive().optional(),
   minPurchase: z.number().positive().optional(),
   maxDiscount: z.number().positive().optional(),
   maxUses: z.number().int().positive().optional(),
@@ -126,7 +140,10 @@ export const promoCodeSchema = z.object({
   validFrom: z.string().datetime().optional(),
   validUntil: z.string().datetime().optional(),
   isActive: z.boolean().default(true),
-});
+}).refine(
+  (data) => data.type !== 'PER_TRANCHE' || (data.trancheSize !== undefined && data.trancheSize > 0),
+  { message: 'trancheSize requis pour PER_TRANCHE', path: ['trancheSize'] }
+);
 
 export const validatePromoCodeSchema = z.object({
   code: z.string().min(1).max(50),
@@ -190,10 +207,11 @@ export const checkoutSchema = z.object({
   phone: z.string().min(10).max(20),
   firstName: z.string().min(1).max(50),
   lastName: z.string().min(1).max(50),
-  // Home delivery address
-  address: z.string().max(200).optional(),
-  city: z.string().max(100).optional(),
-  postalCode: z.string().max(20).optional(),
+  // Billing address — always required (the real person, never a relay)
+  // Used for the invoice and as the default shipping address for home delivery
+  address: z.string().min(1, 'Adresse requise').max(200),
+  city: z.string().min(1, 'Ville requise').max(100),
+  postalCode: z.string().min(1, 'Code postal requis').max(20),
   country: z.string().max(100).default('France'),
   // Relay point info
   relayPointId: z.string().max(50).optional(),
@@ -203,6 +221,8 @@ export const checkoutSchema = z.object({
   relayPointCity: z.string().max(100).optional(),
   relayPointPostalCode: z.string().max(20).optional(),
   relayCarrier: z.string().max(50).optional(),
+  // Opt-in: create an account with this email after checkout (guest → user)
+  createAccount: z.boolean().optional(),
   // Other
   promoCode: z.string().max(50).optional(),
   notes: z.string().max(1000).optional(),

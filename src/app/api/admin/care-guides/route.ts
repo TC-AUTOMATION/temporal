@@ -8,6 +8,28 @@ import {
   serverErrorResponse,
 } from '@/lib/api/response';
 
+function slugify(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function uniqueSlug(base: string, currentId?: string): Promise<string> {
+  const seed = base || 'guide';
+  let slug = seed;
+  let i = 2;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const existing = await prisma.careGuide.findUnique({ where: { categorySlug: slug } });
+    if (!existing || existing.id === currentId) return slug;
+    slug = `${seed}-${i++}`;
+  }
+  return `${seed}-${Date.now()}`;
+}
+
 /**
  * GET /api/admin/care-guides
  */
@@ -47,17 +69,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { categorySlug, nameFr, nameEn, instructionsFr, instructionsEn, iconSymbols, sortOrder, isActive } = body;
 
-    if (!categorySlug || !nameFr || !nameEn || !instructionsFr || !instructionsEn) {
-      return errorResponse('Champs requis manquants');
+    if (!nameFr || !nameEn) {
+      return errorResponse('Nom FR et Nom EN requis');
     }
+
+    const slug = await uniqueSlug(categorySlug?.trim() || slugify(nameFr));
 
     const guide = await prisma.careGuide.create({
       data: {
-        categorySlug,
+        categorySlug: slug,
         nameFr,
         nameEn,
-        instructionsFr,
-        instructionsEn,
+        instructionsFr: instructionsFr || '',
+        instructionsEn: instructionsEn || '',
         iconSymbols: iconSymbols || [],
         sortOrder: sortOrder || 0,
         isActive: isActive !== false,
@@ -91,13 +115,27 @@ export async function PUT(request: NextRequest) {
       return errorResponse('ID requis');
     }
 
+    if (data.nameFr !== undefined && !data.nameFr) {
+      return errorResponse('Nom FR requis');
+    }
+    if (data.nameEn !== undefined && !data.nameEn) {
+      return errorResponse('Nom EN requis');
+    }
+
+    if (data.categorySlug !== undefined && data.categorySlug) {
+      data.categorySlug = await uniqueSlug(slugify(data.categorySlug), id);
+    }
+
     const guide = await prisma.careGuide.update({
       where: { id },
       data,
     });
 
     return successResponse(guide);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return errorResponse('Un guide de lavage existe déjà pour cette catégorie');
+    }
     console.error('PUT /api/admin/care-guides error:', error);
     return serverErrorResponse();
   }

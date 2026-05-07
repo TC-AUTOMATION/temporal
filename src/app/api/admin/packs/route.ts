@@ -10,9 +10,29 @@ import {
 } from '@/lib/api/response';
 import { z } from 'zod';
 
+/**
+ * Sanitize a slug: lowercase, remove accents, replace non-alphanum with dashes,
+ * collapse multiple dashes, trim leading/trailing dashes.
+ */
+function sanitizeSlug(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+const slugField = z
+  .string()
+  .min(1, 'Slug is required')
+  .transform(sanitizeSlug)
+  .refine((s) => s.length > 0, 'Slug must contain at least one alphanumeric character');
+
 const packSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  slug: z.string().min(1, 'Slug is required'),
+  slug: slugField,
   description: z.string().optional(),
   price: z.number().min(0, 'Price must be positive'),
   image: z.string().optional(),

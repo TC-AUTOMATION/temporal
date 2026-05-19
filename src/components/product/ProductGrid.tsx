@@ -1,27 +1,47 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import ProductCard from './ProductCard';
 import { useStore } from '@/stores/useStore';
 import { translations } from '@/lib/translations';
 import TemporalStar from '@/components/ui/TemporalStar';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Package } from 'lucide-react';
 
 interface ProductGridProps {
   category?: string;
 }
 
+interface PackItem {
+  product: { images: string[] };
+}
+
+interface Pack {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  image: string | null;
+  images: string[];
+  isActive: boolean;
+  items: PackItem[];
+  originalPrice: number;
+  discount: number;
+  discountPercent: number;
+}
+
 export default function ProductGrid({ category }: ProductGridProps) {
-  const { language } = useStore();
+  const { language, darkMode } = useStore();
   const t = translations[language];
   const [isVisible, setIsVisible] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  const [packs, setPacks] = useState<Pack[]>([]);
   const [loading, setLoading] = useState(true);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Fetch products from API
+  // Fetch products and packs from API
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchAll = async () => {
       setLoading(true);
       try {
         const params = new URLSearchParams();
@@ -29,22 +49,35 @@ export default function ProductGrid({ category }: ProductGridProps) {
           params.append('category', category);
         }
 
-        const response = await fetch(`/api/products?${params.toString()}`);
-        if (!response.ok) {
+        const [productsRes, packsRes] = await Promise.all([
+          fetch(`/api/products?${params.toString()}`),
+          category ? Promise.resolve(null) : fetch('/api/packs'),
+        ]);
+
+        if (!productsRes.ok) {
           throw new Error('Failed to fetch products');
         }
 
-        const data = await response.json();
-        setProducts(data.data?.products || data.products || []);
+        const productsData = await productsRes.json();
+        setProducts(productsData.data?.products || productsData.products || []);
+
+        if (packsRes && packsRes.ok) {
+          const packsData = await packsRes.json();
+          const allPacks: Pack[] = packsData.data?.packs || [];
+          setPacks(allPacks.filter((p) => p.isActive));
+        } else {
+          setPacks([]);
+        }
       } catch (err) {
         console.error('Error fetching products:', err);
         setProducts([]);
+        setPacks([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchAll();
   }, [category]);
 
   // Separate stickers from other products
@@ -168,17 +201,118 @@ export default function ProductGrid({ category }: ProductGridProps) {
           </div>
         ) : filteredProducts.length > 0 ? (
           <>
-            {/* Clothing products - 2 cols mobile, 4 cols desktop, centered */}
+            {/* Packs + Clothing products - 2 cols mobile, 4 cols desktop, centered */}
             <div className="flex flex-wrap justify-center gap-3 md:gap-6 lg:gap-8">
+              {/* Packs first (before vestes) */}
+              {packs.map((pack, index) => {
+                const heroImage =
+                  (pack.images && pack.images.length > 0 && pack.images[0]) ||
+                  pack.image ||
+                  pack.items[0]?.product.images?.[0] ||
+                  '';
+                const secondImage = pack.images?.[1] || pack.items[1]?.product.images?.[0] || '';
+                const hasDiscount = pack.discount > 0;
+
+                return (
+                  <div
+                    key={`pack-${pack.id}`}
+                    className={`w-[calc(50%-6px)] md:w-[calc(50%-12px)] lg:w-[calc(25%-24px)] transition-all duration-700 ${
+                      isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
+                    }`}
+                    style={{ transitionDelay: `${index * 100}ms` }}
+                  >
+                    <Link href={`/packs/${pack.slug}`} className="group block">
+                      <div className="relative">
+                        <div className={`aspect-[3/4] relative overflow-hidden ${darkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                          <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-110">
+                            {heroImage ? (
+                              <>
+                                <img
+                                  src={heroImage}
+                                  alt={pack.name}
+                                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${secondImage ? 'group-hover:opacity-0' : ''}`}
+                                />
+                                {secondImage && (
+                                  <img
+                                    src={secondImage}
+                                    alt={`${pack.name} - view 2`}
+                                    className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                  />
+                                )}
+                              </>
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <Package size={64} className="text-foreground/10" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Pack badge */}
+                          <div className="absolute top-3 left-3 inline-flex items-center gap-1 bg-primary text-primary-foreground px-3 py-1 text-xs"
+                               style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                            <Package size={12} />
+                            PACK
+                          </div>
+
+                          {/* Discount badge */}
+                          {hasDiscount && (
+                            <div className="absolute top-3 right-3 bg-black/70 text-white px-3 py-1 text-xs"
+                                 style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.1em' }}>
+                              -{pack.discountPercent}%
+                            </div>
+                          )}
+
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        </div>
+
+                        <div className="pt-4 space-y-2">
+                          <p
+                            className="text-xs text-primary uppercase tracking-widest"
+                            style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                          >
+                            PACK
+                          </p>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3
+                              className="text-foreground text-base uppercase leading-tight group-hover:text-primary transition-colors"
+                              style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.02em' }}
+                            >
+                              {pack.name}
+                            </h3>
+                            <div className="flex flex-col items-end flex-shrink-0">
+                              <span
+                                className="text-foreground text-lg"
+                                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                              >
+                                {pack.price.toFixed(0)}€
+                              </span>
+                              {hasDiscount && (
+                                <span
+                                  className={`text-xs line-through ${darkMode ? 'text-white/30' : 'text-black/30'}`}
+                                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                                >
+                                  {pack.originalPrice.toFixed(0)}€
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
+                );
+              })}
+              {/* Clothing products */}
               {sortedClothingProducts.map((product, index) => (
                 <div
                   key={product.id}
                   className={`w-[calc(50%-6px)] md:w-[calc(50%-12px)] lg:w-[calc(25%-24px)] transition-all duration-700 ${
                     isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
                   }`}
-                  style={{ transitionDelay: `${index * 100}ms` }}
+                  style={{ transitionDelay: `${(packs.length + index) * 100}ms` }}
                 >
-                  <ProductCard product={product} index={index} />
+                  <ProductCard product={product} index={packs.length + index} />
                 </div>
               ))}
             </div>

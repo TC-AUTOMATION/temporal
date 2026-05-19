@@ -173,7 +173,7 @@ export async function PUT(request: NextRequest) {
 
     // Support single key/value update (for siteMode, countdownDate, etc.)
     if (body.key && body.value !== undefined) {
-      const allowedKeys = ['siteMode', 'countdownDate', 'sitePassword'];
+      const allowedKeys = ['siteMode', 'countdownDate', 'contestResultsDate', 'contestResultsLabel', 'contestResultsMessage', 'contestResultsColor', 'sitePassword'];
       if (!allowedKeys.includes(body.key)) {
         return errorResponse('Clé non autorisée');
       }

@@ -213,6 +213,16 @@ interface AdminState {
   countdownDate: string;
   setCountdownDate: (date: string) => void;
 
+  // Contest results countdown (shown on hero)
+  contestResultsDate: string;
+  setContestResultsDate: (date: string) => void;
+  contestResultsLabel: string;
+  setContestResultsLabel: (label: string) => void;
+  contestResultsMessage: string;
+  setContestResultsMessage: (message: string) => void;
+  contestResultsColor: string;
+  setContestResultsColor: (color: string) => void;
+
   // Contests
   contests: Contest[];
   updateContest: (id: string, updates: Partial<Contest>) => void;
@@ -505,6 +515,44 @@ export const useAdminStore = create<AdminState>()(
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: 'countdownDate', value: date, type: 'string' }),
+        }).catch(() => {});
+      },
+
+      // Contest results countdown (shown on hero) - empty by default
+      contestResultsDate: '',
+      setContestResultsDate: (date) => {
+        set({ contestResultsDate: date });
+        fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'contestResultsDate', value: date, type: 'string' }),
+        }).catch(() => {});
+      },
+      contestResultsLabel: '',
+      setContestResultsLabel: (label) => {
+        set({ contestResultsLabel: label });
+        fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'contestResultsLabel', value: label, type: 'string' }),
+        }).catch(() => {});
+      },
+      contestResultsMessage: '',
+      setContestResultsMessage: (message) => {
+        set({ contestResultsMessage: message });
+        fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'contestResultsMessage', value: message, type: 'string' }),
+        }).catch(() => {});
+      },
+      contestResultsColor: '',
+      setContestResultsColor: (color) => {
+        set({ contestResultsColor: color });
+        fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'contestResultsColor', value: color, type: 'string' }),
         }).catch(() => {});
       },
 
@@ -1180,6 +1228,10 @@ export const useAdminStore = create<AdminState>()(
       partialize: (state) => ({
         siteMode: state.siteMode,
         countdownDate: state.countdownDate,
+        contestResultsDate: state.contestResultsDate,
+        contestResultsLabel: state.contestResultsLabel,
+        contestResultsMessage: state.contestResultsMessage,
+        contestResultsColor: state.contestResultsColor,
         contests: state.contests,
         marqueeItems: state.marqueeItems,
       }),

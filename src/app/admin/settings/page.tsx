@@ -46,7 +46,14 @@ interface StoreSettings {
 type SectionKey = 'shipping' | 'store' | 'stock' | 'billing';
 
 export default function SettingsPage() {
-  const { categories, fetchCategories, products, fetchProducts, countdownDate, setCountdownDate, siteMode, setSiteMode } = useAdminStore();
+  const {
+    categories, fetchCategories, products, fetchProducts,
+    countdownDate, setCountdownDate, siteMode, setSiteMode,
+    contestResultsDate, setContestResultsDate,
+    contestResultsLabel, setContestResultsLabel,
+    contestResultsMessage, setContestResultsMessage,
+    contestResultsColor, setContestResultsColor,
+  } = useAdminStore();
   const { darkMode, language } = useStore();
 
   // Settings state loaded from API
@@ -382,6 +389,121 @@ export default function SettingsPage() {
             />
             <p className={`text-sm mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
               {t.countdownDesc}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Contest Results Countdown - shown on Hero */}
+      <Card className={darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            <Timer className="h-5 w-5" />
+            {language === 'fr' ? 'Compte à rebours résultats concours (Hero)' : 'Contest Results Countdown (Hero)'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Date */}
+          <div>
+            <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {language === 'fr' ? "Date d'annonce des résultats" : 'Results announcement date'}
+            </label>
+            <Input
+              type="datetime-local"
+              value={contestResultsDate ? formatDateForInput(contestResultsDate) : ''}
+              onChange={(e) => setContestResultsDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
+              className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+            />
+            <p className={`text-sm mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+              {language === 'fr'
+                ? 'Laisser vide pour masquer le compteur. Les cotillons se déclenchent une seule fois et restent visibles 24h max puis disparaissent.'
+                : 'Leave empty to hide. Confetti fires once and stays visible for max 24h, then disappears.'}
+            </p>
+            {contestResultsDate && (
+              <button
+                type="button"
+                onClick={() => setContestResultsDate('')}
+                className={`mt-2 text-xs underline ${darkMode ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                {language === 'fr' ? 'Effacer la date' : 'Clear date'}
+              </button>
+            )}
+          </div>
+
+          {/* Custom label (before deadline) */}
+          <div>
+            <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {language === 'fr' ? 'Libellé avant deadline' : 'Label before deadline'}
+            </label>
+            <Input
+              type="text"
+              maxLength={60}
+              value={contestResultsLabel}
+              onChange={(e) => setContestResultsLabel(e.target.value)}
+              placeholder={language === 'fr' ? 'RÉSULTATS CONCOURS DANS' : 'CONTEST RESULTS IN'}
+              className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+            />
+            <p className={`text-sm mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+              {language === 'fr'
+                ? 'Ex: TIRAGE AU SORT DANS, GAGNANTS RÉVÉLÉS DANS. Laisser vide pour le défaut.'
+                : 'Ex: PRIZE DRAW IN, WINNERS REVEALED IN. Leave empty for default.'}
+            </p>
+          </div>
+
+          {/* Custom message (after deadline) */}
+          <div>
+            <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {language === 'fr' ? 'Message après deadline' : 'Message after deadline'}
+            </label>
+            <Input
+              type="text"
+              maxLength={60}
+              value={contestResultsMessage}
+              onChange={(e) => setContestResultsMessage(e.target.value)}
+              placeholder={language === 'fr' ? 'RÉSULTATS DISPONIBLES' : 'RESULTS AVAILABLE'}
+              className={darkMode ? 'bg-white/10 border-white/20 text-white' : ''}
+            />
+            <p className={`text-sm mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+              {language === 'fr'
+                ? 'Ex: GAGNANTS ANNONCÉS, TIRAGE EFFECTUÉ. Laisser vide pour le défaut.'
+                : 'Ex: WINNERS ANNOUNCED, DRAW COMPLETED. Leave empty for default.'}
+            </p>
+          </div>
+
+          {/* Custom color */}
+          <div>
+            <label className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {language === 'fr' ? 'Couleur (badge + cotillons)' : 'Color (badge + confetti)'}
+            </label>
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                type="color"
+                value={contestResultsColor || '#44047C'}
+                onChange={(e) => setContestResultsColor(e.target.value)}
+                className="h-10 w-16 cursor-pointer rounded border border-gray-300"
+              />
+              <Input
+                type="text"
+                value={contestResultsColor}
+                onChange={(e) => setContestResultsColor(e.target.value)}
+                placeholder="#44047C"
+                maxLength={7}
+                className={`flex-1 ${darkMode ? 'bg-white/10 border-white/20 text-white' : ''}`}
+              />
+              {contestResultsColor && (
+                <button
+                  type="button"
+                  onClick={() => setContestResultsColor('')}
+                  className={`text-xs underline ${darkMode ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  {language === 'fr' ? 'Reset' : 'Reset'}
+                </button>
+              )}
+            </div>
+            <p className={`text-sm mt-1 ${darkMode ? 'text-white/50' : 'text-gray-500'}`}>
+              {language === 'fr'
+                ? 'Couleur du badge "résultats disponibles" et des cotillons. Vide = couleur primaire du site.'
+                : 'Color of "results available" badge and confetti. Empty = site primary color.'}
             </p>
           </div>
         </CardContent>

@@ -12,7 +12,6 @@ import Footer from '@/components/layout/Footer';
 import HeroSection from '@/components/home/HeroSection';
 import { ContestSection } from '@/components/home/HeroSection';
 import ProductGrid from '@/components/product/ProductGrid';
-import PackGrid from '@/components/product/PackGrid';
 import DynamicPopup from '@/components/ui/DynamicPopup';
 
 export default function Home() {
@@ -62,7 +61,6 @@ export default function Home() {
         <main>
           <HeroSection />
           <ContestSection />
-          <PackGrid limit={2} />
           <ProductGrid />
         </main>
         <Footer />

@@ -11,7 +11,30 @@ import CartGauge from '@/components/ui/CartGauge';
 import Link from 'next/link';
 
 // ── Confetti canvas ────────────────────────────────────────────────
-const CONFETTI_COLORS = ['#44047C', '#5B2D8E', '#9333ea', '#a855f7', '#c084fc', '#ffffff', '#e9d5ff'];
+const DEFAULT_CONFETTI_COLORS = ['#44047C', '#5B2D8E', '#9333ea', '#a855f7', '#c084fc', '#ffffff', '#e9d5ff'];
+
+// Build a palette of related shades from a single base hex color
+function buildPalette(hex: string): string[] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return DEFAULT_CONFETTI_COLORS;
+  const num = parseInt(m[1], 16);
+  const r = (num >> 16) & 0xff;
+  const g = (num >> 8) & 0xff;
+  const b = num & 0xff;
+  const mix = (c1: number, c2: number, t: number) => Math.round(c1 + (c2 - c1) * t);
+  const toHex = (r: number, g: number, b: number) =>
+    '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+  // Mix the base color toward white & black to produce 5 tones + white
+  return [
+    toHex(r, g, b),
+    toHex(mix(r, 255, 0.3), mix(g, 255, 0.3), mix(b, 255, 0.3)),
+    toHex(mix(r, 255, 0.55), mix(g, 255, 0.55), mix(b, 255, 0.55)),
+    toHex(mix(r, 0, 0.25), mix(g, 0, 0.25), mix(b, 0, 0.25)),
+    toHex(mix(r, 0, 0.5), mix(g, 0, 0.5), mix(b, 0, 0.5)),
+    '#ffffff',
+    toHex(mix(r, 255, 0.75), mix(g, 255, 0.75), mix(b, 255, 0.75)),
+  ];
+}
 
 interface Particle {
   x: number; y: number;
@@ -24,7 +47,7 @@ interface Particle {
   shape: 'rect' | 'circle';
 }
 
-function ConfettiCanvas({ active }: { active: boolean }) {
+function ConfettiCanvas({ active, baseColor }: { active: boolean; baseColor?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particles = useRef<Particle[]>([]);
   const rafRef = useRef<number | null>(null);
@@ -40,6 +63,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
     canvas.height = window.innerHeight;
 
     const ctx = canvas.getContext('2d')!;
+    const palette = baseColor ? buildPalette(baseColor) : DEFAULT_CONFETTI_COLORS;
 
     // Spawn 180 particles from random x positions at the top
     for (let i = 0; i < 180; i++) {
@@ -48,7 +72,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
         y: -10 - Math.random() * 200,
         vx: (Math.random() - 0.5) * 4,
         vy: 2 + Math.random() * 4,
-        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        color: palette[Math.floor(Math.random() * palette.length)],
         w: 6 + Math.random() * 8,
         h: 4 + Math.random() * 6,
         rotation: Math.random() * Math.PI * 2,
@@ -89,7 +113,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
 
     rafRef.current = requestAnimationFrame(animate);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [active]);
+  }, [active, baseColor]);
 
   return (
     <canvas
@@ -101,16 +125,34 @@ function ConfettiCanvas({ active }: { active: boolean }) {
 }
 // ───────────────────────────────────────────────────────────────────
 
+const CONFETTI_STORAGE_KEY = 'temporal-contest-confetti-fired';
+const CONFETTI_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
 export default function HeroSection() {
   const { language, darkMode } = useStore();
-  const { siteMode: localSiteMode, countdownDate: localCountdownDate, setSiteMode, setCountdownDate } = useAdminStore();
+  const {
+    siteMode: localSiteMode,
+    countdownDate: localCountdownDate,
+    contestResultsDate: localContestResultsDate,
+    contestResultsLabel: localContestResultsLabel,
+    contestResultsMessage: localContestResultsMessage,
+    contestResultsColor: localContestResultsColor,
+    setSiteMode, setCountdownDate, setContestResultsDate,
+    setContestResultsLabel, setContestResultsMessage, setContestResultsColor,
+  } = useAdminStore();
   const t = translations[language];
   const [scrollY, setScrollY] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [dropPassed, setDropPassed] = useState(false);
+  const [resultsPassed, setResultsPassed] = useState(false);
+  const [shouldShowWidget, setShouldShowWidget] = useState(false);
+  const [confettiActive, setConfettiActive] = useState(false);
   const [siteMode, setSiteModeLocal] = useState(localSiteMode);
   const [countdownDate, setCountdownDateLocal] = useState(localCountdownDate);
+  const [contestResultsDate, setContestResultsDateLocal] = useState(localContestResultsDate);
+  const [contestResultsLabel, setContestResultsLabelLocal] = useState(localContestResultsLabel);
+  const [contestResultsMessage, setContestResultsMessageLocal] = useState(localContestResultsMessage);
+  const [contestResultsColor, setContestResultsColorLocal] = useState(localContestResultsColor);
 
   // Fetch siteMode from server (source of truth) to override localStorage
   useEffect(() => {
@@ -120,9 +162,17 @@ export default function HeroSection() {
         if (json.success && json.data) {
           setSiteModeLocal(json.data.siteMode);
           setCountdownDateLocal(json.data.countdownDate);
+          setContestResultsDateLocal(json.data.contestResultsDate || '');
+          setContestResultsLabelLocal(json.data.contestResultsLabel || '');
+          setContestResultsMessageLocal(json.data.contestResultsMessage || '');
+          setContestResultsColorLocal(json.data.contestResultsColor || '');
           // Also update the store so other components see it
           if (json.data.siteMode !== localSiteMode) setSiteMode(json.data.siteMode);
           if (json.data.countdownDate !== localCountdownDate) setCountdownDate(json.data.countdownDate);
+          if ((json.data.contestResultsDate || '') !== localContestResultsDate) setContestResultsDate(json.data.contestResultsDate || '');
+          if ((json.data.contestResultsLabel || '') !== localContestResultsLabel) setContestResultsLabel(json.data.contestResultsLabel || '');
+          if ((json.data.contestResultsMessage || '') !== localContestResultsMessage) setContestResultsMessage(json.data.contestResultsMessage || '');
+          if ((json.data.contestResultsColor || '') !== localContestResultsColor) setContestResultsColor(json.data.contestResultsColor || '');
         }
       })
       .catch(() => {});
@@ -139,33 +189,71 @@ export default function HeroSection() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Countdown timer for countdown mode
+  // Contest results countdown - replaces the drop countdown on the hero
   useEffect(() => {
-    if (siteMode !== 'countdown') return;
+    if (!contestResultsDate) {
+      setShouldShowWidget(false);
+      setConfettiActive(false);
+      return;
+    }
+
+    const targetDate = new Date(contestResultsDate).getTime();
+    if (isNaN(targetDate)) {
+      setShouldShowWidget(false);
+      return;
+    }
 
     const updateCountdown = () => {
-      const targetDate = new Date(countdownDate).getTime();
       const now = Date.now();
       const diff = targetDate - now;
+      const passedMs = -diff; // ms since deadline (negative if not reached)
 
       if (diff > 0) {
-        setDropPassed(false);
+        // Before deadline → show countdown
+        setResultsPassed(false);
+        setShouldShowWidget(true);
+        setConfettiActive(false);
         setCountdown({
           days: Math.floor(diff / (1000 * 60 * 60 * 24)),
           hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
           minutes: Math.floor((diff / (1000 * 60)) % 60),
           seconds: Math.floor((diff / 1000) % 60),
         });
-      } else {
-        setDropPassed(true);
+      } else if (passedMs <= CONFETTI_TTL_MS) {
+        // Within 24h after deadline → show "RÉSULTATS DISPONIBLES" + confetti (once)
+        setResultsPassed(true);
+        setShouldShowWidget(true);
         setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+        // Check localStorage: fire confetti once and only within 24h window
+        try {
+          const stored = localStorage.getItem(CONFETTI_STORAGE_KEY);
+          const storedKey = stored ? JSON.parse(stored) : null;
+          // Bind to the specific deadline date so a new contest can re-fire
+          if (!storedKey || storedKey.date !== contestResultsDate) {
+            localStorage.setItem(
+              CONFETTI_STORAGE_KEY,
+              JSON.stringify({ date: contestResultsDate, firedAt: now })
+            );
+            setConfettiActive(true);
+          } else {
+            // Already fired for this contest → no more confetti
+            setConfettiActive(false);
+          }
+        } catch {
+          setConfettiActive(true);
+        }
+      } else {
+        // 24h+ after deadline → hide widget completely
+        setShouldShowWidget(false);
+        setConfettiActive(false);
       }
     };
 
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [siteMode, countdownDate]);
+  }, [contestResultsDate]);
 
   const scrollProgress = Math.min(scrollY / 300, 1);
   const logoScale = Math.max(0.16, 1 - scrollProgress);
@@ -173,8 +261,8 @@ export default function HeroSection() {
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-background">
-      {/* Confetti on drop */}
-      <ConfettiCanvas active={dropPassed} />
+      {/* Confetti when contest results drop (fired once, max 24h) */}
+      <ConfettiCanvas active={confettiActive} baseColor={contestResultsColor || undefined} />
 
       {/* Starfield background */}
       <div className="absolute inset-0 z-0">
@@ -184,55 +272,80 @@ export default function HeroSection() {
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background z-[1]" />
 
-      {/* Countdown timer - stuck to left edge, upper area */}
-      {siteMode === 'countdown' && (
-        <div
-          className="absolute left-0 top-[30%] z-30 transition-all duration-700"
-          style={{ opacity: isLoaded ? contentOpacity : 0 }}
-        >
-          {!dropPassed ? (
-            <div className={`backdrop-blur-sm border border-l-0 rounded-r-xl px-4 py-3 md:px-5 md:py-4 ${darkMode ? 'bg-white/10 border-white/20' : 'bg-black/5 border-black/10'}`}>
-              <p
-                className={`text-base md:text-xl lg:text-2xl tracking-wider whitespace-nowrap ${darkMode ? 'text-white' : 'text-black'}`}
-                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
-              >
-                <span className="tabular-nums">{String(countdown.days).padStart(2, '0')}</span>
-                <span className="text-primary">j</span>
-                <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
-                <span className="tabular-nums">{String(countdown.hours).padStart(2, '0')}</span>
-                <span className="text-primary">h</span>
-                <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
-                <span className="tabular-nums">{String(countdown.minutes).padStart(2, '0')}</span>
-                <span className="text-primary">m</span>
-                <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
-                <span className="tabular-nums">{String(countdown.seconds).padStart(2, '0')}</span>
-                <span className="text-primary">s</span>
-              </p>
-            </div>
-          ) : (
-            <div className="bg-primary/25 backdrop-blur-sm border border-primary/60 border-l-0 rounded-r-xl px-5 py-3 md:px-6 md:py-4 shadow-[0_0_24px_rgba(68,4,124,0.5)]">
-              <div className="flex items-center gap-2.5">
-                <div className="relative flex-shrink-0">
-                  <div className="w-3 h-3 bg-primary rounded-full animate-ping absolute" />
-                  <div className="w-3 h-3 bg-primary rounded-full" />
-                </div>
+      {/* Contest results countdown - stuck to left edge, upper area */}
+      {shouldShowWidget && (() => {
+        const accentColor = contestResultsColor || '#44047C';
+        const labelText = contestResultsLabel || (language === 'fr' ? 'RÉSULTATS CONCOURS DANS' : 'CONTEST RESULTS IN');
+        const messageText = contestResultsMessage || (language === 'fr' ? 'RÉSULTATS DISPONIBLES' : 'RESULTS AVAILABLE');
+        return (
+          <div
+            className="absolute left-0 top-[30%] z-30 transition-all duration-700"
+            style={{ opacity: isLoaded ? contentOpacity : 0 }}
+          >
+            {!resultsPassed ? (
+              <div className={`backdrop-blur-sm border border-l-0 rounded-r-xl px-4 py-3 md:px-5 md:py-4 ${darkMode ? 'bg-white/10 border-white/20' : 'bg-black/5 border-black/10'}`}>
                 <p
-                  className="text-primary text-base md:text-xl lg:text-2xl tracking-wider"
+                  className={`text-[10px] md:text-xs tracking-[0.2em] uppercase mb-1 ${darkMode ? 'text-white/60' : 'text-black/60'}`}
                   style={{ fontFamily: '"Bebas Neue", sans-serif' }}
                 >
-                  DROP DISPONIBLE
+                  {labelText}
+                </p>
+                <p
+                  className={`text-base md:text-xl lg:text-2xl tracking-wider whitespace-nowrap ${darkMode ? 'text-white' : 'text-black'}`}
+                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                >
+                  <span className="tabular-nums">{String(countdown.days).padStart(2, '0')}</span>
+                  <span style={{ color: accentColor }}>j</span>
+                  <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
+                  <span className="tabular-nums">{String(countdown.hours).padStart(2, '0')}</span>
+                  <span style={{ color: accentColor }}>h</span>
+                  <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
+                  <span className="tabular-nums">{String(countdown.minutes).padStart(2, '0')}</span>
+                  <span style={{ color: accentColor }}>m</span>
+                  <span className={`mx-0.5 md:mx-1 ${darkMode ? 'text-white/40' : 'text-black/30'}`}>-</span>
+                  <span className="tabular-nums">{String(countdown.seconds).padStart(2, '0')}</span>
+                  <span style={{ color: accentColor }}>s</span>
                 </p>
               </div>
-              <p
-                className="text-primary/70 text-[10px] md:text-xs tracking-[0.2em] mt-0.5 ml-5"
-                style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+            ) : (
+              <div
+                className="backdrop-blur-sm border border-l-0 rounded-r-xl px-5 py-3 md:px-6 md:py-4"
+                style={{
+                  backgroundColor: `${accentColor}40`,
+                  borderColor: `${accentColor}99`,
+                  boxShadow: `0 0 24px ${accentColor}80`,
+                }}
               >
-                COMMANDE MAINTENANT
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+                <div className="flex items-center gap-2.5">
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="w-3 h-3 rounded-full animate-ping absolute"
+                      style={{ backgroundColor: accentColor }}
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: accentColor }}
+                    />
+                  </div>
+                  <p
+                    className="text-base md:text-xl lg:text-2xl tracking-wider"
+                    style={{ fontFamily: '"Bebas Neue", sans-serif', color: accentColor }}
+                  >
+                    {messageText}
+                  </p>
+                </div>
+                <Link
+                  href="/concours"
+                  className="block text-[10px] md:text-xs tracking-[0.2em] mt-0.5 ml-5 transition-opacity hover:opacity-100"
+                  style={{ fontFamily: '"Bebas Neue", sans-serif', color: accentColor, opacity: 0.7 }}
+                >
+                  {language === 'fr' ? 'VOIR LES GAGNANTS →' : 'VIEW WINNERS →'}
+                </Link>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Cart Gauge - right side */}
       <div

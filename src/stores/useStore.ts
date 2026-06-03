@@ -79,6 +79,83 @@ function debouncedSyncCart(cart: CartItem[], total: number) {
   }, 500);
 }
 
+// --- Migration: anciens "ensembles" (article unique) -> produits du pack ---
+// Les ensembles Temporal Noir/Blanc n'existent plus en tant qu'article : ils sont
+// désormais des packs (veste + jogging). On remplace donc dans les paniers déjà
+// enregistrés l'ancien article ensemble par ses deux produits, comme le ferait
+// l'ajout du pack au panier (cf. src/app/packs/[slug]/page.tsx).
+type EnsembleComponent = Pick<CartItem, 'id' | 'name' | 'price' | 'color' | 'image'>;
+
+const ENSEMBLE_TO_PACK: Record<string, EnsembleComponent[]> = {
+  prod_ensemble_noir: [
+    {
+      id: 'cmolu6gzg000ko3012zpw2qli',
+      name: 'Veste temporal - Noir',
+      price: 89.98,
+      color: 'Noir',
+      image: '/clothes/img_1242-mnvl9l04.jpg',
+    },
+    {
+      id: 'cmizyi5oj000vrxtfxefj0f86',
+      name: 'Jogging Temporal - Noir',
+      price: 59.98,
+      color: 'Noir',
+      image: '/clothes/img_1257-mnvmk6dr.jpg',
+    },
+  ],
+  prod_ensemble_blanc: [
+    {
+      id: 'cmizyi5o8000jrxtfzyw5sa4t',
+      name: 'Veste Temporal - Blanche',
+      price: 89.98,
+      color: 'Blanc',
+      image: '/clothes/img_1245-mnvmi4ym.jpg',
+    },
+    {
+      id: 'cmizyi5od000prxtf83icbpwb',
+      name: 'Jogging Temporal - Blanc',
+      price: 59.98,
+      color: 'Blanc',
+      image: '/clothes/img_1256-mnvmlby5.jpg',
+    },
+  ],
+};
+
+export function migrateEnsembleCart(cart: CartItem[]): CartItem[] {
+  const result: CartItem[] = [];
+
+  const pushMerged = (item: CartItem) => {
+    const existing = result.find((i) => i.id === item.id && i.size === item.size);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      result.push({ ...item });
+    }
+  };
+
+  for (const item of cart) {
+    const components = ENSEMBLE_TO_PACK[item.id];
+    if (!components) {
+      pushMerged(item);
+      continue;
+    }
+    // Remplace l'ensemble par ses produits, en conservant taille et quantité.
+    for (const comp of components) {
+      pushMerged({
+        id: comp.id,
+        name: comp.name,
+        price: comp.price,
+        size: item.size,
+        color: comp.color,
+        quantity: item.quantity,
+        image: comp.image,
+      });
+    }
+  }
+
+  return result;
+}
+
 interface StoreState {
   language: 'fr' | 'en';
   darkMode: boolean;
@@ -159,6 +236,16 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'temporal-store',
+      version: 1,
+      migrate: (persistedState, version) => {
+        const state = (persistedState ?? {}) as Partial<StoreState>;
+        const cart = Array.isArray(state.cart) ? state.cart : [];
+        return {
+          language: state.language ?? 'fr',
+          darkMode: state.darkMode ?? true,
+          cart: version < 1 ? migrateEnsembleCart(cart) : cart,
+        };
+      },
       partialize: (state) => ({
         language: state.language,
         darkMode: state.darkMode,

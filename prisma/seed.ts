@@ -38,13 +38,33 @@ async function main() {
       },
     }),
     prisma.category.upsert({
-      where: { slug: 'accessoires' },
+      where: { slug: 'bonnets' },
       update: {},
       create: {
-        name: 'Accessoires',
-        slug: 'accessoires',
-        description: 'Bonnets, stickers et plus',
+        name: 'Bonnets',
+        slug: 'bonnets',
+        description: 'Bonnets en laine premium',
         sortOrder: 4,
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'stickers' },
+      update: {},
+      create: {
+        name: 'Stickers',
+        slug: 'stickers',
+        description: 'Stickers holographiques Temporal',
+        sortOrder: 5,
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'upsells' },
+      update: {},
+      create: {
+        name: 'Upsells',
+        slug: 'upsells',
+        description: 'Produits complémentaires',
+        sortOrder: 6,
       },
     }),
     prisma.category.upsert({
@@ -54,10 +74,11 @@ async function main() {
         name: 'Ensembles',
         slug: 'ensembles',
         description: 'Looks complets',
-        sortOrder: 5,
+        sortOrder: 7,
       },
     }),
   ]);
+  // Indices: 0=vestes, 1=tshirts, 2=pantalons, 3=bonnets, 4=stickers, 5=upsells, 6=ensembles
 
   console.log(`Created ${categories.length} categories`);
 
@@ -267,7 +288,7 @@ async function main() {
       slug: 'stickers-tpl-pack',
       description: 'Pack de 6 stickers holographiques Temporal. Inclut toutes les variations de couleurs.',
       price: 12,
-      categoryId: categories[3].id,
+      categoryId: categories[4].id, // stickers
       images: [
         '/stickers/black-purple.webp',
         '/stickers/purple-black.webp',
@@ -295,7 +316,7 @@ async function main() {
       description: 'Protège tes vêtements pendant le lavage en machine. Filet à maille fine qui préserve les impressions et les tissus.',
       descriptionEn: 'Protect your clothes during machine washing. Fine mesh bag that preserves prints and fabrics.',
       price: 0,
-      categoryId: categories[3].id, // accessoires
+      categoryId: categories[5].id, // upsells
       images: [],
       isActive: true,
       isFeatured: false,

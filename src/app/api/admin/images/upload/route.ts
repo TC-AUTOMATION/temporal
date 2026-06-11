@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const allowedTypes = ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'image/svg+xml'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 25 * 1024 * 1024; // 25MB
 
     const uploadedPaths: string[] = [];
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
       if (file.size > maxSize) {
         return NextResponse.json(
-          { success: false, error: `Fichier trop volumineux: ${file.name} (max 10MB)` },
+          { success: false, error: `Fichier trop volumineux: ${file.name} (max 25MB)` },
           { status: 400 }
         );
       }

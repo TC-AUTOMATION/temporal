@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // Allow larger request bodies for admin image uploads (camera/phone photos
+  // are often several MB each). Default limit is 10MB which truncates the
+  // multipart body and breaks FormData parsing.
+  experimental: {
+    proxyClientMaxBodySize: "50mb",
+  },
+
   // Images are pre-optimized as WebP - skip server-side optimization to avoid CPU overload
   images: {
     unoptimized: true,

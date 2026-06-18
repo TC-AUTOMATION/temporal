@@ -298,23 +298,13 @@ export default function MediaPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => handleOptimize({ all: true })}
-            disabled={optimizing || loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {optimizing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
-            <span className="text-sm">{t('Optimiser tout', 'Optimize all')}</span>
-          </button>
-          <button
-            onClick={fetchImages}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors ${card} hover:border-primary/50`}
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            <span className="text-sm">{t('Actualiser', 'Refresh')}</span>
-          </button>
-        </div>
+        <button
+          onClick={fetchImages}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors ${card} hover:border-primary/50`}
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <span className="text-sm">{t('Actualiser', 'Refresh')}</span>
+        </button>
       </div>
 
       {stats && (

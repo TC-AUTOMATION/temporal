@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // Keep sharp (native module) external so it loads from node_modules at runtime
+  // instead of being bundled. Used for server-side image compression.
+  serverExternalPackages: ["sharp"],
+
   // Allow larger request bodies for admin image uploads (camera/phone photos
   // are often several MB each). Default limit is 10MB which truncates the
   // multipart body and breaks FormData parsing.

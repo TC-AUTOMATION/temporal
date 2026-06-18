@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import path from 'path';
+import sharp from 'sharp';
 import { getCurrentUser } from '@/lib/auth/jwt';
 import {
   successResponse,
@@ -63,14 +64,31 @@ export async function POST(request: NextRequest) {
 
       // Add timestamp to avoid conflicts
       const timestamp = Date.now().toString(36);
-      const fileName = `${baseName}-${timestamp}${ext}`;
 
       const publicDir = path.join(process.cwd(), 'public', 'clothes');
-      const filePath = path.join(publicDir, fileName);
-
       const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      await writeFile(filePath, buffer);
+      const inputBuffer = Buffer.from(bytes);
+
+      // Compress raster images (png/jpg/webp) to a resized WebP for fast loading.
+      // Vector/animated formats (svg, gif) are stored as-is.
+      const isRaster = ['image/webp', 'image/png', 'image/jpeg'].includes(file.type);
+      let fileName: string;
+      let outputBuffer: Buffer;
+
+      if (isRaster) {
+        outputBuffer = await sharp(inputBuffer)
+          .rotate() // honor EXIF orientation from phone photos
+          .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+        fileName = `${baseName}-${timestamp}.webp`;
+      } else {
+        outputBuffer = inputBuffer;
+        fileName = `${baseName}-${timestamp}${ext}`;
+      }
+
+      const filePath = path.join(publicDir, fileName);
+      await writeFile(filePath, outputBuffer);
 
       uploadedPaths.push(`/clothes/${fileName}`);
     }

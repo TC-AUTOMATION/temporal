@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
-import { readdir, stat, unlink } from 'fs/promises';
+import { readdir, stat, unlink, readFile, writeFile, access } from 'fs/promises';
 import path from 'path';
+import sharp from 'sharp';
 import { getCurrentUser } from '@/lib/auth/jwt';
 import { prisma } from '@/lib/db/prisma';
+import { replaceImageReferences } from '@/lib/images/references';
 import {
   successResponse,
   errorResponse,
@@ -266,73 +268,7 @@ export async function PATCH(request: NextRequest) {
       return errorResponse("L'ancienne et la nouvelle image sont identiques");
     }
 
-    let updated = 0;
-
-    // Products (images array)
-    const products = await prisma.product.findMany({
-      where: { images: { has: from } },
-      select: { id: true, images: true },
-    });
-    for (const p of products) {
-      await prisma.product.update({
-        where: { id: p.id },
-        data: { images: p.images.map((img) => (img === from ? to : img)) },
-      });
-      updated++;
-    }
-
-    // Packs (image + images array)
-    const packs = await prisma.pack.findMany({
-      where: { OR: [{ image: from }, { images: { has: from } }] },
-      select: { id: true, image: true, images: true },
-    });
-    for (const p of packs) {
-      await prisma.pack.update({
-        where: { id: p.id },
-        data: {
-          image: p.image === from ? to : p.image,
-          images: p.images.map((img) => (img === from ? to : img)),
-        },
-      });
-      updated++;
-    }
-
-    // Popups (image + images array)
-    const popups = await prisma.popup.findMany({
-      where: { OR: [{ image: from }, { images: { has: from } }] },
-      select: { id: true, image: true, images: true },
-    });
-    for (const p of popups) {
-      await prisma.popup.update({
-        where: { id: p.id },
-        data: {
-          image: p.image === from ? to : p.image,
-          images: p.images.map((img) => (img === from ? to : img)),
-        },
-      });
-      updated++;
-    }
-
-    // Upsells (single image)
-    const upsellRes = await prisma.upsell.updateMany({
-      where: { image: from },
-      data: { image: to },
-    });
-    updated += upsellRes.count;
-
-    // Categories (single image)
-    const catRes = await prisma.category.updateMany({
-      where: { image: from },
-      data: { image: to },
-    });
-    updated += catRes.count;
-
-    // Contests (prize image)
-    const contestRes = await prisma.contest.updateMany({
-      where: { prizeImage: from },
-      data: { prizeImage: to },
-    });
-    updated += contestRes.count;
+    const updated = await replaceImageReferences(from, to);
 
     // Delete the old file if requested and it is no longer referenced
     let oldDeleted = false;
@@ -352,6 +288,141 @@ export async function PATCH(request: NextRequest) {
     return successResponse({ updated, oldDeleted });
   } catch (error) {
     console.error('PATCH /api/admin/images/manage error:', error);
+    return serverErrorResponse();
+  }
+}
+
+// Tuning for web delivery: cap dimensions and re-encode to WebP.
+const MAX_DIMENSION = 2000;
+const WEBP_QUALITY = 80;
+// Skip recompressing files already lighter than this (likely already optimized).
+const SKIP_BELOW_BYTES = 150 * 1024;
+
+/** Build a non-colliding "/folder/name.webp" url + absolute path. */
+async function uniqueWebpTarget(folder: string, baseNoExt: string): Promise<{ url: string; path: string }> {
+  const folderDir = path.join(PUBLIC_DIR, folder);
+  let candidate = `${baseNoExt}.webp`;
+  let i = 0;
+  // Avoid overwriting an existing different file
+  while (true) {
+    const full = path.join(folderDir, candidate);
+    try {
+      await access(full);
+      // exists -> try another name
+      i += 1;
+      candidate = `${baseNoExt}-opt${i > 1 ? i : ''}-${Date.now().toString(36)}.webp`;
+    } catch {
+      return { url: `/${folder}/${candidate}`, path: full };
+    }
+  }
+}
+
+/**
+ * POST /api/admin/images/manage
+ * Compress/optimize existing images. Re-encodes to WebP and resizes oversized
+ * images. WebP files are recompressed in place; PNG/JPG files are converted to
+ * a new WebP and all database references are updated to point to it.
+ * Body: { urls?: string[], all?: boolean }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorizedResponse();
+    if (!user.isAdmin) return forbiddenResponse();
+
+    const body = await request.json().catch(() => null);
+    let urls: string[] = Array.isArray(body?.urls) ? body.urls.map(String) : [];
+
+    if (body?.all === true) {
+      // Gather every raster image on disk
+      urls = [];
+      for (const folder of FOLDERS) {
+        const dirPath = path.join(PUBLIC_DIR, folder);
+        try {
+          const files = await readdir(dirPath);
+          for (const file of files) {
+            if (/\.(webp|png|jpg|jpeg)$/i.test(file)) urls.push(`/${folder}/${file}`);
+          }
+        } catch {
+          // folder missing
+        }
+      }
+    }
+
+    if (urls.length === 0) return errorResponse('Aucune image à optimiser');
+
+    let optimized = 0;
+    let skipped = 0;
+    let bytesBefore = 0;
+    let bytesAfter = 0;
+    const failed: Array<{ url: string; error: string }> = [];
+
+    for (const url of urls) {
+      const filePath = resolveImagePath(url);
+      if (!filePath) {
+        failed.push({ url, error: 'Chemin invalide' });
+        continue;
+      }
+      // Only raster formats; leave svg/gif untouched
+      if (!/\.(webp|png|jpg|jpeg)$/i.test(url)) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        const input = await readFile(filePath);
+        const origSize = input.length;
+
+        const output = await sharp(input)
+          .rotate() // honor EXIF orientation
+          .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: WEBP_QUALITY })
+          .toBuffer();
+
+        const isWebp = /\.webp$/i.test(filePath);
+
+        if (isWebp) {
+          // Recompress in place only if it actually helps
+          if (origSize <= SKIP_BELOW_BYTES && output.length >= origSize) {
+            skipped++;
+            continue;
+          }
+          if (output.length >= origSize) {
+            skipped++;
+            continue;
+          }
+          await writeFile(filePath, output);
+          bytesBefore += origSize;
+          bytesAfter += output.length;
+          optimized++;
+        } else {
+          // Convert PNG/JPG -> WebP, update references, delete original
+          const folder = url.split('/')[1];
+          const baseNoExt = path.basename(filePath).replace(IMAGE_REGEX, '');
+          const target = await uniqueWebpTarget(folder, baseNoExt);
+          await writeFile(target.path, output);
+          await replaceImageReferences(url, target.url);
+          await unlink(filePath).catch(() => {});
+          bytesBefore += origSize;
+          bytesAfter += output.length;
+          optimized++;
+        }
+      } catch (err) {
+        console.error('Optimize error for', url, err);
+        failed.push({ url, error: 'Optimisation impossible' });
+      }
+    }
+
+    return successResponse({
+      optimized,
+      skipped,
+      failed,
+      bytesBefore,
+      bytesAfter,
+      saved: Math.max(0, bytesBefore - bytesAfter),
+    });
+  } catch (error) {
+    console.error('POST /api/admin/images/manage error:', error);
     return serverErrorResponse();
   }
 }

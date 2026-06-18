@@ -16,6 +16,7 @@ import {
   Replace,
   CheckSquare,
   Square,
+  Zap,
 } from 'lucide-react';
 
 interface ImageUser {
@@ -71,6 +72,7 @@ export default function MediaPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [detail, setDetail] = useState<MediaImage | null>(null);
@@ -235,6 +237,49 @@ export default function MediaPage() {
     }
   };
 
+  // Compress images (resize + WebP). Migrates png/jpg to webp and updates refs.
+  const handleOptimize = async (payload: { urls?: string[]; all?: boolean }) => {
+    const count = payload.all ? (stats?.total ?? 0) : payload.urls?.length ?? 0;
+    const confirmMsg = payload.all
+      ? t(
+          `Optimiser TOUTES les images (${count}) ? Les PNG/JPG lourds seront convertis en WebP et les images redimensionnées. Cette opération peut prendre un moment.`,
+          `Optimize ALL images (${count})? Heavy PNG/JPG files will be converted to WebP and images resized. This may take a while.`
+        )
+      : t(
+          `Optimiser ${count} image(s) sélectionnée(s) ?`,
+          `Optimize ${count} selected image(s)?`
+        );
+    if (!confirm(confirmMsg)) return;
+
+    setOptimizing(true);
+    try {
+      const res = await fetch('/api/admin/images/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const savedMo = (data.data.saved / (1024 * 1024)).toFixed(1);
+        alert(
+          t(
+            `${data.data.optimized} image(s) optimisée(s), ${data.data.skipped} ignorée(s). ${savedMo} Mo économisés.`,
+            `${data.data.optimized} image(s) optimized, ${data.data.skipped} skipped. ${savedMo} MB saved.`
+          )
+        );
+        setDetail(null);
+        await fetchImages();
+      } else {
+        alert(data.error || t("Erreur lors de l'optimisation", 'Optimize error'));
+      }
+    } catch (err) {
+      console.error('Optimize error:', err);
+      alert(t("Erreur lors de l'optimisation", 'Optimize error'));
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header + stats */}
@@ -253,13 +298,23 @@ export default function MediaPage() {
             )}
           </p>
         </div>
-        <button
-          onClick={fetchImages}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors ${card} hover:border-primary/50`}
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          <span className="text-sm">{t('Actualiser', 'Refresh')}</span>
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleOptimize({ all: true })}
+            disabled={optimizing || loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {optimizing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+            <span className="text-sm">{t('Optimiser tout', 'Optimize all')}</span>
+          </button>
+          <button
+            onClick={fetchImages}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors ${card} hover:border-primary/50`}
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <span className="text-sm">{t('Actualiser', 'Refresh')}</span>
+          </button>
+        </div>
       </div>
 
       {stats && (
@@ -398,6 +453,14 @@ export default function MediaPage() {
               {t('Annuler', 'Cancel')}
             </button>
             <button
+              onClick={() => handleOptimize({ urls: Array.from(selected) })}
+              disabled={optimizing}
+              className="flex items-center gap-2 text-sm px-4 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {optimizing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+              {t('Optimiser', 'Optimize')}
+            </button>
+            <button
               onClick={() => handleDelete(Array.from(selected))}
               disabled={deleting}
               className="flex items-center gap-2 text-sm px-4 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
@@ -476,7 +539,8 @@ export default function MediaPage() {
           onClose={() => setDetail(null)}
           onDelete={() => handleDelete([detail.url])}
           onReplace={(file) => handleReplace(detail, file)}
-          busy={deleting || uploading}
+          onOptimize={() => handleOptimize({ urls: [detail.url] })}
+          busy={deleting || uploading || optimizing}
         />
       )}
     </div>
@@ -491,6 +555,7 @@ function ImageDetailModal({
   onClose,
   onDelete,
   onReplace,
+  onOptimize,
   busy,
 }: {
   image: MediaImage;
@@ -499,6 +564,7 @@ function ImageDetailModal({
   onClose: () => void;
   onDelete: () => void;
   onReplace: (file: File) => void;
+  onOptimize: () => void;
   busy: boolean;
 }) {
   const panel = darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-gray-200 text-gray-900';
@@ -576,6 +642,14 @@ function ImageDetailModal({
               }}
             />
           </label>
+          <button
+            onClick={onOptimize}
+            disabled={busy}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/40 text-primary hover:bg-primary/10 transition-colors text-sm disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+            {t('Optimiser', 'Optimize')}
+          </button>
           <button
             onClick={onDelete}
             disabled={busy}

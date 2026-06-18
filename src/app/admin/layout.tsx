@@ -30,6 +30,7 @@ import {
   TrendingUp,
   Truck,
   BarChart3,
+  Images,
 } from 'lucide-react';
 import TemporalLogoStatic from '@/components/ui/TemporalLogoStatic';
 import TemporalStar from '@/components/ui/TemporalStar';
@@ -60,6 +61,7 @@ const navGroups: NavGroup[] = [
     labelEn: 'SHOP',
     items: [
       { href: '/admin/products', labelFr: 'PRODUITS', labelEn: 'PRODUCTS', icon: Package },
+      { href: '/admin/media', labelFr: 'IMAGES', labelEn: 'MEDIA', icon: Images },
       { href: '/admin/stickers', labelFr: 'STICKERS', labelEn: 'STICKERS', icon: Sticker },
       { href: '/admin/packs', labelFr: 'PACKS', labelEn: 'PACKS', icon: Gift },
       { href: '/admin/upsells', labelFr: 'UPSELLS', labelEn: 'UPSELLS', icon: TrendingUp },

@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         size: string;
         currentStock: number;
         sold: number;
-        colors: { color: string; colorHex: string | null; stock: number; sold: number }[];
+        colors: { variantId: string; color: string; colorHex: string | null; stock: number; sold: number }[];
       }>();
 
       for (const variant of product.variants) {
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
           existing.currentStock += variant.stock;
           existing.sold += sold;
           existing.colors.push({
+            variantId: variant.id,
             color: variant.color,
             colorHex: variant.colorHex,
             stock: variant.stock,
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
             currentStock: variant.stock,
             sold,
             colors: [{
+              variantId: variant.id,
               color: variant.color,
               colorHex: variant.colorHex,
               stock: variant.stock,

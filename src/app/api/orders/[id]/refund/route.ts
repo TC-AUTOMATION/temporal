@@ -13,7 +13,7 @@ import {
 import { sendEmail } from '@/lib/email/send';
 import { orderRefundedEmail } from '@/lib/email/templates';
 import { notifyRefundIssued } from '@/lib/notifications';
-import { expandWithBundleComponents } from '@/lib/stock';
+import { incrementStockWithHistory, opsFromOrderItems } from '@/lib/stock';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -112,16 +112,13 @@ export async function POST(request: NextRequest, { params }: Params) {
 
       // Restore stock for full refunds (y compris composants des bundles)
       if (isFullRefund) {
-        const restoreOps = order.items
-          .filter((item) => item.variantId)
-          .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
-        const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
-        for (const v of expandedRestore) {
-          await tx.productVariant.update({
-            where: { id: v.id },
-            data: { stock: { increment: v.quantity } },
-          });
-        }
+        await incrementStockWithHistory(tx, opsFromOrderItems(order.items), {
+          source: 'AUTO',
+          reason: 'ORDER_REFUNDED',
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          note: 'Remboursement total (admin)',
+        });
       }
     });
 

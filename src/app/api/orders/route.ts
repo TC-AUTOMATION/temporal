@@ -13,7 +13,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { sanitizeNote } from '@/lib/sanitize';
 import { getGaugeConfig, getFreeShippingThreshold } from '@/lib/gauge';
-import { expandWithBundleComponents } from '@/lib/stock';
+import { decrementStockWithHistory } from '@/lib/stock';
 
 type DecimalType = Prisma.Decimal;
 const DecimalCtor = Prisma.Decimal;
@@ -286,16 +286,12 @@ export async function POST(request: NextRequest) {
       const decrementOps = orderItems
         .filter((item) => item.variantId)
         .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
-      const expandedDecrements = await expandWithBundleComponents(tx, decrementOps);
-      for (const v of expandedDecrements) {
-        const updated = await tx.productVariant.updateMany({
-          where: { id: v.id, stock: { gte: v.quantity } },
-          data: { stock: { decrement: v.quantity } },
-        });
-        if (updated.count === 0) {
-          throw new Error(`Stock insuffisant (variant ${v.id})`);
-        }
-      }
+      await decrementStockWithHistory(tx, decrementOps, {
+        source: 'AUTO',
+        reason: 'ORDER',
+        orderId: newOrder.id,
+        orderNumber: newOrder.orderNumber,
+      });
 
       return newOrder;
     });

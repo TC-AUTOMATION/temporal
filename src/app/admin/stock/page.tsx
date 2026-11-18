@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/stores/useStore';
 import {
@@ -14,9 +14,14 @@ import {
   ShoppingBag,
   Loader2,
   RefreshCw,
+  History,
+  PlusCircle,
 } from 'lucide-react';
+import StockHistory from './StockHistory';
+import AdjustStockModal, { type AdjustableVariant } from './AdjustStockModal';
 
 interface ColorStock {
+  variantId: string;
   color: string;
   colorHex: string | null;
   stock: number;
@@ -62,6 +67,32 @@ export default function StockPage() {
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'low' | 'out'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [tab, setTab] = useState<'stock' | 'history'>('stock');
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustVariantId, setAdjustVariantId] = useState<string | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
+
+  const openAdjust = (variantId: string | null) => {
+    setAdjustVariantId(variantId);
+    setAdjustOpen(true);
+  };
+
+  const adjustableVariants: AdjustableVariant[] = useMemo(
+    () =>
+      stockData.flatMap((p) =>
+        sortSizes(p.sizes).flatMap((s) =>
+          s.colors.map((c) => ({
+            variantId: c.variantId,
+            productId: p.id,
+            productName: p.name,
+            color: c.color,
+            size: s.size,
+            stock: c.stock,
+          }))
+        )
+      ),
+    [stockData]
+  );
 
   const t = {
     title: language === 'fr' ? 'STOCK PAR TAILLE' : 'STOCK BY SIZE',
@@ -88,8 +119,8 @@ export default function StockPage() {
     uncategorized: language === 'fr' ? 'NON CLASSE' : 'UNCATEGORIZED',
   };
 
-  const fetchStock = async () => {
-    setLoading(true);
+  const fetchStock = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch('/api/admin/stock', { cache: 'no-store' });
       if (res.ok) {
@@ -199,8 +230,48 @@ export default function StockPage() {
     );
   }
 
+  const tabBtn = (active: boolean) =>
+    `flex items-center gap-2 px-5 py-2.5 rounded-xl border transition-colors ${
+      active
+        ? 'bg-primary text-white border-primary'
+        : darkMode
+          ? 'bg-white/5 border-white/10 text-white/60 hover:border-white/30'
+          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+    }`;
+
   return (
     <div className="space-y-6">
+      <AdjustStockModal
+        open={adjustOpen}
+        onClose={() => setAdjustOpen(false)}
+        onDone={() => {
+          fetchStock(true);
+          setHistoryKey((k) => k + 1);
+        }}
+        variants={adjustableVariants}
+        initialVariantId={adjustVariantId}
+        darkMode={darkMode}
+      />
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button className={tabBtn(tab === 'stock')} onClick={() => setTab('stock')} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+          <Package size={16} /> STOCK
+        </button>
+        <button className={tabBtn(tab === 'history')} onClick={() => setTab('history')} style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em' }}>
+          <History size={16} /> HISTORIQUE
+        </button>
+      </div>
+
+      {tab === 'history' ? (
+        <StockHistory
+          darkMode={darkMode}
+          onAdjust={() => openAdjust(null)}
+          refreshKey={historyKey}
+          onStockChanged={() => fetchStock(true)}
+        />
+      ) : (
+      <>
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className={`p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border ${darkMode ? 'border-blue-500/20' : 'border-blue-200'}`}>
@@ -351,7 +422,15 @@ export default function StockPage() {
           </div>
         </div>
         <button
-          onClick={fetchStock}
+          onClick={() => openAdjust(null)}
+          className="flex items-center gap-2 px-4 py-3 rounded-xl border bg-primary/10 border-primary/40 text-primary hover:bg-primary/20 transition-colors"
+          style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em', fontSize: '0.85rem' }}
+        >
+          <PlusCircle size={14} />
+          AJUSTER
+        </button>
+        <button
+          onClick={() => fetchStock()}
           className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-colors ${darkMode ? 'bg-white/5 border-white/10 text-white/60 hover:border-white/30' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
           style={{ fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.05em', fontSize: '0.85rem' }}
         >
@@ -524,12 +603,21 @@ export default function StockPage() {
                                       ({size.sold} {t.sold.toLowerCase()})
                                     </span>
                                   </div>
-                                  {size.currentStock === 0 && (
-                                    <span className="text-xs text-red-400 flex items-center gap-1">
-                                      <AlertTriangle size={12} />
-                                      {t.outOfStock}
-                                    </span>
-                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {size.currentStock === 0 && (
+                                      <span className="text-xs text-red-400 flex items-center gap-1">
+                                        <AlertTriangle size={12} />
+                                        {t.outOfStock}
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => openAdjust(size.colors[0]?.variantId ?? null)}
+                                      className={`text-xs px-2 py-0.5 rounded-md border ${darkMode ? 'border-white/15 text-white/60 hover:text-white hover:border-white/40' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+                                      title="Ajuster le stock"
+                                    >
+                                      ±
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {/* Stock bar */}
@@ -550,9 +638,11 @@ export default function StockPage() {
                                 {size.colors.length > 1 && (
                                   <div className="flex flex-wrap gap-2 mt-2">
                                     {size.colors.map((c) => (
-                                      <div
+                                      <button
                                         key={c.color}
-                                        className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md ${
+                                        onClick={() => openAdjust(c.variantId)}
+                                        title="Ajuster le stock"
+                                        className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md hover:ring-1 hover:ring-primary ${
                                           darkMode ? 'bg-white/5' : 'bg-white'
                                         }`}
                                       >
@@ -573,7 +663,7 @@ export default function StockPage() {
                                             ({c.sold} {t.sold.toLowerCase()})
                                           </span>
                                         )}
-                                      </div>
+                                      </button>
                                     ))}
                                   </div>
                                 )}
@@ -594,6 +684,8 @@ export default function StockPage() {
           })
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   validationErrorResponse,
 } from '@/lib/api/response';
 import { productSchema } from '@/lib/validations';
+import { syncProductVariants } from '@/lib/stock';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -188,36 +189,16 @@ export async function PATCH(
     });
 
     // Update variants if provided
+    // Les variantes existantes (même couleur + taille) sont mises à jour en place
+    // pour conserver leurs IDs (liens commandes, ensembles, historique de stock).
+    // Chaque écart de stock est journalisé comme mouvement MANUEL.
     if (data.variants) {
-      // Disconnect order items from existing variants before deleting
-      const existingVariants = await prisma.productVariant.findMany({
-        where: { productId: id },
-        select: { id: true },
-      });
-      const variantIds = existingVariants.map(v => v.id);
-
-      if (variantIds.length > 0) {
-        await prisma.orderItem.updateMany({
-          where: { variantId: { in: variantIds } },
-          data: { variantId: null },
-        });
-      }
-
-      await prisma.productVariant.deleteMany({ where: { productId: id } });
-
-      if (data.variants.length > 0) {
-        await prisma.productVariant.createMany({
-          data: data.variants.map((v: { sku: string; color: string; colorHex?: string | null; size: string; stock: number; isActive?: boolean }) => ({
-            productId: id,
-            sku: v.sku,
-            color: v.color,
-            colorHex: v.colorHex || null,
-            size: v.size,
-            stock: v.stock,
-            isActive: v.isActive ?? true,
-          })),
-        });
-      }
+      await prisma.$transaction((tx) =>
+        syncProductVariants(tx, id, data.variants!, {
+          userId: user.id,
+          userName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+        })
+      );
     }
 
     // Re-fetch with all relations

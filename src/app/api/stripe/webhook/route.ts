@@ -14,7 +14,7 @@ import { orderConfirmationEmail, paymentFailedEmail } from '@/lib/email/template
 import { checkAndNotifyLowStock } from '@/lib/stockAlerts';
 import { createShipmentForOrder } from '@/lib/boxtal';
 import { enterOrderInContests } from '@/lib/contests';
-import { expandWithBundleComponents } from '@/lib/stock';
+import { incrementStockWithHistory } from '@/lib/stock';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -380,13 +380,13 @@ async function handleCheckoutExpired(session: Stripe.Checkout.Session) {
       const restoreOps = order.items
         .filter((item) => item.variantId)
         .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
-      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
-      for (const v of expandedRestore) {
-        await tx.productVariant.update({
-          where: { id: v.id },
-          data: { stock: { increment: v.quantity } },
-        });
-      }
+      await incrementStockWithHistory(tx, restoreOps, {
+        source: 'AUTO',
+        reason: 'ORDER_CANCELLED',
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        note: 'Session de paiement Stripe expirée',
+      });
     });
 
     console.log(`Order ${orderId} cancelled due to expired session - stock and promo restored`);
@@ -434,13 +434,13 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     const restoreOps = order.items
       .filter((item) => item.variantId)
       .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
-    const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
-    for (const v of expandedRestore) {
-      await tx.productVariant.update({
-        where: { id: v.id },
-        data: { stock: { increment: v.quantity } },
-      });
-    }
+    await incrementStockWithHistory(tx, restoreOps, {
+      source: 'AUTO',
+      reason: 'ORDER_CANCELLED',
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      note: 'Paiement échoué',
+    });
   });
 
   // Create admin notification
@@ -530,13 +530,13 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
           restoreOps.push({ id: item.variantId, quantity: restoreQty });
         }
       }
-      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
-      for (const v of expandedRestore) {
-        await tx.productVariant.update({
-          where: { id: v.id },
-          data: { stock: { increment: v.quantity } },
-        });
-      }
+      await incrementStockWithHistory(tx, restoreOps, {
+        source: 'AUTO',
+        reason: 'ORDER_REFUNDED',
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        note: `Remboursement Stripe ${isFullRefund ? 'total' : 'partiel'}`,
+      });
 
       // Restore promo code usage on full refund
       if (isFullRefund && order.promoCodeId) {
@@ -652,13 +652,13 @@ async function handlePaymentCanceled(paymentIntent: Stripe.PaymentIntent) {
       const restoreOps = order.items
         .filter((item) => item.variantId)
         .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
-      const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
-      for (const v of expandedRestore) {
-        await tx.productVariant.update({
-          where: { id: v.id },
-          data: { stock: { increment: v.quantity } },
-        });
-      }
+      await incrementStockWithHistory(tx, restoreOps, {
+        source: 'AUTO',
+        reason: 'ORDER_CANCELLED',
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        note: 'Paiement annulé (Stripe)',
+      });
 
       // Only restore promo if it was incremented (i.e., order was PAID)
       if (wasPaid && order.promoCodeId) {
@@ -810,13 +810,13 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
           const restoreOps = order.items
             .filter((item) => item.variantId)
             .map((item) => ({ id: item.variantId as string, quantity: item.quantity }));
-          const expandedRestore = await expandWithBundleComponents(tx, restoreOps);
-          for (const v of expandedRestore) {
-            await tx.productVariant.update({
-              where: { id: v.id },
-              data: { stock: { increment: v.quantity } },
-            });
-          }
+          await incrementStockWithHistory(tx, restoreOps, {
+            source: 'AUTO',
+            reason: 'ORDER_REFUNDED',
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            note: 'Litige perdu',
+          });
 
           if (order.promoCodeId) {
             await tx.promoCode.update({

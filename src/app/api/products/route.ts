@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db/prisma';
 import { productSchema } from '@/lib/validations';
+import { syncProductVariants } from '@/lib/stock';
 import { getCurrentUser } from '@/lib/auth/jwt';
 import {
   successResponse,
@@ -220,17 +221,13 @@ export async function POST(request: NextRequest) {
 
     // Create variants if provided
     if (data.variants && data.variants.length > 0) {
-      await prisma.productVariant.createMany({
-        data: data.variants.map((v: { sku: string; color: string; colorHex?: string | null; size: string; stock: number; isActive?: boolean }) => ({
-          productId: product.id,
-          sku: v.sku,
-          color: v.color,
-          colorHex: v.colorHex || null,
-          size: v.size,
-          stock: v.stock,
-          isActive: v.isActive ?? true,
-        })),
-      });
+      await prisma.$transaction((tx) =>
+        syncProductVariants(tx, product.id, data.variants!, {
+          userId: user.id,
+          userName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+          note: 'Création du produit',
+        })
+      );
     }
 
     // Re-fetch with relations

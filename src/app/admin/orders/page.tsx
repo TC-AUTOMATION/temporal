@@ -143,6 +143,17 @@ export default function OrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Deep link: /admin/orders?order=TPL-XXXX (ex: depuis l'historique de stock)
+  const [deepLinkOrder] = useState(() =>
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('order') : null
+  );
+  useEffect(() => {
+    if (!deepLinkOrder) return;
+    setSearch(deepLinkOrder);
+    const match = orders.find((o) => o.orderNumber === deepLinkOrder);
+    if (match) setSelectedOrder((prev) => prev ?? match);
+  }, [deepLinkOrder, orders]);
+
   // Sync tracking input when selected order changes
   useEffect(() => {
     setTrackingInput(selectedOrder?.trackingNumber || '');

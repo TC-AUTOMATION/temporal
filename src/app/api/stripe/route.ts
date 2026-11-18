@@ -5,7 +5,7 @@ import { checkoutSchema } from '@/lib/validations';
 import { getCurrentUser, generateOrderNumber } from '@/lib/auth/jwt';
 import { Prisma } from '@prisma/client';
 import { getGaugeConfig, getFreeShippingThreshold } from '@/lib/gauge';
-import { expandWithBundleComponents } from '@/lib/stock';
+import { decrementStockWithHistory, incrementStockWithHistory } from '@/lib/stock';
 
 type DecimalType = Prisma.Decimal;
 const DecimalCtor = Prisma.Decimal;
@@ -199,19 +199,6 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Atomic stock decrement with guard: fail if stock would go negative.
-      // On étend les variantes "bundle" en leurs composants (ex: ensemble = veste + jogging).
-      const expandedDecrements = await expandWithBundleComponents(tx, variantsToDecrement);
-      for (const v of expandedDecrements) {
-        const updated = await tx.productVariant.updateMany({
-          where: { id: v.id, stock: { gte: v.quantity } },
-          data: { stock: { decrement: v.quantity } },
-        });
-        if (updated.count === 0) {
-          throw new Error('Stock insuffisant (mis à jour par une autre commande)');
-        }
-      }
-
       // Apply free shipping if the cart reached the gauge threshold
       if (
         freeShippingThreshold != null &&
@@ -346,6 +333,16 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Atomic stock decrement with guard: fail if stock would go negative.
+      // On étend les variantes "bundle" en leurs composants (ex: ensemble = veste + jogging).
+      // Chaque mouvement est journalisé dans l'historique de stock, relié à la commande.
+      await decrementStockWithHistory(
+        tx,
+        variantsToDecrement,
+        { source: 'AUTO', reason: 'ORDER', orderId: order.id, orderNumber: order.orderNumber },
+        'Stock insuffisant (mis à jour par une autre commande)'
+      );
+
       return { order, lineItems, discount, orderNumber, variantsToDecrement, promoCodeId };
     });
 
@@ -396,12 +393,13 @@ export async function POST(request: NextRequest) {
           where: { id: result.order.id },
           data: { status: 'CANCELLED', paymentStatus: 'FAILED' },
         });
-        for (const v of result.variantsToDecrement) {
-          await tx.productVariant.update({
-            where: { id: v.id },
-            data: { stock: { increment: v.quantity } },
-          });
-        }
+        await incrementStockWithHistory(tx, result.variantsToDecrement, {
+          source: 'AUTO',
+          reason: 'ORDER_CANCELLED',
+          orderId: result.order.id,
+          orderNumber: result.order.orderNumber,
+          note: 'Échec de création de la session Stripe',
+        });
       });
       throw stripeError;
     }

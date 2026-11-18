@@ -13,27 +13,27 @@ datasource db {
 // ==================== USERS ====================
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String?   // Hashed password (optional for guest checkout)
-  emailVerified Boolean   @default(false)
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String? // Hashed password (optional for guest checkout)
+  emailVerified Boolean  @default(false)
   firstName     String?
   lastName      String?
   phone         String?
-  isAdmin       Boolean   @default(false)
-  isActive      Boolean   @default(true)
-  newsletter    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isAdmin       Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  newsletter    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  addresses      Address[]
-  orders         Order[]
-  sessions       Session[]
-  tickets        Ticket[]
-  ticketReplies  TicketReply[]
-  wishlist       Wishlist[]
-  cartSnapshots  CartSnapshot[]
+  addresses     Address[]
+  orders        Order[]
+  sessions      Session[]
+  tickets       Ticket[]
+  ticketReplies TicketReply[]
+  wishlist      Wishlist[]
+  cartSnapshots CartSnapshot[]
 
   @@map("users")
 }
@@ -86,16 +86,16 @@ model Address {
 // ==================== PRODUCTS ====================
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   nameEn      String?
-  slug        String    @unique
+  slug        String   @unique
   description String?
   image       String?
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   products Product[]
 
@@ -103,42 +103,43 @@ model Category {
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  sku           String   @unique
-  name          String
-  nameEn        String?
-  slug          String   @unique
-  description   String?
-  descriptionEn String?
-  materials     String?  // Materials info (FR)
-  materialsEn   String?  // Materials info (EN)
-  careInstructions   String?  // Care instructions (FR)
-  careInstructionsEn String?  // Care instructions (EN)
-  modelInfo     String?  // Info about the model wearing the product
-  price         Decimal  @db.Decimal(10, 2)
-  originalPrice Decimal? @db.Decimal(10, 2) // For showing discounts
-  categoryId    String
-  images        String[] // Array of image URLs
-  isActive      Boolean  @default(true)
-  isFeatured    Boolean  @default(false)
-  isNew         Boolean  @default(true)  // Show "NEW" badge
-  sortOrder     Int      @default(0)
-  stripeProductId String?  // Stripe product ID for sync
-  stripePriceId   String?  // Stripe price ID for checkout
-  sizeGuideId     String?
-  careGuideId     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  sku                String   @unique
+  name               String
+  nameEn             String?
+  slug               String   @unique
+  description        String?
+  descriptionEn      String?
+  materials          String? // Materials info (FR)
+  materialsEn        String? // Materials info (EN)
+  careInstructions   String? // Care instructions (FR)
+  careInstructionsEn String? // Care instructions (EN)
+  modelInfo          String? // Info about the model wearing the product
+  price              Decimal  @db.Decimal(10, 2)
+  originalPrice      Decimal? @db.Decimal(10, 2) // For showing discounts
+  categoryId         String
+  images             String[] // Array of image URLs
+  isActive           Boolean  @default(true)
+  isFeatured         Boolean  @default(false)
+  isNew              Boolean  @default(true) // Show "NEW" badge
+  sortOrder          Int      @default(0)
+  stripeProductId    String? // Stripe product ID for sync
+  stripePriceId      String? // Stripe price ID for checkout
+  sizeGuideId        String?
+  careGuideId        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relations
-  category   Category         @relation(fields: [categoryId], references: [id])
-  sizeGuide  SizeGuide?       @relation(fields: [sizeGuideId], references: [id], onDelete: SetNull)
-  careGuide  CareGuide?       @relation(fields: [careGuideId], references: [id], onDelete: SetNull)
-  variants   ProductVariant[]
-  orderItems OrderItem[]
-  packItems  PackItem[]
-  upsells    Upsell[]
-  wishlist   Wishlist[]
+  category       Category         @relation(fields: [categoryId], references: [id])
+  sizeGuide      SizeGuide?       @relation(fields: [sizeGuideId], references: [id], onDelete: SetNull)
+  careGuide      CareGuide?       @relation(fields: [careGuideId], references: [id], onDelete: SetNull)
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
+  packItems      PackItem[]
+  stockMovements StockMovement[]
+  upsells        Upsell[]
+  wishlist       Wishlist[]
 
   @@index([categoryId])
   @@index([slug])
@@ -151,9 +152,9 @@ model ProductVariant {
   id        String  @id @default(cuid())
   productId String
   sku       String  @unique
-  color     String  // e.g., "Noir", "Blanc"
+  color     String // e.g., "Noir", "Blanc"
   colorHex  String? // e.g., "#000000"
-  size      String  // e.g., "S", "M", "L", "XL"
+  size      String // e.g., "S", "M", "L", "XL"
   stock     Int     @default(0)
   isActive  Boolean @default(true)
   // Marque cette variante comme un "ensemble" (bundle). Ses composants
@@ -164,8 +165,9 @@ model ProductVariant {
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
 
-  bundleComponents    ProductBundleComponent[] @relation("BundleVariant")
-  componentOfBundles  ProductBundleComponent[] @relation("ComponentVariant")
+  bundleComponents   ProductBundleComponent[] @relation("BundleVariant")
+  componentOfBundles ProductBundleComponent[] @relation("ComponentVariant")
+  stockMovements     StockMovement[]
 
   @@unique([productId, color, size])
   @@index([productId])
@@ -176,10 +178,10 @@ model ProductVariant {
 /// Quand un OrderItem avec bundleVariantId est vendu, on décrémente aussi
 /// chaque composantVariantId par (orderItem.quantity * quantity).
 model ProductBundleComponent {
-  id                  String @id @default(cuid())
-  bundleVariantId     String
-  componentVariantId  String
-  quantity            Int    @default(1)
+  id                 String @id @default(cuid())
+  bundleVariantId    String
+  componentVariantId String
+  quantity           Int    @default(1)
 
   bundleVariant    ProductVariant @relation("BundleVariant", fields: [bundleVariantId], references: [id], onDelete: Cascade)
   componentVariant ProductVariant @relation("ComponentVariant", fields: [componentVariantId], references: [id], onDelete: Cascade)
@@ -190,32 +192,91 @@ model ProductBundleComponent {
   @@map("product_bundle_components")
 }
 
+// ==================== STOCK HISTORY ====================
+
+/// AUTO   = mouvement déclenché par le système (commande, annulation, remboursement…)
+/// MANUAL = mouvement fait à la main par un admin (ajustement, édition fiche produit)
+enum StockMovementSource {
+  AUTO
+  MANUAL
+}
+
+enum StockMovementReason {
+  ORDER // Commande passée → stock retiré
+  ORDER_CANCELLED // Commande annulée / paiement échoué / session expirée → stock remis
+  ORDER_REFUNDED // Remboursement → stock remis
+  MANUAL_ADJUSTMENT // Ajustement manuel depuis la page Stock
+  PRODUCT_EDIT // Stock modifié depuis la fiche produit
+  INITIAL // Stock de départ (reconstitué lors de l'import de l'historique)
+}
+
+/// Historique de chaque modification de stock d'une variante (+1, -1, +2…).
+/// Les infos produit sont copiées pour rester lisibles même si la variante
+/// ou le produit est supprimé / recréé.
+model StockMovement {
+  id          String  @id @default(cuid())
+  variantId   String?
+  productId   String?
+  productName String
+  sku         String?
+  color       String?
+  size        String?
+
+  delta       Int // +2, -1, …
+  stockBefore Int?
+  stockAfter  Int?
+
+  source StockMovementSource
+  reason StockMovementReason
+
+  orderId     String?
+  orderNumber String?
+  userId      String? // Admin qui a fait le mouvement (MANUAL)
+  userName    String?
+  note        String?
+
+  // true = ligne reconstituée à partir des commandes existantes (import historique)
+  isBackfill Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order   Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([variantId, createdAt])
+  @@index([productId, createdAt])
+  @@index([orderId])
+  @@index([source])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
 // ==================== UPSELLS ====================
 
 model Upsell {
-  id              String   @id @default(cuid())
-  name            String
-  nameEn          String?
-  description     String?
-  descriptionEn   String?
-  productId       String
-  product         Product  @relation(fields: [productId], references: [id])
-  triggerType     String   // "cart_total" | "product_in_cart" | "category_in_cart"
-  triggerValue    String   // e.g. "100" for cart total, product ID, or category slug
-  displayLocation String   // "cart" | "checkout" | "product_page"
-  discountType    String?  // "percentage" | "fixed" | "free"
-  discountValue   Decimal? @db.Decimal(10, 2)
-  freeThreshold   Decimal? @db.Decimal(10, 2) // cart total at which it becomes FREE
+  id                     String   @id @default(cuid())
+  name                   String
+  nameEn                 String?
+  description            String?
+  descriptionEn          String?
+  productId              String
+  product                Product  @relation(fields: [productId], references: [id])
+  triggerType            String // "cart_total" | "product_in_cart" | "category_in_cart"
+  triggerValue           String // e.g. "100" for cart total, product ID, or category slug
+  displayLocation        String // "cart" | "checkout" | "product_page"
+  discountType           String? // "percentage" | "fixed" | "free"
+  discountValue          Decimal? @db.Decimal(10, 2)
+  freeThreshold          Decimal? @db.Decimal(10, 2) // cart total at which it becomes FREE
   // Produits requis dans le panier pour que l'upsell devienne gratuit (liste d'IDs).
   // Vide = aucune contrainte produit (seul freeThreshold s'applique).
   freeRequiredProductIds String[] @default([])
-  message         String?
-  messageEn       String?
-  image           String?
-  isActive        Boolean  @default(true)
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  message                String?
+  messageEn              String?
+  image                  String?
+  isActive               Boolean  @default(true)
+  sortOrder              Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([isActive, sortOrder])
   @@index([productId])
@@ -242,20 +303,20 @@ enum PaymentStatus {
 }
 
 enum DeliveryMethod {
-  DELIVERY      // Standard home delivery
-  RELAY         // Relay point pickup
+  DELIVERY // Standard home delivery
+  RELAY // Relay point pickup
   HAND_DELIVERY // Hand-to-hand (friends only)
 }
 
 model Order {
-  id              String         @id @default(cuid())
-  orderNumber     String         @unique
-  userId          String?
-  addressId       String?
+  id          String  @id @default(cuid())
+  orderNumber String  @unique
+  userId      String?
+  addressId   String?
 
   // Customer info (copied for historical purposes)
-  customerEmail   String
-  customerPhone   String?
+  customerEmail     String
+  customerPhone     String?
   customerFirstName String
   customerLastName  String
 
@@ -267,54 +328,55 @@ model Order {
 
   // Billing address (the real customer home — always the person, never a relay)
   // Used on the invoice's "FACTURÉ À" block.
-  billingStreet      String?
-  billingCity        String?
-  billingPostalCode  String?
-  billingCountry     String?
+  billingStreet     String?
+  billingCity       String?
+  billingPostalCode String?
+  billingCountry    String?
 
   // Relay point info (for RELAY delivery)
-  relayCarrier       String?  // mondial_relay, colissimo, chronopost, ups
-  relayPointCode     String?  // Boxtal parcelshop code
-  relayPointName     String?  // Relay point name
-  relayPointAddress  String?  // Relay point address
+  relayCarrier      String? // mondial_relay, colissimo, chronopost, ups
+  relayPointCode    String? // Boxtal parcelshop code
+  relayPointName    String? // Relay point name
+  relayPointAddress String? // Relay point address
 
   // Amounts
-  subtotal        Decimal        @db.Decimal(10, 2)
-  shippingCost    Decimal        @db.Decimal(10, 2)
-  discount        Decimal        @default(0) @db.Decimal(10, 2)
-  total           Decimal        @db.Decimal(10, 2)
+  subtotal     Decimal @db.Decimal(10, 2)
+  shippingCost Decimal @db.Decimal(10, 2)
+  discount     Decimal @default(0) @db.Decimal(10, 2)
+  total        Decimal @db.Decimal(10, 2)
 
   // Status
-  status          OrderStatus    @default(PENDING)
-  paymentStatus   PaymentStatus  @default(PENDING)
-  deliveryMethod  DeliveryMethod @default(DELIVERY)
+  status         OrderStatus    @default(PENDING)
+  paymentStatus  PaymentStatus  @default(PENDING)
+  deliveryMethod DeliveryMethod @default(DELIVERY)
 
   // Payment
-  stripeSessionId   String?
-  stripePaymentId   String?
+  stripeSessionId String?
+  stripePaymentId String?
 
   // Promo
-  promoCodeId     String?
-  promoCode       PromoCode?     @relation(fields: [promoCodeId], references: [id])
+  promoCodeId String?
+  promoCode   PromoCode? @relation(fields: [promoCodeId], references: [id])
 
   // Tracking
-  trackingNumber  String?
-  trackingUrl     String?
-  shippedAt       DateTime?
-  deliveredAt     DateTime?
+  trackingNumber String?
+  trackingUrl    String?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
 
   // Notes
-  customerNotes   String?
-  adminNotes      String?
+  customerNotes String?
+  adminNotes    String?
 
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user       User?       @relation(fields: [userId], references: [id])
-  address    Address?    @relation(fields: [addressId], references: [id])
-  items      OrderItem[]
-  shipment   Shipment?
+  user           User?           @relation(fields: [userId], references: [id])
+  address        Address?        @relation(fields: [addressId], references: [id])
+  items          OrderItem[]
+  shipment       Shipment?
+  stockMovements StockMovement[]
 
   @@index([userId])
   @@index([orderNumber])
@@ -324,16 +386,16 @@ model Order {
 }
 
 model OrderItem {
-  id         String  @id @default(cuid())
-  orderId    String
-  productId  String
-  variantId  String?
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  variantId String?
 
   // Copied product info (for historical purposes)
-  productName  String
-  productSku   String
-  color        String?
-  size         String?
+  productName String
+  productSku  String
+  color       String?
+  size        String?
 
   quantity   Int
   unitPrice  Decimal @db.Decimal(10, 2)
@@ -351,30 +413,30 @@ model OrderItem {
 // ==================== PROMO CODES ====================
 
 enum PromoType {
-  PERCENTAGE  // e.g., 20% off
-  FIXED       // e.g., 10€ off
+  PERCENTAGE // e.g., 20% off
+  FIXED // e.g., 10€ off
   FREE_SHIPPING
   PER_TRANCHE // e.g., 5€ off per 100€ tranche (dynamic)
 }
 
 model PromoCode {
-  id              String    @id @default(cuid())
-  code            String    @unique
-  type            PromoType
-  value           Decimal   @db.Decimal(10, 2) // Percentage, fixed amount, or discount per tranche
-  trancheSize     Decimal?  @db.Decimal(10, 2) // For PER_TRANCHE: cart amount step (e.g. 100€)
-  minPurchase     Decimal?  @db.Decimal(10, 2) // Minimum cart value
-  maxDiscount     Decimal?  @db.Decimal(10, 2) // Maximum discount (for percentage / per-tranche cap)
-  maxUses         Int?      // Total uses allowed
-  maxUsesPerUser  Int?      // Uses per user
-  usedCount       Int       @default(0)
-  validFrom       DateTime  @default(now())
-  validUntil      DateTime?
-  isActive        Boolean   @default(true)
-  stripeCouponId  String?   // Stripe Coupon ID for sync
-  stripePromoId   String?   // Stripe Promotion Code ID
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  code           String    @unique
+  type           PromoType
+  value          Decimal   @db.Decimal(10, 2) // Percentage, fixed amount, or discount per tranche
+  trancheSize    Decimal?  @db.Decimal(10, 2) // For PER_TRANCHE: cart amount step (e.g. 100€)
+  minPurchase    Decimal?  @db.Decimal(10, 2) // Minimum cart value
+  maxDiscount    Decimal?  @db.Decimal(10, 2) // Maximum discount (for percentage / per-tranche cap)
+  maxUses        Int? // Total uses allowed
+  maxUsesPerUser Int? // Uses per user
+  usedCount      Int       @default(0)
+  validFrom      DateTime  @default(now())
+  validUntil     DateTime?
+  isActive       Boolean   @default(true)
+  stripeCouponId String? // Stripe Coupon ID for sync
+  stripePromoId  String? // Stripe Promotion Code ID
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   orders Order[]
 
@@ -389,7 +451,7 @@ model Pack {
   slug        String   @unique
   description String?
   price       Decimal  @db.Decimal(10, 2) // Pack price (discounted)
-  image       String?  // Legacy: kept for backward compatibility, prefer `images`
+  image       String? // Legacy: kept for backward compatibility, prefer `images`
   images      String[] @default([]) // Gallery of pack images
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -431,23 +493,23 @@ enum TicketPriority {
 }
 
 model Ticket {
-  id           String         @id @default(cuid())
-  ticketNumber String         @unique
-  userId       String?        // Optional - null for guest tickets
-  orderId      String?        // Optional link to order
+  id           String  @id @default(cuid())
+  ticketNumber String  @unique
+  userId       String? // Optional - null for guest tickets
+  orderId      String? // Optional link to order
 
   // Guest ticket info (when no user account)
-  guestEmail   String?
-  guestName    String?
+  guestEmail String?
+  guestName  String?
 
-  subject      String
-  message      String
-  status       TicketStatus   @default(OPEN)
-  priority     TicketPriority @default(MEDIUM)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  subject   String
+  message   String
+  status    TicketStatus   @default(OPEN)
+  priority  TicketPriority @default(MEDIUM)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
-  user    User?          @relation(fields: [userId], references: [id])
+  user    User?         @relation(fields: [userId], references: [id])
   replies TicketReply[]
 
   @@index([userId])
@@ -488,8 +550,8 @@ model Setting {
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
-  action    String   // e.g., "ORDER_CREATED", "PRODUCT_UPDATED"
-  entity    String   // e.g., "Order", "Product"
+  action    String // e.g., "ORDER_CREATED", "PRODUCT_UPDATED"
+  entity    String // e.g., "Order", "Product"
   entityId  String?
   oldData   Json?
   newData   Json?
@@ -533,14 +595,14 @@ enum NotificationType {
 }
 
 model AdminNotification {
-  id          String           @id @default(cuid())
-  type        NotificationType
-  title       String
-  message     String
-  data        Json?            // Additional data (orderId, userId, etc.)
-  isRead      Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  readAt      DateTime?
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  data      Json? // Additional data (orderId, userId, etc.)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  readAt    DateTime?
 
   @@index([isRead])
   @@index([type])
@@ -551,47 +613,47 @@ model AdminNotification {
 // ==================== POPUPS ====================
 
 enum PopupType {
-  NEWSLETTER      // Newsletter signup
-  DELIVERY_ISSUE  // Delivery delay or issue notification
-  NEW_DROP        // New products / drop announcement
+  NEWSLETTER // Newsletter signup
+  DELIVERY_ISSUE // Delivery delay or issue notification
+  NEW_DROP // New products / drop announcement
 }
 
 model Popup {
-  id           String    @id @default(cuid())
-  type         PopupType
-  isActive     Boolean   @default(false)
+  id       String    @id @default(cuid())
+  type     PopupType
+  isActive Boolean   @default(false)
 
   // Titles (bilingual)
-  titleFr      String
-  titleEn      String
+  titleFr String
+  titleEn String
 
   // Subtitles (bilingual)
-  subtitleFr   String?
-  subtitleEn   String?
+  subtitleFr String?
+  subtitleEn String?
 
   // Button text (bilingual)
   buttonTextFr String?
   buttonTextEn String?
 
   // Additional content (bilingual) - for announcements, descriptions
-  contentFr    String?
-  contentEn    String?
+  contentFr String?
+  contentEn String?
 
   // Optional image (URL ou chemin /uploads/...) affichée dans la popup
   // Legacy: kept for backward compatibility, prefer `images`
-  image        String?
+  image  String?
   // Gallery of popup images (carousel)
-  images       String[] @default([])
+  images String[] @default([])
 
   // Optional link (e.g., for "Shop Now" button)
-  linkUrl      String?
+  linkUrl String?
 
   // Display settings
-  showDelay    Int       @default(5000)  // Delay in ms before showing popup
-  showOnce     Boolean   @default(true)  // Show only once per session
+  showDelay Int     @default(5000) // Delay in ms before showing popup
+  showOnce  Boolean @default(true) // Show only once per session
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([type])
   @@index([isActive])
@@ -601,15 +663,15 @@ model Popup {
 // ==================== NEWSLETTER ====================
 
 model NewsletterSubscriber {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  firstName    String?
-  lastName     String?
-  isActive     Boolean  @default(true)
-  source       String   @default("popup")  // popup, checkout, footer, etc.
-  userId       String?  // Optional link to user account
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String?
+  lastName  String?
+  isActive  Boolean  @default(true)
+  source    String   @default("popup") // popup, checkout, footer, etc.
+  userId    String? // Optional link to user account
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([isActive])
@@ -619,23 +681,23 @@ model NewsletterSubscriber {
 // ==================== CONTESTS ====================
 
 model Contest {
-  id              String   @id @default(cuid())
-  number          String   @unique // "01", "02", etc.
-  prizeName       String
-  prizeNameEn     String?
-  prizeValue      Decimal  @db.Decimal(10, 2)
-  prizeImage      String?
-  purchaseAmount  Decimal  @db.Decimal(10, 2) // Minimum purchase to enter
-  description     String?
-  descriptionEn   String?
-  isActive        Boolean  @default(true)
-  startDate       DateTime @default(now())
-  endDate         DateTime?
-  winnerId        String?  // User who won
-  winnerOrderId   String?  // Order that won
-  drawnAt         DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String    @id @default(cuid())
+  number         String    @unique // "01", "02", etc.
+  prizeName      String
+  prizeNameEn    String?
+  prizeValue     Decimal   @db.Decimal(10, 2)
+  prizeImage     String?
+  purchaseAmount Decimal   @db.Decimal(10, 2) // Minimum purchase to enter
+  description    String?
+  descriptionEn  String?
+  isActive       Boolean   @default(true)
+  startDate      DateTime  @default(now())
+  endDate        DateTime?
+  winnerId       String? // User who won
+  winnerOrderId  String? // Order that won
+  drawnAt        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   entries ContestEntry[]
 
@@ -644,19 +706,19 @@ model Contest {
 }
 
 model ContestEntry {
-  id        String   @id @default(cuid())
-  contestId String
+  id             String   @id @default(cuid())
+  contestId      String
   // userId et orderId sont optionnels pour permettre l'ajout manuel
   // (personnes ayant acheté hors site, saisies par l'admin).
-  userId    String?
-  orderId   String?
-  orderTotal Decimal? @db.Decimal(10, 2) // Stored for reference
+  userId         String?
+  orderId        String?
+  orderTotal     Decimal? @db.Decimal(10, 2) // Stored for reference
   // Champs pour les participations ajoutées manuellement par l'admin
   manualName     String?
   manualEmail    String?
   manualNote     String?
   addedByAdminId String?
-  createdAt DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
 
@@ -684,18 +746,18 @@ model MarqueeMessage {
 // ==================== NEWSLETTER CAMPAIGNS ====================
 
 model NewsletterCampaign {
-  id           String   @id @default(cuid())
-  subject      String
-  subjectEn    String?
-  contentHtml  String   @db.Text
-  contentHtmlEn String? @db.Text
-  sentAt       DateTime?
-  sentCount    Int      @default(0)
-  openCount    Int      @default(0)
-  clickCount   Int      @default(0)
-  status       String   @default("draft") // draft, sending, sent
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(cuid())
+  subject       String
+  subjectEn     String?
+  contentHtml   String    @db.Text
+  contentHtmlEn String?   @db.Text
+  sentAt        DateTime?
+  sentCount     Int       @default(0)
+  openCount     Int       @default(0)
+  clickCount    Int       @default(0)
+  status        String    @default("draft") // draft, sending, sent
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([status])
   @@map("newsletter_campaigns")
@@ -705,12 +767,12 @@ model NewsletterCampaign {
 
 model SizeGuide {
   id           String   @id @default(cuid())
-  categorySlug String   // e.g., "vestes", "tshirts", "pantalons", "accessoires"
-  nameFr       String   // e.g., "Vestes"
-  nameEn       String   // e.g., "Jackets"
-  tipsFr       String?  // Fitting tips FR
-  tipsEn       String?  // Fitting tips EN
-  sizes        Json     // Array of { size: "S", chest: "96", waist: "84", hips: "92", length: "68", shoulders: "46" }
+  categorySlug String // e.g., "vestes", "tshirts", "pantalons", "accessoires"
+  nameFr       String // e.g., "Vestes"
+  nameEn       String // e.g., "Jackets"
+  tipsFr       String? // Fitting tips FR
+  tipsEn       String? // Fitting tips EN
+  sizes        Json // Array of { size: "S", chest: "96", waist: "84", hips: "92", length: "68", shoulders: "46" }
   unit         String   @default("cm") // "cm" or "inches"
   sortOrder    Int      @default(0)
   isActive     Boolean  @default(true)
@@ -728,12 +790,12 @@ model SizeGuide {
 
 model CareGuide {
   id             String   @id @default(cuid())
-  categorySlug   String   // e.g., "vestes", "tshirts"
+  categorySlug   String // e.g., "vestes", "tshirts"
   nameFr         String
   nameEn         String
   instructionsFr String   @db.Text // Rich care instructions FR
   instructionsEn String   @db.Text // Rich care instructions EN
-  iconSymbols    Json?    // Array of { symbol: "wash-30", labelFr: "Lavage 30°C", labelEn: "Wash 30°C" }
+  iconSymbols    Json? // Array of { symbol: "wash-30", labelFr: "Lavage 30°C", labelEn: "Wash 30°C" }
   sortOrder      Int      @default(0)
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -749,20 +811,20 @@ model CareGuide {
 // ==================== SHIPPING (BOXTAL) ====================
 
 model Shipment {
-  id              String   @id @default(cuid())
-  orderId         String   @unique
-  boxtalReference String?  // Boxtal shipment reference
-  carrier         String?  // Carrier name (Mondial Relay, Colissimo, etc.)
+  id              String    @id @default(cuid())
+  orderId         String    @unique
+  boxtalReference String? // Boxtal shipment reference
+  carrier         String? // Carrier name (Mondial Relay, Colissimo, etc.)
   trackingNumber  String?
   trackingUrl     String?
-  labelUrl        String?  // URL to download shipping label
-  status          String   @default("pending") // pending, created, shipped, delivered
-  weight          Decimal? @db.Decimal(10, 3) // Weight in kg
-  dimensions      Json?    // { length, width, height }
+  labelUrl        String? // URL to download shipping label
+  status          String    @default("pending") // pending, created, shipped, delivered
+  weight          Decimal?  @db.Decimal(10, 3) // Weight in kg
+  dimensions      Json? // { length, width, height }
   shippedAt       DateTime?
   deliveredAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -777,7 +839,7 @@ model CartSnapshot {
   id        String   @id @default(cuid())
   sessionId String
   userId    String?
-  items     Json     // Array of cart items with product details
+  items     Json // Array of cart items with product details
   total     Decimal  @default(0) @db.Decimal(10, 2)
   itemCount Int      @default(0)
   createdAt DateTime @default(now())

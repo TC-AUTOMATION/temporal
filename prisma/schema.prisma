@@ -417,6 +417,7 @@ enum PromoType {
   FIXED // e.g., 10€ off
   FREE_SHIPPING
   PER_TRANCHE // e.g., 5€ off per 100€ tranche (dynamic)
+  TIERED // Paliers conditionnels : ex. ensemble au panier → -20 %, sinon -15 % (sur toute la commande)
 }
 
 model PromoCode {
@@ -435,6 +436,12 @@ model PromoCode {
   isActive       Boolean   @default(true)
   stripeCouponId String? // Stripe Coupon ID for sync
   stripePromoId  String? // Stripe Promotion Code ID
+  // Promo appliquée automatiquement (sans saisir de code) entre validFrom et validUntil
+  isAutomatic    Boolean   @default(false)
+  // Nom affiché au client (ex: "Black Friday")
+  name           String?
+  // TIERED : [{ condition: ANY|PACK|CATEGORY|PRODUCT, targets: string[], percent: number }]
+  rules          Json?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

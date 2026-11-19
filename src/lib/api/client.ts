@@ -449,7 +449,7 @@ export const promo = {
     });
   },
 
-  validate: async (code: string, cartTotal: number) => {
+  validate: async (code: string, cartTotal: number, items?: { productId: string; quantity: number }[]) => {
     return request<{
       valid: boolean;
       code: string;
@@ -459,7 +459,21 @@ export const promo = {
       newTotal: number;
     }>('/promo/validate', {
       method: 'POST',
-      body: JSON.stringify({ code, cartTotal }),
+      body: JSON.stringify({ code, cartTotal, items }),
+    });
+  },
+
+  /** Promo automatique en cours pour ce panier (ex. Black Friday), ou null */
+  auto: async (cartTotal: number, items: { productId: string; quantity: number }[]) => {
+    return request<{
+      code: string;
+      name: string;
+      discount: number;
+      discountLabel: string;
+      validUntil: string | null;
+    } | null>('/promo/auto', {
+      method: 'POST',
+      body: JSON.stringify({ cartTotal, items }),
     });
   },
 };

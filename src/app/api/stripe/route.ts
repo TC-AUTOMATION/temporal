@@ -6,6 +6,7 @@ import { getCurrentUser, generateOrderNumber } from '@/lib/auth/jwt';
 import { Prisma } from '@prisma/client';
 import { getGaugeConfig, getFreeShippingThreshold } from '@/lib/gauge';
 import { decrementStockWithHistory, incrementStockWithHistory } from '@/lib/stock';
+import { resolveOrderPromo } from '@/lib/promo';
 
 type DecimalType = Prisma.Decimal;
 const DecimalCtor = Prisma.Decimal;
@@ -211,69 +212,20 @@ export async function POST(request: NextRequest) {
           : 'Livraison offerte';
       }
 
-      // Validate promo code (but do NOT increment usedCount - that happens on payment confirmation)
-      let discount = new DecimalCtor(0);
-      let promoCodeId: string | undefined;
-
-      if (data.promoCode) {
-        const promo = await tx.promoCode.findUnique({
-          where: { code: data.promoCode.toUpperCase() },
-        });
-
-        if (promo && promo.isActive) {
-          const now = new Date();
-          const validFrom = promo.validFrom || new Date(0);
-          const validUntil = promo.validUntil || new Date('2099-12-31');
-
-          if (now >= validFrom && now <= validUntil) {
-            if (!promo.maxUses || promo.usedCount < promo.maxUses) {
-              // Check per-user limit if user is authenticated
-              if (promo.maxUsesPerUser && user?.id) {
-                const userUsageCount = await tx.order.count({
-                  where: {
-                    userId: user.id,
-                    promoCodeId: promo.id,
-                    paymentStatus: { in: ['PAID', 'PENDING'] },
-                  },
-                });
-                if (userUsageCount >= promo.maxUsesPerUser) {
-                  throw new Error('Vous avez déjà utilisé ce code promo le nombre maximum de fois');
-                }
-              }
-
-              if (!promo.minPurchase || subtotal.gte(promo.minPurchase)) {
-                promoCodeId = promo.id;
-
-                if (promo.type === 'PERCENTAGE') {
-                  discount = subtotal.mul(promo.value).div(100);
-                  if (promo.maxDiscount && discount.gt(promo.maxDiscount)) {
-                    discount = new DecimalCtor(promo.maxDiscount.toString());
-                  }
-                } else if (promo.type === 'FIXED') {
-                  discount = new DecimalCtor(promo.value.toString());
-                } else if (promo.type === 'FREE_SHIPPING') {
-                  discount = shippingCost;
-                } else if (promo.type === 'PER_TRANCHE') {
-                  const trancheSize = promo.trancheSize
-                    ? new DecimalCtor(promo.trancheSize.toString())
-                    : new DecimalCtor(100);
-                  const tranches = Math.floor(Number(subtotal.div(trancheSize)));
-                  discount = new DecimalCtor(tranches).mul(promo.value);
-                  if (promo.maxDiscount && discount.gt(promo.maxDiscount)) {
-                    discount = new DecimalCtor(promo.maxDiscount.toString());
-                  }
-                  if (discount.gt(subtotal)) {
-                    discount = subtotal;
-                  }
-                }
-
-                // NOTE: usedCount is incremented in webhook handleCheckoutCompleted
-                // This prevents promo from being "used" if payment never completes
-              }
-            }
-          }
-        }
-      }
+      // Promo : code saisi OU promo automatique (ex. Black Friday), la plus avantageuse.
+      // usedCount n'est PAS incrémenté ici (seulement à la confirmation du paiement, webhook).
+      const promoResult = await resolveOrderPromo(tx, {
+        code: data.promoCode,
+        userId: user?.id,
+        ctx: {
+          subtotal,
+          shippingCost,
+          lines: orderItems.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        },
+      });
+      const discount = promoResult?.discount ?? new DecimalCtor(0);
+      const promoCodeId: string | undefined = promoResult?.promo.id;
+      const promoLabel = promoResult ? (promoResult.promo.name || promoResult.promo.code) : undefined;
 
       const total = subtotal.add(shippingCost).sub(discount);
 
@@ -343,7 +295,7 @@ export async function POST(request: NextRequest) {
         'Stock insuffisant (mis à jour par une autre commande)'
       );
 
-      return { order, lineItems, discount, orderNumber, variantsToDecrement, promoCodeId };
+      return { order, lineItems, discount, orderNumber, variantsToDecrement, promoCodeId, promoLabel };
     });
 
     // Add shipping to Stripe if applicable
@@ -376,7 +328,7 @@ export async function POST(request: NextRequest) {
           },
           ...(result.discount.gt(0) ? {
             discounts: [{
-              coupon: await createStripeCoupon(stripe, result.discount, data.promoCode || 'PROMO'),
+              coupon: await createStripeCoupon(stripe, result.discount, result.promoLabel || data.promoCode || 'PROMO'),
             }],
           } : {}),
           success_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin')}/checkout?success=true&order=${result.orderNumber}`,

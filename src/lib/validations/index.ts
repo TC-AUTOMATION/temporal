@@ -130,7 +130,7 @@ export const updateOrderStatusSchema = z.object({
 
 export const promoCodeSchema = z.object({
   code: z.string().min(1, 'Code requis').max(50).toUpperCase(),
-  type: z.enum(['PERCENTAGE', 'FIXED', 'FREE_SHIPPING', 'PER_TRANCHE']),
+  type: z.enum(['PERCENTAGE', 'FIXED', 'FREE_SHIPPING', 'PER_TRANCHE', 'TIERED']),
   value: z.number().positive('Valeur invalide'),
   trancheSize: z.number().positive().optional(),
   minPurchase: z.number().positive().optional(),
@@ -145,9 +145,21 @@ export const promoCodeSchema = z.object({
   { message: 'trancheSize requis pour PER_TRANCHE', path: ['trancheSize'] }
 );
 
+const promoCartItemsSchema = z.array(z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().positive(),
+})).max(100).optional();
+
 export const validatePromoCodeSchema = z.object({
   code: z.string().min(1).max(50),
   cartTotal: z.number().positive(),
+  // Articles du panier (requis pour les promos à paliers)
+  items: promoCartItemsSchema,
+});
+
+export const autoPromoSchema = z.object({
+  cartTotal: z.number().nonnegative(),
+  items: promoCartItemsSchema,
 });
 
 // ==================== TICKET ====================

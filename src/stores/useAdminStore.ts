@@ -61,6 +61,8 @@ export interface AdminProduct {
   updatedAt: string;
   totalStock: number;
   sku: string;
+  /** Variantes réelles (pour l'ajustement rapide du stock depuis la fiche) */
+  variants?: { id: string; color: string; colorHex: string | null; size: string; stock: number }[];
 }
 
 export interface OrderItem {
@@ -332,6 +334,13 @@ function apiProductToAdmin(p: ApiProduct): AdminProduct {
     updatedAt: new Date().toISOString(),
     totalStock: p.variants.reduce((sum, v) => sum + v.stock, 0),
     sku: p.sku,
+    variants: p.variants.map((v) => ({
+      id: v.id,
+      color: v.color,
+      colorHex: v.colorHex || null,
+      size: v.size,
+      stock: v.stock,
+    })),
   };
 }
 
@@ -785,7 +794,8 @@ export const useAdminStore = create<AdminState>()(
         set({ isLoading: true, error: null });
         try {
           const promos = await promoApi.list();
-          const adminPromos = promos.map(apiPromoToAdmin);
+          // Les promos à paliers (TIERED) sont gérées dans leur propre section
+          const adminPromos = promos.filter((p) => (p.type as string) !== 'TIERED').map(apiPromoToAdmin);
           set({ promoCodes: adminPromos, isLoading: false });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Erreur lors du chargement des codes promo';

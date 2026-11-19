@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useAdminStore, AdminProduct } from '@/stores/useAdminStore';
 import { useStore } from '@/stores/useStore';
 import Link from 'next/link';
+import QuickStock from './QuickStock';
 import {
   Plus,
   Search,
@@ -1085,6 +1086,9 @@ export default function ProductsPage() {
                     </span>
                   )}
                 </div>
+
+                {/* Stock rapide : − / + / saisie, enregistré dans l'historique */}
+                <QuickStock product={product} darkMode={darkMode} />
               </div>
             </div>
           </div>

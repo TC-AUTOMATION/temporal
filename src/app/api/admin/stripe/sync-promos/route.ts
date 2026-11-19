@@ -28,7 +28,8 @@ export async function POST() {
     if (!user.isAdmin) return forbiddenResponse();
 
     const stripe = getStripe();
-    const promoCodes = await prisma.promoCode.findMany();
+    // Les promos à paliers (TIERED) sont calculées dynamiquement au checkout : pas de coupon Stripe fixe
+    const promoCodes = await prisma.promoCode.findMany({ where: { type: { not: 'TIERED' } } });
 
     const results: Array<{
       code: string;

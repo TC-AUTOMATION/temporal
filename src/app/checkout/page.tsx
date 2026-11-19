@@ -73,6 +73,8 @@ function CheckoutContent() {
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
+  // Promo automatique en cours (ex. Black Friday) — appliquée sans code
+  const [autoPromo, setAutoPromo] = useState<{ name: string; discount: number; discountLabel: string } | null>(null);
   const [newsletter, setNewsletter] = useState(true);
   const [createAccount, setCreateAccount] = useState(true);
   const [showHandDeliveryConfirm, setShowHandDeliveryConfirm] = useState(false);
@@ -243,7 +245,10 @@ function CheckoutContent() {
   const shippingCost = getShippingCost();
   const shippingIsFree =
     freeShippingThreshold != null && total >= freeShippingThreshold;
-  const finalTotal = Math.round(Math.max(0, total + shippingCost - promoDiscount) * 100) / 100;
+  // Code saisi et promo automatique ne se cumulent pas : la plus avantageuse s'applique
+  const autoWins = !!autoPromo && autoPromo.discount > promoDiscount;
+  const effectiveDiscount = autoWins ? autoPromo!.discount : promoDiscount;
+  const finalTotal = Math.round(Math.max(0, total + shippingCost - effectiveDiscount) * 100) / 100;
 
   // Get carrier info helper
   const getCarrierInfo = (carrierId: RelayCarrier) => {
@@ -264,7 +269,11 @@ function CheckoutContent() {
     setPromoMessage('');
 
     try {
-      const result = await promoApi.validate(promoCode, total);
+      const result = await promoApi.validate(
+        promoCode,
+        total,
+        cartItems.map((i) => ({ productId: i.id, quantity: i.quantity }))
+      );
       if (result.valid) {
         setPromoDiscount(result.discount);
         setPromoMessage(`${result.discountLabel} applied!`);
@@ -277,6 +286,27 @@ function CheckoutContent() {
       setPromoLoading(false);
     }
   };
+
+  // Récupère la promo automatique active pour le panier courant
+  const autoPromoKey = cartItems.map((i) => `${i.id}:${i.quantity}`).join('|') + `|${total}`;
+  useEffect(() => {
+    if (cartItems.length === 0 || total <= 0) {
+      setAutoPromo(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      promoApi
+        .auto(total, cartItems.map((i) => ({ productId: i.id, quantity: i.quantity })))
+        .then((r) => { if (!cancelled) setAutoPromo(r); })
+        .catch(() => { if (!cancelled) setAutoPromo(null); });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPromoKey]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -495,6 +525,16 @@ function CheckoutContent() {
               {promoMessage}
             </p>
           )}
+          {autoPromo && (
+            <div className="mt-2 flex items-center gap-2 text-[10px] sm:text-xs text-green-500">
+              <Zap size={12} className="flex-shrink-0" />
+              <span>
+                {autoPromo.discountLabel} — {language === 'fr' ? 'appliqué automatiquement' : 'applied automatically'}
+                {promoDiscount > 0 && !autoWins && (language === 'fr' ? ' (votre code est plus avantageux)' : ' (your code is better)')}
+                {promoDiscount > 0 && autoWins && (language === 'fr' ? ' (non cumulable, plus avantageux que votre code)' : ' (not cumulative, better than your code)')}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Totals */}
@@ -509,11 +549,11 @@ function CheckoutContent() {
               {deliveryMethod ? (shippingCost === 0 ? t.free.toUpperCase() : `${Number(shippingCost).toFixed(2)}€`) : '—'}
             </span>
           </div>
-          {promoDiscount > 0 && (
+          {effectiveDiscount > 0 && (
             <div className="flex justify-between items-center text-xs sm:text-sm">
-              <span className="text-green-500">{t.discount}</span>
+              <span className="text-green-500">{autoWins ? autoPromo!.name : t.discount}</span>
               <span className="text-green-500 font-bold" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
-                -{Number(promoDiscount).toFixed(2)}€
+                -{Number(effectiveDiscount).toFixed(2)}€
               </span>
             </div>
           )}

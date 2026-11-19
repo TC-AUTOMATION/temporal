@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import TieredPromos from './TieredPromos';
 
 export default function PromosPage() {
   const { darkMode, language } = useStore();
@@ -172,6 +173,9 @@ export default function PromosPage() {
 
   return (
     <div className="space-y-6">
+      {/* Promos automatiques / à paliers (ex. Black Friday) */}
+      <TieredPromos darkMode={darkMode} />
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
